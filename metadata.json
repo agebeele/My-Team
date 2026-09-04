@@ -1,0 +1,10 @@
+{
+  "name": "TeamGol - App de Equipo de Fútbol",
+  "description": "App para gestión de equipo de fútbol con roles de dueño y jugador, calendario, tabla de goleo y general, convocatoria gráfica, votación y cámara automática de MVP, alineación táctica interactiva, muro social, y exportación de resultados a PDF.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
