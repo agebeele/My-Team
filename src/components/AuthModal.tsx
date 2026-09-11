@@ -37,33 +37,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-[#141416] border border-white/10 w-full max-w-md rounded-xl shadow-2xl p-6 space-y-5 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+      <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-5 relative text-[#050505] dark:text-white">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 transition-colors"
+          className="absolute top-4 right-4 p-2 rounded-xl text-[#65676B] hover:text-[#050505] dark:text-gray-400 dark:hover:text-white bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
 
         <div className="text-center space-y-1">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/30">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-[#1877F2]/20 text-[#1877F2] flex items-center justify-center mx-auto border border-[#1877F2]/30 shadow-xs">
             <Lock className="w-6 h-6" />
           </div>
-          <h3 className="text-xl font-bold text-white">
+          <h3 className="text-xl font-black text-[#050505] dark:text-white">
             {t.auth.login} / Cambiar Perfil
           </h3>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-[#65676B] dark:text-gray-400 font-medium">
             {t.auth.socialAuthDesc}
           </p>
         </div>
 
         {/* Social Login Options */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {/* Google Login */}
           <button
             onClick={() => handleSocialLogin('Google')}
-            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-lg bg-white hover:bg-gray-100 text-black font-bold text-xs shadow-sm transition-all"
+            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl bg-white hover:bg-gray-50 text-black font-bold text-xs border border-[#CED0D4] shadow-xs transition-all cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -89,7 +89,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Facebook Login */}
           <button
             onClick={() => handleSocialLogin('Facebook')}
-            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-lg bg-[#1877F2] hover:bg-[#166fe5] text-white font-bold text-xs shadow-sm transition-all"
+            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
           >
             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
@@ -99,8 +99,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Demo Fast Switch Profile */}
-        <div className="pt-3 border-t border-white/5 space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+        <div className="pt-3 border-t border-[#CED0D4]/70 dark:border-white/10 space-y-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#65676B] dark:text-gray-400 block">
             Seleccionar Cuenta de Prueba Rápida:
           </span>
 
@@ -114,10 +114,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     setCurrentUser(user);
                     onClose();
                   }}
-                  className={`w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all ${
+                  className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-white'
-                      : 'bg-black/40 border-white/5 hover:border-white/15 text-gray-300'
+                      ? 'bg-blue-50 dark:bg-emerald-500/10 border-[#1877F2]/40 dark:border-emerald-500/30 text-[#050505] dark:text-white'
+                      : 'bg-[#F0F2F5] dark:bg-black/40 border-[#CED0D4]/70 dark:border-white/5 hover:border-[#1877F2]/40 dark:hover:border-white/15 text-[#050505] dark:text-gray-300'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -125,23 +125,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       src={user.avatarUrl}
                       alt={user.name}
                       referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-white/10"
+                      className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"
                     />
                     <div className="min-w-0">
                       <span className="text-xs font-bold block truncate">
                         {user.name}
                       </span>
-                      <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                      <span className="text-[10px] text-[#65676B] dark:text-gray-400 flex items-center gap-1 font-medium">
                         {user.role === 'owner' ? (
-                          <span className="text-amber-400 font-semibold flex items-center gap-0.5">
+                          <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-0.5">
                             <Crown className="w-2.5 h-2.5" /> Dueño
                           </span>
                         ) : user.role === 'admin' ? (
-                          <span className="text-purple-400 font-semibold flex items-center gap-0.5">
+                          <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-0.5">
                             <Shield className="w-2.5 h-2.5" /> Admin
                           </span>
                         ) : (
-                          <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
+                          <span className="text-[#1877F2] dark:text-emerald-400 font-bold flex items-center gap-0.5">
                             <User className="w-2.5 h-2.5" /> Jugador
                           </span>
                         )}
@@ -151,7 +151,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
 
                   {isSelected && (
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <Check className="w-4 h-4 text-[#1877F2] dark:text-emerald-400 shrink-0" />
                   )}
                 </button>
               );

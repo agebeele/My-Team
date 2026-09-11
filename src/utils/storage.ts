@@ -14,6 +14,7 @@ import {
   INITIAL_STANDINGS,
   INITIAL_POSTS,
   INITIAL_USERS,
+  DEFAULT_LINEUP,
 } from '../data/initialData';
 
 const STORAGE_KEYS = {
@@ -38,10 +39,37 @@ export const loadInitialState = () => {
     const savedCurrentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     const savedLang = localStorage.getItem(STORAGE_KEYS.LANGUAGE) as Language | null;
 
+    const loadedTeam = savedTeam ? (JSON.parse(savedTeam) as TeamInfo) : INITIAL_TEAM;
+    if (loadedTeam.primaryColor === '#10B981') {
+      loadedTeam.primaryColor = '#1877F2';
+      loadedTeam.secondaryColor = '#0866FF';
+    }
+
+    const loadedMatches = savedMatches ? (JSON.parse(savedMatches) as Match[]) : INITIAL_MATCHES;
+    const normalizedMatches = loadedMatches.map((m) => {
+      let lineup = m.lineup;
+      if (!lineup || lineup.length !== 7) {
+        lineup = DEFAULT_LINEUP;
+      }
+      return {
+        ...m,
+        modality: 'fut7' as const,
+        lineup,
+      };
+    });
+
+    const loadedPlayers = savedPlayers ? (JSON.parse(savedPlayers) as Player[]) : INITIAL_PLAYERS;
+    // Ensure only the 7 starting players in DEFAULT_LINEUP have isStarter = true
+    const starterIds = new Set(DEFAULT_LINEUP.map((p) => p.playerId));
+    const normalizedPlayers = loadedPlayers.map((p) => ({
+      ...p,
+      isStarter: starterIds.has(p.id),
+    }));
+
     return {
-      team: savedTeam ? (JSON.parse(savedTeam) as TeamInfo) : INITIAL_TEAM,
-      players: savedPlayers ? (JSON.parse(savedPlayers) as Player[]) : INITIAL_PLAYERS,
-      matches: savedMatches ? (JSON.parse(savedMatches) as Match[]) : INITIAL_MATCHES,
+      team: loadedTeam,
+      players: normalizedPlayers,
+      matches: normalizedMatches,
       standings: savedStandings ? (JSON.parse(savedStandings) as StandingsRow[]) : INITIAL_STANDINGS,
       posts: savedPosts ? (JSON.parse(savedPosts) as Post[]) : INITIAL_POSTS,
       users: savedUsers ? (JSON.parse(savedUsers) as AppUser[]) : INITIAL_USERS,

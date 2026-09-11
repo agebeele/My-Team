@@ -27,6 +27,7 @@ import { StandingsAndScorers } from './components/StandingsAndScorers';
 import { SocialWall } from './components/SocialWall';
 import { PlayerProfileView } from './components/PlayerProfileView';
 import { OwnerAdminPanel } from './components/OwnerAdminPanel';
+import { LiveMatchMode } from './components/LiveMatchMode';
 import { AuthModal } from './components/AuthModal';
 
 export default function App() {
@@ -51,6 +52,25 @@ export default function App() {
     currentUser.playerId || initial.players?.[0]?.id || 'p1'
   );
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Dark Mode state: persist to localStorage & reflect on <html>
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('app_theme') === 'dark';
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('app_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('app_theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => !prev);
+  };
 
   // Auto-save changes to storage
   useEffect(() => {
@@ -78,13 +98,18 @@ export default function App() {
     setActiveTab('mvp');
   };
 
+  const handleStartLiveMatch = (matchId: string) => {
+    setSelectedMatchId(matchId);
+    setActiveTab('live_match');
+  };
+
   const handleViewPlayerProfile = (playerId: string) => {
     setSelectedPlayerId(playerId);
     setActiveTab('profile');
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-gray-100 flex flex-col selection:bg-emerald-500 selection:text-black">
+    <div className={`min-h-screen ${isDarkMode ? 'dark bg-[#18191A] text-white' : 'bg-[#F0F2F5] text-[#050505]'} flex flex-col selection:bg-[#1877F2] selection:text-white transition-colors duration-200`}>
       {/* Top Main Navigation Bar */}
       <Navbar
         team={team}
@@ -93,9 +118,12 @@ export default function App() {
         allUsers={users}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        hasLiveMatch={matches.some((m) => m.status === 'live')}
         language={language}
         setLanguage={setLanguage}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
       />
 
       {/* Main Content Viewport */}
@@ -110,6 +138,27 @@ export default function App() {
             currentUser={currentUser}
             language={language}
             onOpenMvp={handleOpenMvpForMatch}
+            onStartLiveMatch={handleStartLiveMatch}
+          />
+        )}
+
+        {/* TAB 1.5: Live Match Mode (Modo Partido) */}
+        {(activeTab === 'live_match' || activeTab === 'match_mode') && (
+          <LiveMatchMode
+            team={team}
+            matches={matches}
+            setMatches={setMatches}
+            players={players}
+            setPlayers={setPlayers}
+            currentUser={currentUser}
+            language={language}
+            selectedMatchId={selectedMatchId}
+            onOpenMvp={handleOpenMvpForMatch}
+            onNavigateToLineup={(matchId) => {
+              setSelectedMatchId(matchId);
+              setActiveTab('lineup');
+            }}
+            onBackToCalendar={() => setActiveTab('calendar')}
           />
         )}
 
@@ -142,6 +191,7 @@ export default function App() {
         {/* TAB 4: MVP Voting (50min rule) & Automatic Camera */}
         {activeTab === 'mvp' && (
           <MVPVotingAndCamera
+            team={team}
             matches={matches}
             setMatches={setMatches}
             players={players}
@@ -154,7 +204,7 @@ export default function App() {
         )}
 
         {/* TAB 5: Standings & Golden Boot Scorers */}
-        {activeTab === 'standings' && (
+        {(activeTab === 'standings' || activeTab === 'tables') && (
           <StandingsAndScorers
             standings={standings}
             players={players}
@@ -205,6 +255,7 @@ export default function App() {
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        hasLiveMatch={matches.some((m) => m.status === 'live')}
         currentUser={currentUser}
         language={language}
       />

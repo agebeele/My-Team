@@ -168,13 +168,13 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Top Header Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#141416] p-5 rounded-xl border border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-[#242526] p-5 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs transition-colors">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <MessageSquare className="w-6 h-6 text-emerald-400" />
+          <h2 className="text-xl sm:text-2xl font-black text-[#050505] dark:text-white tracking-tight flex items-center gap-2">
+            <MessageSquare className="w-6 h-6 text-[#1877F2]" />
             {t.wall.title}
           </h2>
-          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-[#65676B] dark:text-gray-400 mt-0.5 font-medium">
             {t.wall.subtitle}
           </p>
         </div>
@@ -182,7 +182,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
         <button
           id="btn-new-post"
           onClick={() => setShowNewPostModal(true)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-sm transition-all self-start sm:self-auto"
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           {t.wall.newPost}
@@ -199,7 +199,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
             <article
               key={post.id}
               id={`wall-post-${post.id}`}
-              className="bg-[#141416] rounded-xl border border-white/5 p-5 space-y-4 transition-all hover:border-white/10"
+              className="bg-white dark:bg-[#242526] rounded-2xl border border-[#CED0D4] dark:border-white/10 p-5 space-y-4 shadow-xs transition-all hover:border-[#1877F2]/40 dark:hover:border-white/20"
             >
               {/* Post Author Header */}
               <div className="flex items-center justify-between">
@@ -208,39 +208,39 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                     src={post.authorAvatar}
                     alt={post.authorName}
                     referrerPolicy="no-referrer"
-                    className="w-10 h-10 rounded-full object-cover ring-1 ring-white/10"
+                    className="w-10 h-10 rounded-full object-cover ring-1 ring-[#CED0D4] dark:ring-white/10"
                   />
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-bold text-white">
+                      <h4 className="text-sm font-bold text-[#050505] dark:text-white">
                         {post.authorName}
                       </h4>
                       {getRoleBadge(post.authorRole)}
                     </div>
-                    <span className="text-[11px] text-gray-400">
+                    <span className="text-[11px] text-[#65676B] dark:text-gray-400 font-medium">
                       {post.createdAt}
                     </span>
                   </div>
                 </div>
 
-                <span className="text-[11px] px-2.5 py-1 rounded-full bg-white/5 text-gray-300 font-medium border border-white/10">
+                <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F0F2F5] dark:bg-white/5 text-[#65676B] dark:text-gray-300 font-bold border border-[#CED0D4]/70 dark:border-white/10">
                   {post.category}
                 </span>
               </div>
 
               {/* Title & Body Content */}
               <div>
-                <h3 className="text-base sm:text-lg font-bold text-white mb-1.5">
+                <h3 className="text-base sm:text-lg font-black text-[#050505] dark:text-white mb-1.5">
                   {post.title}
                 </h3>
-                <p className="text-xs sm:text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
+                <p className="text-xs sm:text-sm text-[#050505] dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                   {post.content}
                 </p>
               </div>
 
               {/* Attached Image if any */}
               {post.imageUrl && (
-                <div className="rounded-lg overflow-hidden border border-white/10 max-h-96">
+                <div className="rounded-xl overflow-hidden border border-[#CED0D4] dark:border-white/10 max-h-96">
                   <img
                     src={post.imageUrl}
                     alt={post.title}
@@ -251,41 +251,41 @@ export const SocialWall: React.FC<SocialWallProps> = ({
               )}
 
               {/* Reactions Bar */}
-              <div className="flex items-center justify-between pt-3 border-t border-white/5 gap-2 flex-wrap">
+              <div className="flex items-center justify-between pt-3 border-t border-[#CED0D4]/70 dark:border-white/10 gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5">
                   {/* Like Button */}
                   <button
                     onClick={() => handleToggleReaction(post.id, 'likes')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       userReaction === 'likes'
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                        : 'bg-black/40 hover:bg-white/5 text-gray-400 hover:text-white border border-white/5'
+                        ? 'bg-rose-50 dark:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-300 dark:border-rose-500/40'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-black/40 dark:hover:bg-white/5 text-[#65676B] dark:text-gray-400 border border-[#CED0D4]/60 dark:border-white/5'
                     }`}
                   >
-                    <Heart className={`w-3.5 h-3.5 ${userReaction === 'likes' ? 'fill-rose-400 text-rose-400' : ''}`} />
+                    <Heart className={`w-3.5 h-3.5 ${userReaction === 'likes' ? 'fill-rose-500 text-rose-500' : ''}`} />
                     <span>{post.reactions.likes}</span>
                   </button>
 
                   {/* Fire Button */}
                   <button
                     onClick={() => handleToggleReaction(post.id, 'fire')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       userReaction === 'fire'
-                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                        : 'bg-black/40 hover:bg-white/5 text-gray-400 hover:text-white border border-white/5'
+                        ? 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-500/40'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-black/40 dark:hover:bg-white/5 text-[#65676B] dark:text-gray-400 border border-[#CED0D4]/60 dark:border-white/5'
                     }`}
                   >
-                    <Flame className={`w-3.5 h-3.5 ${userReaction === 'fire' ? 'fill-amber-400 text-amber-400' : ''}`} />
+                    <Flame className={`w-3.5 h-3.5 ${userReaction === 'fire' ? 'fill-amber-500 text-amber-500' : ''}`} />
                     <span>{post.reactions.fire}</span>
                   </button>
 
                   {/* Clap Button */}
                   <button
                     onClick={() => handleToggleReaction(post.id, 'clap')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       userReaction === 'clap'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        : 'bg-black/40 hover:bg-white/5 text-gray-400 hover:text-white border border-white/5'
+                        ? 'bg-blue-50 dark:bg-emerald-500/20 text-[#1877F2] dark:text-emerald-300 border border-[#1877F2]/30 dark:border-emerald-500/40'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-black/40 dark:hover:bg-white/5 text-[#65676B] dark:text-gray-400 border border-[#CED0D4]/60 dark:border-white/5'
                     }`}
                   >
                     <span>👏</span>
@@ -295,10 +295,10 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                   {/* Goal Button */}
                   <button
                     onClick={() => handleToggleReaction(post.id, 'goal')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       userReaction === 'goal'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        : 'bg-black/40 hover:bg-white/5 text-gray-400 hover:text-white border border-white/5'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-black/40 dark:hover:bg-white/5 text-[#65676B] dark:text-gray-400 border border-[#CED0D4]/60 dark:border-white/5'
                     }`}
                   >
                     <span>⚽</span>
@@ -313,7 +313,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                       [post.id]: !areCommentsOpen,
                     }))
                   }
-                  className="text-xs text-gray-400 hover:text-emerald-400 font-semibold transition-colors flex items-center gap-1"
+                  className="text-xs text-[#65676B] hover:text-[#1877F2] dark:text-gray-400 dark:hover:text-emerald-400 font-bold transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                   {post.comments.length} {t.wall.comments}
@@ -322,18 +322,18 @@ export const SocialWall: React.FC<SocialWallProps> = ({
 
               {/* Comments Section */}
               {areCommentsOpen && (
-                <div className="pt-3 border-t border-white/5 space-y-3">
+                <div className="pt-3 border-t border-[#CED0D4]/60 dark:border-white/5 space-y-3">
                   {/* Comments List */}
                   <div className="space-y-2 max-h-60 overflow-y-auto">
                     {post.comments.length === 0 ? (
-                      <p className="text-xs text-gray-500 italic py-1">
+                      <p className="text-xs text-[#65676B] dark:text-gray-500 italic py-1 font-medium">
                         Sé el primero en comentar...
                       </p>
                     ) : (
                       post.comments.map((comment) => (
                         <div
                           key={comment.id}
-                          className="flex items-start gap-2.5 p-2.5 rounded-lg bg-black/40 border border-white/5 text-xs"
+                          className="flex items-start gap-2.5 p-2.5 rounded-xl bg-[#F0F2F5] dark:bg-black/40 border border-[#CED0D4]/60 dark:border-white/5 text-xs"
                         >
                           <img
                             src={comment.authorAvatar}
@@ -343,14 +343,14 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                           />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-bold text-white">
+                              <span className="font-bold text-[#050505] dark:text-white">
                                 {comment.authorName}
                               </span>
-                              <span className="text-[10px] text-gray-500">
+                              <span className="text-[10px] text-[#65676B] dark:text-gray-500">
                                 {comment.createdAt}
                               </span>
                             </div>
-                            <p className="text-gray-300 mt-0.5">
+                            <p className="text-[#050505] dark:text-gray-300 mt-0.5 font-medium">
                               {comment.text}
                             </p>
                           </div>
@@ -371,11 +371,11 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleAddComment(post.id);
                       }}
-                      className="flex-1 px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500"
+                      className="flex-1 px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-medium focus:outline-none focus:border-[#1877F2]"
                     />
                     <button
                       onClick={() => handleAddComment(post.id)}
-                      className="p-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black transition-all font-bold"
+                      className="p-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white transition-all font-bold cursor-pointer shadow-xs"
                     >
                       <Send className="w-3.5 h-3.5" />
                     </button>
@@ -389,16 +389,16 @@ export const SocialWall: React.FC<SocialWallProps> = ({
 
       {/* Modal: Publish New Post */}
       {showNewPostModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#141416] border border-white/10 w-full max-w-lg rounded-xl shadow-2xl p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Plus className="w-5 h-5 text-emerald-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4 text-[#050505] dark:text-white">
+            <h3 className="text-lg font-black text-[#050505] dark:text-white flex items-center gap-2">
+              <Plus className="w-5 h-5 text-[#1877F2]" />
               {t.wall.newPost}
             </h3>
 
             <form onSubmit={handleCreatePost} className="space-y-3">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#65676B] dark:text-gray-400 mb-1">
                   Título del Anuncio
                 </label>
                 <input
@@ -407,18 +407,18 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="ej. Horario de entrenamiento especial"
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#65676B] dark:text-gray-400 mb-1">
                   Categoría
                 </label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as Post['category'])}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 >
                   <option value="Anuncio">Anuncio Oficial</option>
                   <option value="Partido">Partido</option>
@@ -429,7 +429,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#65676B] dark:text-gray-400 mb-1">
                   Contenido
                 </label>
                 <textarea
@@ -438,12 +438,12 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
                   placeholder={t.wall.placeholder}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500 resize-none"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-medium focus:outline-none focus:border-[#1877F2] resize-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#65676B] dark:text-gray-400 mb-1">
                   URL de Imagen (Opcional)
                 </label>
                 <input
@@ -451,21 +451,21 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
                   placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#CED0D4] dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setShowNewPostModal(false)}
-                  className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:text-white text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] border border-[#CED0D4] dark:bg-white/5 dark:border-white/10 text-[#050505] dark:text-gray-300 text-xs font-bold cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold shadow-sm"
+                  className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs cursor-pointer"
                 >
                   {t.wall.publish}
                 </button>

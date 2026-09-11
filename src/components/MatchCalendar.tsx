@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Calendar,
   Clock,
@@ -15,10 +15,15 @@ import {
   ExternalLink,
   Shield,
   Activity,
+  Zap,
+  Download,
+  Image as ImageIcon,
 } from 'lucide-react';
-import { Match, TeamInfo, Player, AppUser, Language } from '../types';
+import { Match, MatchModality, TeamInfo, Player, AppUser, Language } from '../types';
 import { getT } from '../utils/translations';
 import { exportMatchToPdf } from '../utils/pdfExport';
+import { downloadElementAsImage } from '../utils/imageDownloader';
+import { getModalityInfo, ALL_MODALITIES } from '../utils/modalityHelper';
 
 interface MatchCalendarProps {
   matches: Match[];
@@ -31,6 +36,7 @@ interface MatchCalendarProps {
   onOpenMvp?: (matchId: string) => void;
   onNavigateToLineup?: (matchId: string) => void;
   onNavigateToConvocatoria?: (matchId: string) => void;
+  onStartLiveMatch?: (matchId: string) => void;
   activeReminders?: string[];
   toggleMatchReminder?: (match: Match) => void;
 }
@@ -46,6 +52,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   onOpenMvp,
   onNavigateToLineup = (_matchId: string) => {},
   onNavigateToConvocatoria = (_matchId: string) => {},
+  onStartLiveMatch,
   activeReminders = [],
   toggleMatchReminder = (_match: Match) => {},
 }) => {
@@ -66,6 +73,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
     time: '20:00',
     stadium: 'Cancha 1 - Polideportivo',
     isHome: true,
+    modality: 'fut11' as MatchModality,
   });
 
   // Form states for registering score
@@ -75,18 +83,66 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   const [selectedScorerPlayerId, setSelectedScorerPlayerId] = useState<string>(players[0]?.id || '');
   const [scorerMinute, setScorerMinute] = useState<number>(15);
 
+  // Gallery image download states
+  const [downloadingMatchId, setDownloadingMatchId] = useState<string | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [calendarToast, setCalendarToast] = useState<string | null>(null);
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadMatchImage = async (match: Match) => {
+    const cardEl = document.getElementById(`match-card-${match.id}`);
+    if (!cardEl) return;
+
+    setDownloadingMatchId(match.id);
+    const cleanRival = match.rival.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const cleanTeam = team.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const fileName = `partido_${cleanTeam}_vs_${cleanRival}_${match.date}.png`;
+
+    const res = await downloadElementAsImage(cardEl, {
+      fileName,
+      backgroundColor: '#141416',
+      scale: 2.5,
+    });
+
+    setDownloadingMatchId(null);
+    if (res) {
+      setCalendarToast(`¡Foto del partido guardada en tu galería!`);
+      setTimeout(() => setCalendarToast(null), 3500);
+    }
+  };
+
+  const handleDownloadAllCalendar = async () => {
+    if (!calendarContainerRef.current) return;
+    setIsDownloadingAll(true);
+    const cleanTeam = team.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const fileName = `calendario_partidos_${cleanTeam}.png`;
+
+    const res = await downloadElementAsImage(calendarContainerRef.current, {
+      fileName,
+      backgroundColor: '#0A0A0B',
+      scale: 2,
+    });
+
+    setIsDownloadingAll(false);
+    if (res) {
+      setCalendarToast(`¡Calendario completo guardado en tu galería!`);
+      setTimeout(() => setCalendarToast(null), 3500);
+    }
+  };
+
   const filteredMatches = matches.filter((m) => {
     if (filter === 'scheduled') return m.status === 'scheduled' || m.status === 'live';
     if (filter === 'finished') return m.status === 'finished';
     return true;
   });
 
-  // Calculate if 50 minutes have elapsed since start
+  // Calculate if MVP voting is available based on match modality duration (25m for fut 5,7,9; 50m for fut 11)
   const isMvpVoteAvailable = (match: Match): boolean => {
     if (match.status === 'finished') return true;
     const now = Date.now();
     const elapsedMinutes = (now - match.matchStartTimestamp) / (1000 * 60);
-    return elapsedMinutes >= 50;
+    const minRequired = getModalityInfo(match.modality).mvpAvailableMinutes;
+    return elapsedMinutes >= minRequired;
   };
 
   const getMinutesElapsed = (match: Match): number => {
@@ -112,6 +168,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 time: formData.time,
                 stadium: formData.stadium,
                 isHome: formData.isHome,
+                modality: formData.modality,
                 matchStartTimestamp: matchDateTime || m.matchStartTimestamp,
               }
             : m
@@ -127,6 +184,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
         time: formData.time,
         stadium: formData.stadium,
         isHome: formData.isHome,
+        modality: formData.modality,
         status: 'scheduled',
         scoreUs: null,
         scoreThem: null,
@@ -147,6 +205,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
       time: '20:00',
       stadium: 'Cancha 1 - Polideportivo',
       isHome: true,
+      modality: 'fut11',
     });
   };
 
@@ -196,41 +255,66 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification when image is saved */}
+      {calendarToast && (
+        <div className="fixed top-20 right-4 z-50 bg-emerald-500 text-black px-4 py-3 rounded-xl shadow-2xl font-bold text-xs sm:text-sm flex items-center gap-2 border border-white animate-fade-in">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <span>{calendarToast}</span>
+        </div>
+      )}
+
       {/* Top Header Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#141416] p-5 rounded-xl border border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-[#242526] p-5 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs transition-colors">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-emerald-400" />
+          <h2 className="text-xl sm:text-2xl font-black text-[#050505] dark:text-white tracking-tight flex items-center gap-2">
+            <Calendar className="w-6 h-6 text-[#1877F2]" />
             {t.calendar.title}
           </h2>
-          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-[#65676B] dark:text-gray-400 mt-0.5 font-medium">
             {t.calendar.subtitle}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Download Entire Calendar Graphic Button */}
+          <button
+            onClick={handleDownloadAllCalendar}
+            disabled={isDownloadingAll}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/15 text-[#050505] dark:text-white border border-[#CED0D4] dark:border-white/10 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+            title="Descargar rol completo de partidos en tu galería"
+          >
+            <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
+            <span>{isDownloadingAll ? 'Descargando...' : 'Guardar Calendario'}</span>
+          </button>
+
           {/* Filter Pills */}
-          <div className="flex bg-black/50 p-1 rounded-lg border border-white/5 text-xs">
+          <div className="flex bg-[#F0F2F5] dark:bg-[#18191A] p-1 rounded-xl border border-[#CED0D4] dark:border-white/10 text-xs font-bold">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
-                filter === 'all' ? 'bg-white/10 text-white font-semibold' : 'text-gray-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                filter === 'all'
+                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs font-black'
+                  : 'text-[#65676B] dark:text-gray-400 hover:text-[#050505] dark:hover:text-white'
               }`}
             >
               Todos
             </button>
             <button
               onClick={() => setFilter('scheduled')}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
-                filter === 'scheduled' ? 'bg-white/10 text-white font-semibold' : 'text-gray-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                filter === 'scheduled'
+                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs font-black'
+                  : 'text-[#65676B] dark:text-gray-400 hover:text-[#050505] dark:hover:text-white'
               }`}
             >
               Próximos
             </button>
             <button
               onClick={() => setFilter('finished')}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
-                filter === 'finished' ? 'bg-white/10 text-white font-semibold' : 'text-gray-400 hover:text-white'
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                filter === 'finished'
+                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs font-black'
+                  : 'text-[#65676B] dark:text-gray-400 hover:text-[#050505] dark:hover:text-white'
               }`}
             >
               Finalizados
@@ -245,7 +329,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 setEditingMatch(null);
                 setShowAddModal(true);
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               {t.calendar.newMatch}
@@ -254,40 +338,83 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
         </div>
       </div>
 
+      {/* Live Match Alert Banner */}
+      {matches.some((m) => m.status === 'live') && (
+        <div className="bg-gradient-to-r from-rose-950/60 via-rose-900/40 to-black border border-rose-500/40 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg animate-pulse">
+          <div className="flex items-center gap-3 text-left w-full sm:w-auto">
+            <span className="flex h-3 w-3 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500" />
+            </span>
+            <div>
+              <p className="text-sm font-black text-white flex items-center gap-2">
+                <span>PARTIDO EN JUEGO</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-rose-500/30 text-rose-300 font-mono">
+                  {matches.find((m) => m.status === 'live')?.rival}
+                </span>
+              </p>
+              <p className="text-xs text-rose-200/80">
+                Registra goles, cambios y tarjetas en tiempo real en el Modo Partido.
+              </p>
+            </div>
+          </div>
+          {onStartLiveMatch && (
+            <button
+              onClick={() => {
+                const liveM = matches.find((m) => m.status === 'live');
+                if (liveM) onStartLiveMatch(liveM.id);
+              }}
+              className="w-full sm:w-auto px-4 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-md hover:shadow-rose-500/20 transition-all cursor-pointer"
+            >
+              <Zap className="w-4 h-4 fill-white" />
+              <span>Entrar al Modo Partido</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Match Cards List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div ref={calendarContainerRef} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredMatches.map((match) => {
+          const modalityInfo = getModalityInfo(match.modality);
           const mvpActive = isMvpVoteAvailable(match);
           const minutesElapsed = getMinutesElapsed(match);
           const isReminded = activeReminders.includes(match.id);
 
-          return (
+              return (
             <div
               key={match.id}
               id={`match-card-${match.id}`}
-              className="relative bg-[#141416] rounded-xl border border-white/5 p-5 shadow-xl transition-all hover:border-white/10 space-y-4"
+              className="relative bg-white dark:bg-[#242526] rounded-2xl border border-[#CED0D4] dark:border-white/10 p-5 shadow-xs transition-all hover:border-[#1877F2]/40 space-y-4 text-[#050505] dark:text-white"
             >
               {/* Match Header: Status & Actions */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {match.status === 'live' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 animate-pulse">
                       <span className="w-2 h-2 rounded-full bg-rose-500" />
                       {t.calendar.statusLive} ({minutesElapsed}')
                     </span>
                   ) : match.status === 'finished' ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/5 text-gray-300 border border-white/10">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#F0F2F5] dark:bg-white/5 text-[#65676B] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                       {t.calendar.statusFinished}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#E7F3FF] dark:bg-emerald-500/10 text-[#1877F2] dark:text-emerald-400 border border-[#1877F2]/20 dark:border-emerald-500/20">
+                      <Clock className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
                       {t.calendar.statusScheduled}
                     </span>
                   )}
 
-                  <span className="text-xs font-medium text-gray-400">
+                  {/* Modality & Duration Badge */}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 dark:bg-amber-400/10 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-400/20">
+                    <Zap className="w-2.5 h-2.5" />
+                    <span>{modalityInfo.label}</span>
+                    <span className="text-amber-700/80 dark:text-amber-200/70 font-mono">({modalityInfo.halfMinutes}m/T)</span>
+                  </span>
+
+                  <span className="text-xs font-semibold text-[#65676B] dark:text-gray-400">
                     {match.date} • {match.time} hrs
                   </span>
                 </div>
@@ -305,17 +432,18 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                           time: match.time,
                           stadium: match.stadium,
                           isHome: match.isHome,
+                          modality: match.modality || 'fut7',
                         });
                         setShowAddModal(true);
                       }}
-                      className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[#F0F2F5] dark:hover:bg-white/5 text-[#65676B] hover:text-[#050505] dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
                       title="Editar partido"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteMatch(match.id)}
-                      className="p-1.5 rounded-lg hover:bg-white/5 text-gray-400 hover:text-rose-400 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-[#F0F2F5] dark:hover:bg-white/5 text-[#65676B] hover:text-rose-500 transition-colors cursor-pointer"
                       title="Eliminar partido"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -324,51 +452,54 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 )}
               </div>
 
-              {/* Teams & Scoreboard Visual */}
-              <div className="bg-black/50 p-4 rounded-xl border border-white/5 flex items-center justify-between gap-2">
-                {/* Our Team */}
+              {/* Teams & Scoreboard Visual - Full Names & Badges */}
+              <div className="bg-[#F0F2F5] dark:bg-[#18191A] p-4 rounded-xl border border-[#E4E6EB] dark:border-white/10 flex items-center justify-between gap-3">
+                {/* Our Team - Full Name */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <img
                     src={team.logoUrl}
                     alt={team.name}
                     referrerPolicy="no-referrer"
-                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg object-cover border border-emerald-500/30 shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=150&q=80';
+                    }}
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover border border-[#1877F2]/30 shrink-0 shadow-xs"
                   />
-                  <div className="min-w-0">
-                    <h4 className="text-sm sm:text-base font-bold text-white truncate">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white leading-snug break-words">
                       {team.name}
                     </h4>
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">
+                    <span className="text-[10px] uppercase font-bold text-[#1877F2] dark:text-[#60A5FA] tracking-wider block mt-0.5">
                       {match.isHome ? t.calendar.local : t.calendar.visitor}
                     </span>
                   </div>
                 </div>
 
                 {/* Center Score or VS */}
-                <div className="flex flex-col items-center justify-center px-3 py-1.5 bg-[#141416] rounded-lg border border-white/10 min-w-[70px]">
+                <div className="flex flex-col items-center justify-center px-2.5 sm:px-3 py-1.5 bg-white dark:bg-[#242526] rounded-xl border border-[#CED0D4] dark:border-white/10 shrink-0 min-w-[65px] sm:min-w-[75px] shadow-xs">
                   {match.scoreUs !== null && match.scoreThem !== null ? (
-                    <div className="text-xl sm:text-2xl font-black font-sport tracking-wider text-white">
-                      <span className="text-emerald-400">{match.scoreUs}</span>
-                      <span className="text-gray-600 mx-1">-</span>
+                    <div className="text-xl sm:text-2xl font-black font-sport tracking-wider text-[#050505] dark:text-white flex items-center">
+                      <span className="text-[#1877F2] dark:text-emerald-400">{match.scoreUs}</span>
+                      <span className="text-[#65676B] dark:text-gray-500 mx-1">-</span>
                       <span>{match.scoreThem}</span>
                     </div>
                   ) : (
-                    <div className="text-base sm:text-lg font-black font-sport tracking-widest text-gray-400">
+                    <div className="text-base sm:text-lg font-black font-sport tracking-widest text-[#65676B] dark:text-gray-400">
                       VS
                     </div>
                   )}
-                  <span className="text-[10px] text-gray-500 font-medium">
+                  <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-bold mt-0.5">
                     {match.time}
                   </span>
                 </div>
 
-                {/* Rival Team */}
+                {/* Rival Team - Full Name */}
                 <div className="flex items-center justify-end gap-3 flex-1 min-w-0 text-right">
-                  <div className="min-w-0">
-                    <h4 className="text-sm sm:text-base font-bold text-white truncate">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white leading-snug break-words">
                       {match.rival}
                     </h4>
-                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                    <span className="text-[10px] uppercase font-bold text-[#65676B] dark:text-gray-400 tracking-wider block mt-0.5">
                       {!match.isHome ? t.calendar.local : t.calendar.visitor}
                     </span>
                   </div>
@@ -376,20 +507,23 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     src={match.rivalLogo}
                     alt={match.rival}
                     referrerPolicy="no-referrer"
-                    className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg object-cover border border-white/10 shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=150&q=80';
+                    }}
+                    className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover border border-[#CED0D4] dark:border-white/10 shrink-0 shadow-xs"
                   />
                 </div>
               </div>
 
               {/* Stadium & Scorers info */}
-              <div className="flex items-center justify-between text-xs text-gray-400">
+              <div className="flex items-center justify-between text-xs text-[#65676B] dark:text-gray-400">
                 <div className="flex items-center gap-1.5 truncate">
-                  <MapPin className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span className="truncate">{match.stadium}</span>
+                  <MapPin className="w-3.5 h-3.5 text-[#65676B] dark:text-gray-500 shrink-0" />
+                  <span className="truncate font-medium">{match.stadium}</span>
                 </div>
 
                 {match.scorersUs.length > 0 && (
-                  <div className="text-[11px] text-gray-300 font-medium truncate ml-2">
+                  <div className="text-[11px] text-[#050505] dark:text-gray-300 font-semibold truncate ml-2">
                     ⚽ {match.scorersUs.map((s) => `${s.playerName.split(' ')[0]} (${s.minute}')`).join(', ')}
                   </div>
                 )}
@@ -397,16 +531,16 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
               {/* 50-Minute MVP Rule Banner if active */}
               {mvpActive ? (
-                <div className="bg-amber-400/10 border border-amber-400/20 rounded-xl p-3 flex items-center justify-between gap-3">
+                <div className="bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 rounded-xl p-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-spin" />
+                    <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 animate-spin" />
                     <div>
-                      <p className="text-xs font-bold text-amber-300">
+                      <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
                         {match.mvpPlayerName
                           ? `MVP: ${match.mvpPlayerName}`
                           : '¡Votación de MVP Abierta! (+50m transcurridos)'}
                       </p>
-                      <p className="text-[10px] text-amber-200/80">
+                      <p className="text-[10px] text-amber-700/80 dark:text-amber-200/80">
                         {match.mvpPlayerName
                           ? 'Foto oficial capturada y archivada en su perfil'
                           : 'Vota al jugador destacado y toma su foto oficial con la cámara'}
@@ -416,32 +550,44 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
                   <button
                     onClick={() => handleGoToMvp(match.id)}
-                    className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs shrink-0 shadow-sm transition-all"
+                    className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs shrink-0 shadow-xs transition-all cursor-pointer"
                   >
                     {match.mvpPlayerName ? 'Ver MVP' : t.calendar.voteMvp}
                   </button>
                 </div>
               ) : (
-                <div className="bg-black/40 border border-white/5 rounded-xl p-2.5 text-[11px] text-gray-400 flex items-center justify-between">
+                <div className="bg-[#F0F2F5] dark:bg-black/40 border border-[#CED0D4] dark:border-white/5 rounded-xl p-2.5 text-[11px] text-[#65676B] dark:text-gray-400 flex items-center justify-between">
                   <span>Votación MVP: disponible a los 50 min de partido</span>
-                  <span className="font-mono text-emerald-400 font-semibold">{minutesElapsed > 0 ? `${minutesElapsed} min jugados` : 'Previa'}</span>
+                  <span className="font-mono text-[#1877F2] dark:text-emerald-400 font-bold">{minutesElapsed > 0 ? `${minutesElapsed} min jugados` : 'Previa'}</span>
                 </div>
               )}
 
               {/* Footer Quick Action Buttons */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/5 gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between pt-3 border-t border-[#CED0D4] dark:border-white/5 gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Download Match Photo / Image to Gallery Button */}
+                  <button
+                    id={`btn-download-img-${match.id}`}
+                    onClick={() => handleDownloadMatchImage(match)}
+                    disabled={downloadingMatchId === match.id}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#E7F3FF] dark:bg-[#1877F2]/20 hover:bg-[#DBEAFE] text-[#1877F2] dark:text-[#60A5FA] text-xs font-bold border border-[#1877F2]/30 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                    title="Descargar imagen del partido a tu galería"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-[#60A5FA]" />
+                    <span>{downloadingMatchId === match.id ? 'Guardando...' : 'Guardar Foto'}</span>
+                  </button>
+
                   {/* Push Notification Button */}
                   <button
                     id={`btn-reminder-${match.id}`}
                     onClick={() => toggleMatchReminder(match)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
                       isReminded
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10'
                     }`}
                   >
-                    <Bell className={`w-3.5 h-3.5 ${isReminded ? 'fill-emerald-400 text-emerald-400' : ''}`} />
+                    <Bell className={`w-3.5 h-3.5 ${isReminded ? 'fill-emerald-500 text-emerald-500' : ''}`} />
                     {isReminded ? t.calendar.notified : t.calendar.notifyMe}
                   </button>
 
@@ -449,19 +595,19 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   <button
                     id={`btn-export-pdf-${match.id}`}
                     onClick={() => exportMatchToPdf(match, team, players)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-medium border border-white/10 transition-all"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-white text-xs font-bold border border-[#CED0D4] dark:border-white/10 transition-all cursor-pointer shadow-xs"
                     title={t.calendar.exportPdf}
                   >
-                    <FileDown className="w-3.5 h-3.5 text-emerald-400" />
+                    <FileDown className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
                     PDF
                   </button>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {/* Jump to Convocatoria flyer */}
                   <button
                     onClick={() => onNavigateToConvocatoria(match.id)}
-                    className="text-xs text-gray-400 hover:text-emerald-400 font-medium px-2 py-1"
+                    className="text-xs text-[#1877F2] dark:text-[#60A5FA] hover:underline font-bold px-2 py-1 cursor-pointer"
                   >
                     Convocatoria
                   </button>
@@ -469,18 +615,53 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   {/* Jump to Lineup Pitch */}
                   <button
                     onClick={() => onNavigateToLineup(match.id)}
-                    className="text-xs text-gray-400 hover:text-emerald-400 font-medium px-2 py-1"
+                    className="text-xs text-[#1877F2] dark:text-[#60A5FA] hover:underline font-bold px-2 py-1 cursor-pointer"
                   >
                     Alineación
                   </button>
+
+                  {/* Enter Live Match Mode */}
+                  {onStartLiveMatch && (
+                    <button
+                      id={`btn-live-match-${match.id}`}
+                      onClick={() => onStartLiveMatch(match.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                        match.status === 'live'
+                          ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md'
+                          : match.status === 'finished'
+                          ? 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10'
+                          : 'bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 dark:hover:bg-rose-500/25 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
+                      }`}
+                      title={
+                        match.status === 'live'
+                          ? 'Modo Partido en Vivo'
+                          : match.status === 'finished'
+                          ? 'Ver Resumen del Partido'
+                          : 'Iniciar Modo Partido en Vivo'
+                      }
+                    >
+                      <Zap
+                        className={`w-3.5 h-3.5 ${
+                          match.status === 'live' ? 'fill-white text-white' : 'text-rose-500 dark:text-rose-400'
+                        }`}
+                      />
+                      <span>
+                        {match.status === 'live'
+                          ? 'Modo Partido'
+                          : match.status === 'finished'
+                          ? 'Resumen'
+                          : 'Modo Partido'}
+                      </span>
+                    </button>
+                  )}
 
                   {/* Owner: Record Score */}
                   {isOwnerOrAdmin && (
                     <button
                       onClick={() => handleOpenResultModal(match)}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-white/5 hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/30 border border-white/10 text-xs font-bold text-gray-200 transition-all"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-200 border border-[#CED0D4] dark:border-white/10 text-xs font-bold transition-all cursor-pointer shadow-xs"
                     >
-                      <Trophy className="w-3 h-3 text-amber-400" />
+                      <Trophy className="w-3 h-3 text-amber-500" />
                       {t.calendar.recordResult}
                     </button>
                   )}
@@ -493,15 +674,15 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
       {/* Modal: Schedule / Edit Match */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#141416] border border-white/10 w-full max-w-lg rounded-xl shadow-2xl p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4 text-[#050505] dark:text-white">
+            <h3 className="text-lg font-black text-[#050505] dark:text-white">
               {editingMatch ? t.calendar.editMatch : t.calendar.newMatch}
             </h3>
 
             <form onSubmit={handleCreateOrUpdateMatch} className="space-y-4">
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                   Nombre del Rival
                 </label>
                 <input
@@ -510,13 +691,13 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   value={formData.rival}
                   onChange={(e) => setFormData({ ...formData, rival: e.target.value })}
                   placeholder="ej. Halcones FC, Toros FC..."
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2.5 bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                     {t.calendar.date}
                   </label>
                   <input
@@ -524,11 +705,11 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     required
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                     {t.calendar.time}
                   </label>
                   <input
@@ -536,13 +717,13 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     required
                     value={formData.time}
                     onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                    className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                   {t.calendar.stadium}
                 </label>
                 <input
@@ -551,22 +732,22 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   value={formData.stadium}
                   onChange={(e) => setFormData({ ...formData, stadium: e.target.value })}
                   placeholder="Cancha 2 - Deportivo Norte"
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2.5 bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                   Condición de Local / Visitante
                 </label>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, isHome: true })}
-                    className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs ${
                       formData.isHome
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                        : 'bg-black/50 border-white/10 text-gray-400'
+                        ? 'bg-[#E7F3FF] dark:bg-[#1877F2]/20 border-[#1877F2] text-[#1877F2] dark:text-[#60A5FA]'
+                        : 'bg-[#F0F2F5] dark:bg-black/50 border-[#CED0D4] dark:border-white/10 text-[#65676B] dark:text-gray-400'
                     }`}
                   >
                     {t.calendar.local} (Casa)
@@ -574,10 +755,10 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, isHome: false })}
-                    className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs ${
                       !formData.isHome
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                        : 'bg-black/50 border-white/10 text-gray-400'
+                        ? 'bg-[#E7F3FF] dark:bg-[#1877F2]/20 border-[#1877F2] text-[#1877F2] dark:text-[#60A5FA]'
+                        : 'bg-[#F0F2F5] dark:bg-black/50 border-[#CED0D4] dark:border-white/10 text-[#65676B] dark:text-gray-400'
                     }`}
                   >
                     {t.calendar.visitor} (Fuera)
@@ -585,17 +766,53 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/5">
+              {/* Modalidad de Juego */}
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
+                  Modalidad de Juego (Duración por tiempo)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_MODALITIES.map((mod) => {
+                    const isSelected = (formData.modality || 'fut7') === mod.id;
+                    return (
+                      <button
+                        key={mod.id}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, modality: mod.id })}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer shadow-xs ${
+                          isSelected
+                            ? 'bg-[#E7F3FF] dark:bg-[#1877F2]/20 border-[#1877F2] text-[#050505] dark:text-white'
+                            : 'bg-[#F0F2F5] dark:bg-black/50 border-[#CED0D4] dark:border-white/10 text-[#65676B] dark:text-gray-400 hover:text-[#050505] dark:hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-black ${isSelected ? 'text-[#1877F2] dark:text-[#60A5FA]' : 'text-[#050505] dark:text-gray-300'}`}>
+                            {mod.name}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-white dark:bg-white/10 font-mono font-bold text-[#65676B] dark:text-gray-300 border border-[#CED0D4]/60 dark:border-transparent">
+                            {mod.halfMinutes}m/T
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-[#65676B] dark:text-gray-400 mt-0.5 font-medium">
+                          {mod.durationNote}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#CED0D4] dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-semibold border border-white/10"
+                  className="px-4 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 text-xs font-bold border border-[#CED0D4] dark:border-white/10 cursor-pointer shadow-xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold shadow-sm"
+                  className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs cursor-pointer"
                 >
                   {editingMatch ? 'Actualizar' : 'Programar Partido'}
                 </button>
@@ -607,18 +824,18 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
       {/* Modal: Record Match Result & Scorers */}
       {showResultModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#141416] border border-white/10 w-full max-w-lg rounded-xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto text-[#050505] dark:text-white">
+            <h3 className="text-lg font-black text-[#050505] dark:text-white flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-500" />
               {t.calendar.recordResult}
             </h3>
 
-            <div className="p-4 bg-black/50 rounded-xl border border-white/5 text-center">
-              <p className="text-xs text-gray-400 mb-2">Marcador Final Oficial</p>
+            <div className="p-4 bg-[#F0F2F5] dark:bg-[#18191A] rounded-2xl border border-[#CED0D4] dark:border-white/10 text-center">
+              <p className="text-xs text-[#65676B] dark:text-gray-400 font-semibold mb-2">Marcador Final Oficial</p>
               <div className="flex items-center justify-center gap-4">
                 <div className="text-center">
-                  <span className="block text-xs font-bold text-emerald-400 truncate max-w-[100px]">
+                  <span className="block text-xs font-black text-[#1877F2] dark:text-[#60A5FA] truncate max-w-[100px]">
                     {team.shortName}
                   </span>
                   <input
@@ -626,14 +843,14 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     min={0}
                     value={resultScoreUs}
                     onChange={(e) => setResultScoreUs(parseInt(e.target.value) || 0)}
-                    className="w-16 h-14 bg-[#141416] border-2 border-emerald-500 rounded-lg text-center text-2xl font-black text-white font-sport mt-1"
+                    className="w-16 h-14 bg-white dark:bg-[#242526] border-2 border-[#1877F2] rounded-xl text-center text-2xl font-black text-[#050505] dark:text-white font-sport mt-1 shadow-xs"
                   />
                 </div>
 
-                <span className="text-2xl font-black text-gray-600">-</span>
+                <span className="text-2xl font-black text-[#65676B] dark:text-gray-500">-</span>
 
                 <div className="text-center">
-                  <span className="block text-xs font-bold text-gray-400 truncate max-w-[100px]">
+                  <span className="block text-xs font-black text-[#65676B] dark:text-gray-400 truncate max-w-[100px]">
                     {showResultModal.rival}
                   </span>
                   <input
@@ -641,7 +858,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     min={0}
                     value={resultScoreThem}
                     onChange={(e) => setResultScoreThem(parseInt(e.target.value) || 0)}
-                    className="w-16 h-14 bg-[#141416] border-2 border-white/10 rounded-lg text-center text-2xl font-black text-white font-sport mt-1"
+                    className="w-16 h-14 bg-white dark:bg-[#242526] border-2 border-[#CED0D4] dark:border-white/10 rounded-xl text-center text-2xl font-black text-[#050505] dark:text-white font-sport mt-1 shadow-xs"
                   />
                 </div>
               </div>
@@ -649,7 +866,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
             {/* Goal Scorers Registration */}
             <div className="space-y-2">
-              <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold">
+              <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold">
                 {t.calendar.scorers} ({team.shortName})
               </label>
 
@@ -657,7 +874,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 <select
                   value={selectedScorerPlayerId}
                   onChange={(e) => setSelectedScorerPlayerId(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500"
+                  className="flex-1 px-3 py-2 bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-semibold focus:outline-none focus:border-[#1877F2]"
                 >
                   {players.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -666,22 +883,22 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   ))}
                 </select>
 
-                <div className="w-24 flex items-center bg-black/50 border border-white/10 rounded-lg px-2">
+                <div className="w-24 flex items-center bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl px-2">
                   <input
                     type="number"
                     min={1}
                     max={120}
                     value={scorerMinute}
                     onChange={(e) => setScorerMinute(parseInt(e.target.value) || 1)}
-                    className="w-full bg-transparent text-white text-xs font-bold text-center focus:outline-none"
+                    className="w-full bg-transparent text-[#050505] dark:text-white text-xs font-bold text-center focus:outline-none"
                   />
-                  <span className="text-[10px] text-gray-500 font-bold">'</span>
+                  <span className="text-[10px] text-[#65676B] dark:text-gray-500 font-bold">'</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleAddScorer}
-                  className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs rounded-lg"
+                  className="px-3.5 py-2 bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
                 >
                   + Gol
                 </button>
@@ -692,15 +909,15 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 {scorersList.map((sc, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center justify-between p-2 rounded-lg bg-black/50 text-xs border border-white/5"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#F0F2F5] dark:bg-black/50 text-xs border border-[#CED0D4] dark:border-white/5"
                   >
-                    <span className="text-white font-medium">
-                      ⚽ {sc.playerName} <span className="text-emerald-400 font-bold">({sc.minute}')</span>
+                    <span className="text-[#050505] dark:text-white font-semibold">
+                      ⚽ {sc.playerName} <span className="text-[#1877F2] dark:text-[#60A5FA] font-bold">({sc.minute}')</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveScorer(idx)}
-                      className="text-gray-400 hover:text-rose-400"
+                      className="text-[#65676B] hover:text-rose-500 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -709,18 +926,18 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/5">
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#CED0D4] dark:border-white/10">
               <button
                 type="button"
                 onClick={() => setShowResultModal(null)}
-                className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-semibold border border-white/10"
+                className="px-4 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 text-xs font-bold border border-[#CED0D4] dark:border-white/10 cursor-pointer shadow-xs"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleSaveResult}
-                className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold shadow-sm"
+                className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 {t.calendar.saveResult}
               </button>

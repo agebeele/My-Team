@@ -6,6 +6,7 @@ export const translations = {
     tagline: 'Gestión Profesional de Equipo',
     nav: {
       calendar: 'Partidos',
+      liveMatch: 'Modo Partido',
       convocatoria: 'Convocatoria',
       lineup: 'Alineación',
       tables: 'Tablas',
@@ -178,6 +179,7 @@ export const translations = {
     tagline: 'Professional Soccer Team Manager',
     nav: {
       calendar: 'Fixtures',
+      liveMatch: 'Match Mode',
       convocatoria: 'Squad Call-up',
       lineup: 'Tactical Pitch',
       tables: 'Tables',

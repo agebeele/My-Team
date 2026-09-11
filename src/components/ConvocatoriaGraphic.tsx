@@ -298,13 +298,13 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Header Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#141416] p-5 rounded-xl border border-white/5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-[#242526] p-5 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs transition-colors">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            <Users className="w-6 h-6 text-emerald-400" />
+          <h2 className="text-xl sm:text-2xl font-black text-[#050505] dark:text-white tracking-tight flex items-center gap-2">
+            <Users className="w-6 h-6 text-[#1877F2]" />
             {t.convocatoria.title}
           </h2>
-          <p className="text-xs sm:text-sm text-gray-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-[#65676B] dark:text-gray-400 mt-0.5 font-medium">
             {t.convocatoria.subtitle}
           </p>
         </div>
@@ -314,7 +314,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
           <select
             value={activeMatchId}
             onChange={(e) => setActiveMatchId(e.target.value)}
-            className="px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs font-semibold focus:outline-none focus:border-emerald-500"
+            className="px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-bold focus:outline-none focus:border-[#1877F2]"
           >
             {matches.map((m) => (
               <option key={m.id} value={m.id}>
@@ -328,7 +328,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
             id="btn-download-convocatoria"
             onClick={handleDownloadGraphic}
             disabled={isGenerating}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs shadow-sm transition-all disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             {isGenerating ? 'Generando...' : t.convocatoria.downloadGraphic}
@@ -338,10 +338,10 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
           {isOwnerOrAdmin && (
             <button
               onClick={() => setShowEditTeamModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-semibold text-xs border border-white/10 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] dark:bg-white/5 dark:hover:bg-white/10 dark:text-gray-300 font-bold text-xs border border-[#CED0D4] dark:border-white/10 transition-all cursor-pointer shadow-xs"
               title="Actualizar Escudo, Foto y Nombre del Club"
             >
-              <Shield className="w-4 h-4 text-emerald-400" />
+              <Shield className="w-4 h-4 text-[#1877F2]" />
               {t.convocatoria.teamDetails}
             </button>
           )}
@@ -532,13 +532,13 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
 
         {/* Right Side: Roster Controls & Player Registration */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-[#141416] p-5 rounded-xl border border-white/5 space-y-4">
+          <div className="bg-white dark:bg-[#242526] p-5 rounded-2xl border border-[#CED0D4] dark:border-white/10 space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-white">
+                <h3 className="text-base font-black text-[#050505] dark:text-white">
                   {t.convocatoria.rosterTitle} ({players.length})
                 </h3>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-[#65676B] dark:text-gray-400 font-medium">
                   Marca los jugadores que jugarán este partido
                 </p>
               </div>
@@ -547,7 +547,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                 <button
                   id="btn-add-player-roster"
                   onClick={() => setShowAddPlayerModal(true)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black font-bold text-xs shadow-sm transition-all"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   {t.convocatoria.addPlayer}
@@ -559,13 +559,13 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
             <div className="flex items-center gap-2 pt-1">
               <button
                 onClick={selectAllPlayers}
-                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 text-xs font-medium"
+                className="px-2.5 py-1 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10 text-xs font-bold cursor-pointer"
               >
                 {t.convocatoria.allCalled}
               </button>
               <button
                 onClick={clearAllPlayers}
-                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10 text-xs font-medium"
+                className="px-2.5 py-1 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#65676B] dark:text-gray-400 border border-[#CED0D4] dark:border-white/10 text-xs font-bold cursor-pointer"
               >
                 {t.convocatoria.clearAll}
               </button>
@@ -577,10 +577,10 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                 <div
                   key={player.id}
                   id={`player-row-${player.id}`}
-                  className={`flex items-center justify-between p-2.5 rounded-lg border transition-all ${
+                  className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
                     player.isCalledUp
-                      ? 'bg-emerald-500/10 border-emerald-500/30'
-                      : 'bg-black/40 border-white/5 hover:border-white/10'
+                      ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30'
+                      : 'bg-[#F0F2F5] dark:bg-black/40 border-[#CED0D4]/70 dark:border-white/5 hover:border-[#1877F2]/40'
                   }`}
                 >
                   <div
@@ -590,8 +590,8 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                     <div
                       className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${
                         player.isCalledUp
-                          ? 'bg-emerald-500 text-black'
-                          : 'border border-white/10 bg-black/50'
+                          ? 'bg-[#1877F2] text-white shadow-xs'
+                          : 'border border-[#CED0D4] dark:border-white/10 bg-white dark:bg-black/50'
                       }`}
                     >
                       {player.isCalledUp && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -601,19 +601,19 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                       src={player.avatarUrl}
                       alt={player.name}
                       referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-full object-cover shrink-0"
+                      className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"
                     />
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-xs font-black text-emerald-400">
+                        <span className="font-mono text-xs font-black text-[#1877F2] dark:text-emerald-400">
                           #{player.number}
                         </span>
-                        <span className="text-xs font-bold text-white truncate">
+                        <span className="text-xs font-bold text-[#050505] dark:text-white truncate">
                           {player.name}
                         </span>
                       </div>
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-medium">
                         {player.position} • {player.goals} goles • {player.mvpHistory?.length || 0} MVPs
                       </span>
                     </div>
@@ -622,7 +622,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                   {isOwnerOrAdmin && (
                     <button
                       onClick={() => handleDeletePlayer(player.id)}
-                      className="p-1 text-gray-500 hover:text-rose-400 transition-colors ml-2"
+                      className="p-1 text-[#65676B] hover:text-rose-500 transition-colors ml-2 cursor-pointer"
                       title="Eliminar de plantilla"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -637,16 +637,16 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
 
       {/* Modal: Add New Player to Roster */}
       {showAddPlayerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#141416] border border-white/10 w-full max-w-md rounded-xl shadow-2xl p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Plus className="w-5 h-5 text-emerald-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 text-[#050505] dark:text-white">
+            <h3 className="text-lg font-black text-[#050505] dark:text-white flex items-center gap-2">
+              <Plus className="w-5 h-5 text-[#1877F2]" />
               {t.convocatoria.addPlayer}
             </h3>
 
             <form onSubmit={handleAddPlayer} className="space-y-3">
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                   Nombre Completo
                 </label>
                 <input
@@ -655,13 +655,13 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                   value={newPlayer.name}
                   onChange={(e) => setNewPlayer({ ...newPlayer, name: e.target.value })}
                   placeholder="ej. Santiago Giménez"
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                     Número de Camiseta
                   </label>
                   <input
@@ -671,18 +671,18 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                     required
                     value={newPlayer.number}
                     onChange={(e) => setNewPlayer({ ...newPlayer, number: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                     Posición
                   </label>
                   <select
                     value={newPlayer.position}
                     onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value as PlayerPosition })}
-                    className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                   >
                     <option value="POR">Portero (POR)</option>
                     <option value="DEF">Defensa (DEF)</option>
@@ -693,7 +693,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                   Apodo / Sobrenombre (Opcional)
                 </label>
                 <input
@@ -701,12 +701,12 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                   value={newPlayer.nickname}
                   onChange={(e) => setNewPlayer({ ...newPlayer, nickname: e.target.value })}
                   placeholder="ej. Bebote"
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                   URL de Foto del Jugador
                 </label>
                 <input
@@ -714,21 +714,21 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                   value={newPlayer.avatarUrl}
                   onChange={(e) => setNewPlayer({ ...newPlayer, avatarUrl: e.target.value })}
                   placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#CED0D4] dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setShowAddPlayerModal(false)}
-                  className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-semibold border border-white/10"
+                  className="px-4 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] dark:bg-white/5 dark:hover:bg-white/10 dark:text-gray-300 text-xs font-bold border border-[#CED0D4] dark:border-white/10 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold shadow-sm"
+                  className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs cursor-pointer"
                 >
                   Registrar Jugador
                 </button>
@@ -740,17 +740,17 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
 
       {/* Modal: Edit Team Identity (Owner / Logo / Banner) */}
       {showEditTeamModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#141416] border border-white/10 w-full max-w-lg rounded-xl shadow-2xl p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Shield className="w-5 h-5 text-emerald-400" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-lg rounded-2xl shadow-2xl p-6 space-y-4 text-[#050505] dark:text-white">
+            <h3 className="text-lg font-black text-[#050505] dark:text-white flex items-center gap-2">
+              <Shield className="w-5 h-5 text-[#1877F2]" />
               {t.convocatoria.teamDetails}
             </h3>
 
             <form onSubmit={handleSaveTeamIdentity} className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                     {t.convocatoria.teamName}
                   </label>
                   <input
@@ -758,11 +758,11 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                     required
                     value={teamForm.name}
                     onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })}
-                    className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                  <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                     {t.convocatoria.shortName}
                   </label>
                   <input
@@ -770,13 +770,13 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                     required
                     value={teamForm.shortName}
                     onChange={(e) => setTeamForm({ ...teamForm, shortName: e.target.value })}
-                    className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1">
                   {t.convocatoria.league}
                 </label>
                 <input
@@ -784,45 +784,45 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                   required
                   value={teamForm.leagueName}
                   onChange={(e) => setTeamForm({ ...teamForm, leagueName: e.target.value })}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1 flex items-center justify-between">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1 flex items-center justify-between">
                   <span>{t.convocatoria.uploadLogo} (URL)</span>
                 </label>
                 <input
                   type="url"
                   value={teamForm.logoUrl}
                   onChange={(e) => setTeamForm({ ...teamForm, logoUrl: e.target.value })}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-1 flex items-center justify-between">
+                <label className="block text-[11px] uppercase tracking-wider text-[#65676B] dark:text-gray-400 font-bold mb-1 flex items-center justify-between">
                   <span>{t.convocatoria.uploadBanner} (URL)</span>
                 </label>
                 <input
                   type="url"
                   value={teamForm.bannerUrl}
                   onChange={(e) => setTeamForm({ ...teamForm, bannerUrl: e.target.value })}
-                  className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-white/10">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#CED0D4] dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setShowEditTeamModal(false)}
-                  className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white text-xs font-semibold border border-white/10"
+                  className="px-4 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] dark:bg-white/5 dark:hover:bg-white/10 dark:text-gray-300 text-xs font-bold border border-[#CED0D4] dark:border-white/10 cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-black text-xs font-bold shadow-sm"
+                  className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs cursor-pointer"
                 >
                   Guardar Cambios
                 </button>

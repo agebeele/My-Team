@@ -2,6 +2,8 @@ export type UserRole = 'owner' | 'player' | 'admin';
 
 export type PlayerPosition = 'POR' | 'DEF' | 'MED' | 'DEL';
 
+export type MatchModality = 'fut5' | 'fut7' | 'fut9' | 'fut11';
+
 export interface MVPRecord {
   id: string;
   matchId: string;
@@ -36,16 +38,40 @@ export interface TeamInfo {
   logoUrl: string;
   bannerUrl: string;
   leagueName: string;
+  season?: string;
   stadium: string;
   foundedYear: string;
   primaryColor: string;
   secondaryColor: string;
 }
 
+export type MatchEventType = 'goal' | 'substitution' | 'yellow_card' | 'red_card';
+
+export interface MatchEvent {
+  id: string;
+  type: MatchEventType;
+  minute: number;
+  period: '1T' | '2T';
+  team: 'us' | 'them';
+  playerId?: string;
+  playerName?: string;
+  assistPlayerId?: string;
+  assistPlayerName?: string;
+  playerInId?: string;
+  playerInName?: string;
+  playerOutId?: string;
+  playerOutName?: string;
+  cardType?: 'yellow' | 'red';
+  note?: string;
+  scoreSnapshot?: { scoreUs: number; scoreThem: number };
+  timestamp: number;
+}
+
 export interface MatchScorer {
   playerId: string;
   playerName: string;
   minute: number;
+  assistPlayerName?: string;
 }
 
 export interface LineupPosition {
@@ -68,7 +94,9 @@ export interface Match {
   scoreThem: number | null;
   scorersUs: MatchScorer[];
   calledUpPlayerIds: string[];
+  modality?: MatchModality;
   lineup: LineupPosition[];
+  events?: MatchEvent[];
   mvpId?: string;
   mvpPlayerName?: string;
   mvpPhotoUrl?: string;
