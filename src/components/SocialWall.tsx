@@ -151,15 +151,8 @@ export const SocialWall: React.FC<SocialWallProps> = ({
         </span>
       );
     }
-    if (role === 'admin') {
-      return (
-        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 inline-flex items-center gap-1">
-          <Shield className="w-2.5 h-2.5" /> Admin
-        </span>
-      );
-    }
     return (
-      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 inline-flex items-center gap-1">
+      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30 inline-flex items-center gap-1">
         <User className="w-2.5 h-2.5" /> Jugador
       </span>
     );

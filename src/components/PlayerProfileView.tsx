@@ -22,7 +22,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Player, TeamInfo, AppUser, Language } from '../types';
+import { Player, TeamInfo, AppUser, Language, DEFAULT_FACEBOOK_AVATAR, getPlayerPositionName } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 
@@ -44,7 +44,7 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
   onBack,
 }) => {
   const t = getT(language);
-  const isOwnerOrAdmin = currentUser.role === 'owner' || currentUser.role === 'admin';
+  const isOwnerOrAdmin = currentUser.role === 'owner';
   const isSelf = currentUser.playerId === player.id;
   // Players can always edit their profile photo via camera and alias directly
   const canEdit = true;
@@ -284,18 +284,7 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
   };
 
   const getPositionLabel = (pos: string) => {
-    switch (pos) {
-      case 'POR':
-        return 'Portero';
-      case 'DEF':
-        return 'Defensa';
-      case 'MED':
-        return 'Mediocampista';
-      case 'DEL':
-        return 'Delantero';
-      default:
-        return pos;
-    }
+    return getPlayerPositionName(pos);
   };
 
   return (
@@ -342,10 +331,13 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
           {/* Avatar with Camera Overlay Trigger */}
           <div className="relative shrink-0 group">
             <img
-              src={player.avatarUrl}
+              src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
               alt={player.name}
               referrerPolicy="no-referrer"
-              className="w-28 h-28 sm:w-32 sm:h-32 rounded-full object-cover ring-4 ring-[#1877F2]/20 shadow-md"
+              onError={(e) => {
+                e.currentTarget.src = DEFAULT_FACEBOOK_AVATAR;
+              }}
+              className="w-28 h-28 sm:w-32 sm:h-32 rounded-full object-cover ring-4 ring-[#1877F2]/20 shadow-md bg-[#E4E6EB]"
             />
 
             {/* Number Badge */}
@@ -929,10 +921,13 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
               <div className="relative z-10 flex flex-col items-center">
                 <div className="relative">
                   <img
-                    src={player.avatarUrl}
+                    src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                     alt={player.name}
                     referrerPolicy="no-referrer"
-                    className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl object-cover border-2 border-white shadow-2xl"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_FACEBOOK_AVATAR;
+                    }}
+                    className="w-28 h-28 sm:w-32 sm:h-32 rounded-2xl object-cover border-2 border-white shadow-2xl bg-[#E4E6EB]"
                   />
                   {/* Number Badge */}
                   <span className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-[#1877F2] text-white font-mono font-black text-lg flex items-center justify-center shadow-xl border-2 border-white">

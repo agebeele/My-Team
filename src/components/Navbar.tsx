@@ -36,8 +36,6 @@ interface NavbarProps {
   onOpenNotifications?: () => void;
   onOpenAuthModal?: () => void;
   onOpenAuth?: () => void;
-  isDarkMode?: boolean;
-  onToggleDarkMode?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -57,8 +55,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotifications = () => {},
   onOpenAuthModal,
   onOpenAuth,
-  isDarkMode = false,
-  onToggleDarkMode,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const t = getT(language);
@@ -72,29 +68,20 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleOpenAuth = onOpenAuth || onOpenAuthModal || (() => {});
 
   const getRoleBadge = (role: UserRole) => {
-    switch (role) {
-      case 'owner':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#E7F3FF] text-[#1877F2] border border-[#1877F2]/30">
-            <Crown className="w-3 h-3 text-[#1877F2]" />
-            {t.roles.owner}
-          </span>
-        );
-      case 'admin':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-200">
-            <Shield className="w-3 h-3 text-indigo-600" />
-            {t.roles.admin}
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-            <User className="w-3 h-3 text-gray-500" />
-            {t.roles.player}
-          </span>
-        );
+    if (role === 'owner') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#E7F3FF] text-[#1877F2] border border-[#1877F2]/30">
+          <Crown className="w-3 h-3 text-[#1877F2]" />
+          {t.roles.owner}
+        </span>
+      );
     }
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+        <User className="w-3 h-3 text-gray-500" />
+        {t.roles.player}
+      </span>
+    );
   };
 
   return (
@@ -233,38 +220,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               {t.nav.wall}
             </button>
-            {(currentUser.role === 'owner' || currentUser.role === 'admin') && (
+            {currentUser.role === 'owner' && (
               <button
                 id="nav-btn-admin"
                 onClick={() => handleTabChange('admin')}
                 className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                   selectedTab === 'admin'
-                    ? 'bg-white dark:bg-[#242526] text-indigo-600 dark:text-indigo-400 shadow-xs'
-                    : 'text-indigo-600/80 dark:text-indigo-300 hover:text-indigo-700 hover:bg-white/60 dark:hover:bg-white/10'
+                    ? 'bg-white text-[#1877F2] shadow-xs'
+                    : 'text-[#1877F2] hover:bg-white/60'
                 }`}
               >
-                {t.nav.admin}
+                Configuración
               </button>
             )}
           </nav>
 
           {/* Right Action Bar - Facebook Circular Action Buttons */}
           <div className="flex items-center gap-2">
-            {/* Dark Mode Toggle Switch Button */}
-            {onToggleDarkMode && (
-              <button
-                id="btn-theme-toggle"
-                onClick={onToggleDarkMode}
-                className="w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-white transition-colors flex items-center justify-center text-xs shadow-xs cursor-pointer"
-                title={isDarkMode ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
-              >
-                {isDarkMode ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-[#050505]" />
-                )}
-              </button>
-            )}
 
             {/* Language Switcher */}
             <button
@@ -356,40 +328,40 @@ export const Navbar: React.FC<NavbarProps> = ({
                             />
                             <div className="truncate">
                               <span className="font-bold block truncate">{u.name}</span>
-                              <span className="text-[10px] text-[#65676B] dark:text-gray-400 capitalize">
-                                {u.role === 'owner' ? t.roles.owner : u.role === 'admin' ? t.roles.admin : t.roles.player}
+                              <span className="text-[10px] text-[#65676B] capitalize">
+                                {u.role === 'owner' ? t.roles.owner : t.roles.player}
                               </span>
                             </div>
                           </div>
-                          {isCurrent && <Check className="w-4 h-4 text-[#1877F2] dark:text-[#60A5FA] shrink-0" />}
+                          {isCurrent && <Check className="w-4 h-4 text-[#1877F2] shrink-0" />}
                         </button>
                       );
                     })}
                   </div>
 
-                  <div className="mt-3 pt-2 border-t border-gray-100 dark:border-white/10 flex items-center justify-between">
+                  <div className="mt-3 pt-2 border-t border-gray-100 flex items-center justify-between">
                     <button
                       id="btn-social-auth-modal"
                       onClick={() => {
                         setShowRoleMenu(false);
                         handleOpenAuth();
                       }}
-                      className="text-xs text-[#1877F2] dark:text-[#60A5FA] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                      className="text-xs text-[#1877F2] hover:underline font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <User className="w-3.5 h-3.5" />
-                      {t.auth.login} / Social
+                      {t.auth.login} / Jugador
                     </button>
 
-                    {(currentUser.role === 'owner' || currentUser.role === 'admin') && (
+                    {currentUser.role === 'owner' && (
                       <button
                         onClick={() => {
                           handleTabChange('admin');
                           setShowRoleMenu(false);
                         }}
-                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                        className="text-xs text-[#1877F2] hover:underline font-bold flex items-center gap-1 cursor-pointer"
                       >
                         <Settings className="w-3.5 h-3.5" />
-                        {t.nav.admin}
+                        Configuración
                       </button>
                     )}
                   </div>

@@ -47,7 +47,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   };
 
   const role = userRole || currentUser?.role || 'player';
-  const isOwnerOrAdmin = role === 'owner' || role === 'admin';
+  const isOwner = role === 'owner';
 
   // Primary tabs visible in dock
   const primaryTabs = [
@@ -107,14 +107,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     },
   ];
 
-  if (isOwnerOrAdmin) {
+  if (isOwner) {
     secondaryMenuItems.push({
       id: 'admin',
-      label: t.nav.admin,
-      description: 'Gestión de club, escudo y plantilla',
+      label: 'Configuración de Equipo',
+      description: 'Gestión de club, agregar o eliminar jugadores',
       icon: Settings,
-      badge: 'Admin',
-      color: 'purple',
+      badge: 'Dueño',
+      color: 'blue',
     });
   }
 

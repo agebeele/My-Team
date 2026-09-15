@@ -11,12 +11,16 @@ import {
   Plus,
   X,
   Trash2,
+  Download,
 } from 'lucide-react';
-import { Match, Player, AppUser, Language, LineupPosition, MatchModality } from '../types';
+import { Match, Player, AppUser, Language, LineupPosition, MatchModality, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
 import { DEFAULT_LINEUP } from '../data/initialData';
+import { LineupDownloadModal } from './LineupDownloadModal';
 
 interface TacticalPitchProps {
+  team: TeamInfo;
+  setTeam?: React.Dispatch<React.SetStateAction<TeamInfo>>;
   players: Player[];
   matches: Match[];
   setMatches: React.Dispatch<React.SetStateAction<Match[]>>;
@@ -241,6 +245,8 @@ export const FORMATIONS_BY_MODALITY: Record<MatchModality, Record<string, Format
 };
 
 export const TacticalPitch: React.FC<TacticalPitchProps> = ({
+  team,
+  setTeam,
   players,
   matches,
   setMatches,
@@ -249,13 +255,16 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
   selectedMatchId,
 }) => {
   const t = getT(language);
-  const isOwnerOrAdmin = currentUser.role === 'owner' || currentUser.role === 'admin';
+  const isOwnerOrAdmin = currentUser.role === 'owner';
 
   const [activeMatchId, setActiveMatchId] = useState<string>(
     selectedMatchId || matches[0]?.id || ''
   );
 
   const activeMatch = matches.find((m) => m.id === activeMatchId) || matches[0];
+
+  // Download modal state
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   // Modality state: Fútbol 7
   const [modality, setModality] = useState<MatchModality>('fut7');
@@ -629,6 +638,17 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                 </option>
               ))}
             </select>
+
+            {/* Download Lineup Poster Button */}
+            <button
+              id="btn-open-download-lineup"
+              onClick={() => setIsDownloadModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#E7F3FF] hover:bg-[#D0E7FF] text-[#1877F2] font-bold text-xs shadow-xs transition-all border border-[#1877F2]/30 cursor-pointer"
+              title="Descargar alineación oficial con logo del club y fondo de estadio"
+            >
+              <Download className="w-4 h-4" />
+              <span>Descargar Alineación</span>
+            </button>
 
             {/* Save Button */}
             {isOwnerOrAdmin && (
@@ -1194,6 +1214,22 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal: Descargar Alineación Oficial con Logo, Estadio y Colores */}
+      <LineupDownloadModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        team={team}
+        setTeam={setTeam}
+        activeMatch={activeMatch}
+        formation={formation}
+        starterPlayers={pitchLineup.map((slot) => ({
+          slot,
+          player: players.find((p) => p.id === slot.playerId),
+        }))}
+        benchPlayers={benchPlayers}
+        language={language}
+      />
     </div>
   );
 };

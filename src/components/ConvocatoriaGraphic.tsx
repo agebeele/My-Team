@@ -12,9 +12,33 @@ import {
   Calendar,
   MapPin,
   Image as ImageIcon,
+  Palette,
+  RotateCcw,
+  ExternalLink,
+  Copy,
+  X,
 } from 'lucide-react';
-import { Match, TeamInfo, Player, AppUser, Language, PlayerPosition } from '../types';
+import {
+  Match,
+  TeamInfo,
+  Player,
+  AppUser,
+  Language,
+  PlayerPosition,
+  getPositionCategory,
+  ALL_POSITIONS,
+  DEFAULT_FACEBOOK_AVATAR,
+} from '../types';
 import { getT } from '../utils/translations';
+import {
+  STADIUM_BACKGROUND_PRESETS,
+  COLOR_THEME_PRESETS,
+  loadCanvasImageSafe,
+  downloadCanvasOrBlob,
+  CanvasExportResult,
+  triggerBrowserFileDownload,
+} from '../utils/graphicPresets';
+import { copyImageToClipboard } from '../utils/lineupPosterGenerator';
 
 interface ConvocatoriaGraphicProps {
   team: TeamInfo;
@@ -38,7 +62,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
   selectedMatchId,
 }) => {
   const t = getT(language);
-  const isOwnerOrAdmin = currentUser.role === 'owner' || currentUser.role === 'admin';
+  const isOwnerOrAdmin = currentUser.role === 'owner';
 
   const [activeMatchId, setActiveMatchId] = useState<string>(
     selectedMatchId || matches[0]?.id || ''
@@ -73,6 +97,34 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
 
   const posterRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Stadium background & team color customization
+  const [selectedBg, setSelectedBg] = useState<string>(
+    STADIUM_BACKGROUND_PRESETS[0].url
+  );
+  const [primaryColor, setPrimaryColor] = useState<string>(
+    team.primaryColor || '#1877F2'
+  );
+  const [secondaryColor, setSecondaryColor] = useState<string>(
+    team.secondaryColor || '#0866FF'
+  );
+  const [colorsSaved, setColorsSaved] = useState(false);
+  const [showStyleControls, setShowStyleControls] = useState(false);
+  const [generatedResult, setGeneratedResult] = useState<CanvasExportResult | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Save customized colors to team
+  const handleSaveColorsToClub = () => {
+    if (typeof setTeam === 'function') {
+      setTeam((prev) => ({
+        ...prev,
+        primaryColor,
+        secondaryColor,
+      }));
+      setColorsSaved(true);
+      setTimeout(() => setColorsSaved(false), 3000);
+    }
+  };
 
   const currentMatch = matches.find((m) => m.id === activeMatchId) || matches[0];
 
@@ -144,10 +196,10 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
 
   // Group called-up players by position for official flyer layout
   const calledUpPlayers = players.filter((p) => p.isCalledUp);
-  const goalkeepers = calledUpPlayers.filter((p) => p.position === 'POR');
-  const defenders = calledUpPlayers.filter((p) => p.position === 'DEF');
-  const midfielders = calledUpPlayers.filter((p) => p.position === 'MED');
-  const forwards = calledUpPlayers.filter((p) => p.position === 'DEL');
+  const goalkeepers = calledUpPlayers.filter((p) => getPositionCategory(p.position) === 'POR');
+  const defenders = calledUpPlayers.filter((p) => getPositionCategory(p.position) === 'DEF');
+  const midfielders = calledUpPlayers.filter((p) => getPositionCategory(p.position) === 'MED');
+  const forwards = calledUpPlayers.filter((p) => getPositionCategory(p.position) === 'DEL');
 
   // Generate PNG image using pure Canvas drawing from vector & DOM coordinates
   const handleDownloadGraphic = async () => {
@@ -161,65 +213,117 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Dark gradient background
-      const grad = ctx.createLinearGradient(0, 0, width, height);
-      grad.addColorStop(0, '#090d16');
-      grad.addColorStop(0.5, '#0f172a');
-      grad.addColorStop(1, '#05080e');
+      // Base solid dark
+      ctx.fillStyle = '#05070B';
+      ctx.fillRect(0, 0, width, height);
+
+      // Layer 1: Draw Stadium / Pitch / Players background image
+      const bgImg = await loadCanvasImageSafe(selectedBg);
+      if (bgImg) {
+        ctx.save();
+        ctx.drawImage(bgImg, 0, 0, width, height);
+        ctx.restore();
+      }
+
+      // Layer 2: Rich dark gradient overlay with brand color aura
+      const grad = ctx.createLinearGradient(0, 0, 0, height);
+      grad.addColorStop(0, 'rgba(5, 7, 11, 0.88)');
+      grad.addColorStop(0.3, 'rgba(5, 7, 11, 0.70)');
+      grad.addColorStop(0.85, 'rgba(5, 7, 11, 0.94)');
+      grad.addColorStop(1, 'rgba(5, 7, 11, 0.98)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      // Top green glow
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
-      ctx.beginPath();
-      ctx.arc(width / 2, 0, 450, 0, Math.PI * 2);
-      ctx.fill();
+      // Top brand color glow behind logo
+      const radialGlow = ctx.createRadialGradient(width / 2, 110, 10, width / 2, 110, 380);
+      radialGlow.addColorStop(0, `${primaryColor}45`);
+      radialGlow.addColorStop(1, 'transparent');
+      ctx.fillStyle = radialGlow;
+      ctx.fillRect(0, 0, width, 450);
 
-      // Golden geometric lines
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
-      ctx.lineWidth = 3;
+      // Layer 3: Draw Team Logo with circular frame
+      const logoImg = await loadCanvasImageSafe(team.logoUrl);
+      const logoX = width / 2;
+      const logoY = 90;
+      const logoR = 48;
+
+      ctx.save();
+      // Glowing outer ring
+      ctx.strokeStyle = primaryColor;
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(80, 180);
-      ctx.lineTo(width - 80, 180);
+      ctx.arc(logoX, logoY, logoR + 2, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Team Logo & Name Header
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 54px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(team.name.toUpperCase(), width / 2, 105);
+      if (logoImg) {
+        ctx.beginPath();
+        ctx.arc(logoX, logoY, logoR, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(logoImg, logoX - logoR, logoY - logoR, logoR * 2, logoR * 2);
+      } else {
+        // Stylish fallback shield
+        ctx.fillStyle = primaryColor;
+        ctx.beginPath();
+        ctx.arc(logoX, logoY, logoR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(team.shortName.charAt(0) || 'T', logoX, logoY);
+      }
+      ctx.restore();
 
-      ctx.fillStyle = '#10B981';
-      ctx.font = 'bold 24px sans-serif';
-      ctx.fillText(team.leagueName.toUpperCase(), width / 2, 145);
+      // Team Name & League Header
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(team.name.toUpperCase(), width / 2, 185);
+
+      ctx.fillStyle = secondaryColor || '#60A5FA';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.fillText(team.leagueName.toUpperCase(), width / 2, 218);
+
+      // Golden geometric lines
+      ctx.strokeStyle = `${primaryColor}60`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(100, 235);
+      ctx.lineTo(width - 100, 235);
+      ctx.stroke();
 
       // Match Banner Block
-      ctx.fillStyle = '#1e293b';
-      ctx.roundRect(80, 210, width - 160, 140, 20);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.roundRect(80, 255, width - 160, 130, 20);
       ctx.fill();
-      ctx.strokeStyle = '#334155';
+      ctx.strokeStyle = `${primaryColor}80`;
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = 'bold 20px sans-serif';
-      ctx.fillText('PRÓXIMO ENCUENTRO OFICIAL', width / 2, 245);
+      ctx.fillStyle = '#F59E0B';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('PRÓXIMO ENCUENTRO OFICIAL', width / 2, 285);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 38px sans-serif';
-      ctx.fillText(`${team.shortName}  VS  ${currentMatch ? currentMatch.rival.toUpperCase() : 'RIVAL'}`, width / 2, 295);
+      ctx.font = 'bold 36px sans-serif';
+      ctx.fillText(
+        `${team.shortName}  VS  ${currentMatch ? currentMatch.rival.toUpperCase() : 'RIVAL'}`,
+        width / 2,
+        330
+      );
 
-      ctx.fillStyle = '#34d399';
-      ctx.font = '20px sans-serif';
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '18px sans-serif';
       const matchDetails = currentMatch
         ? `📅 ${currentMatch.date}  •  ⏰ ${currentMatch.time} hrs  •  📍 ${currentMatch.stadium}`
         : 'Horario y Estadio por confirmar';
-      ctx.fillText(matchDetails, width / 2, 330);
+      ctx.fillText(matchDetails, width / 2, 362);
 
-      // Big Title: CONVOCATORIA
+      // Big Title: CONVOCATORIA OFICIAL
       ctx.fillStyle = '#F59E0B';
-      ctx.font = '900 68px sans-serif';
-      ctx.fillText('★ CONVOCATORIA OFICIAL ★', width / 2, 420);
+      ctx.font = '900 58px sans-serif';
+      ctx.fillText('★ CONVOCATORIA OFICIAL ★', width / 2, 450);
 
       // Columns for positions
       const colLeftX = 140;
@@ -232,62 +336,62 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
         startY: number
       ) => {
         ctx.textAlign = 'left';
-        ctx.fillStyle = '#10B981';
-        ctx.font = 'bold 26px sans-serif';
+        ctx.fillStyle = primaryColor;
+        ctx.font = '900 24px sans-serif';
         ctx.fillText(title, startX, startY);
 
-        let y = startY + 36;
+        let y = startY + 34;
         if (groupPlayers.length === 0) {
           ctx.fillStyle = '#64748b';
-          ctx.font = 'italic 20px sans-serif';
+          ctx.font = 'italic 18px sans-serif';
           ctx.fillText('Sin convocados', startX + 15, y);
         } else {
           groupPlayers.forEach((p) => {
             // Jersey badge
-            ctx.fillStyle = '#0f766e';
-            ctx.roundRect(startX, y - 22, 44, 28, 6);
+            ctx.fillStyle = primaryColor;
+            ctx.roundRect(startX, y - 20, 42, 26, 6);
             ctx.fill();
 
             ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 18px monospace';
+            ctx.font = 'bold 16px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(String(p.number), startX + 22, y - 2);
+            ctx.fillText(String(p.number), startX + 21, y - 1);
 
             // Player name
             ctx.textAlign = 'left';
-            ctx.font = 'bold 22px sans-serif';
+            ctx.font = 'bold 20px sans-serif';
             ctx.fillStyle = '#f8fafc';
-            ctx.fillText(p.name + (p.nickname ? ` "${p.nickname}"` : ''), startX + 56, y - 2);
-            y += 40;
+            ctx.fillText(p.name + (p.nickname ? ` "${p.nickname}"` : ''), startX + 54, y - 1);
+            y += 38;
           });
         }
       };
 
       // Left Column: Porteros + Defensas
-      drawPositionGroup('PORTEROS', goalkeepers, colLeftX, 480);
-      drawPositionGroup('DEFENSAS', defenders, colLeftX, 620);
+      drawPositionGroup('PORTEROS', goalkeepers, colLeftX, 510);
+      drawPositionGroup('DEFENSAS', defenders, colLeftX, 640);
 
       // Right Column: Mediocampistas + Delanteros
-      drawPositionGroup('MEDIOCAMPISTAS', midfielders, colRightX, 480);
-      drawPositionGroup('DELANTEROS', forwards, colRightX, 740);
+      drawPositionGroup('MEDIOCAMPISTAS', midfielders, colRightX, 510);
+      drawPositionGroup('DELANTEROS', forwards, colRightX, 760);
 
       // Bottom sponsor / footer bar
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, height - 100, width, 100);
-      ctx.fillStyle = '#10B981';
-      ctx.font = 'bold 22px sans-serif';
+      ctx.fillStyle = 'rgba(10, 15, 26, 0.95)';
+      ctx.fillRect(0, height - 90, width, 90);
+      ctx.fillStyle = secondaryColor || '#60A5FA';
+      ctx.font = 'bold 20px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('¡VAMOS POR LOS TRES PUNTOS!  #JuntosPorLaGloria', width / 2, height - 55);
-      ctx.fillStyle = '#64748b';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`Diseñado en TeamGol App  •  ${team.name}`, width / 2, height - 25);
+      ctx.fillText('¡VAMOS POR LOS TRES PUNTOS!  #JuntosPorLaGloria', width / 2, height - 48);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '15px sans-serif';
+      ctx.fillText(`Diseñado en TeamGol App  •  ${team.name}`, width / 2, height - 20);
 
-      // Export as PNG
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `Convocatoria_${team.shortName}_vs_${currentMatch?.rival || 'Partido'}.png`;
-      link.href = dataUrl;
-      link.click();
+      // Export as PNG using safe Blob Downloader
+      const fileName = `Convocatoria_${team.shortName}_vs_${currentMatch?.rival || 'Partido'}.png`;
+      const res = await downloadCanvasOrBlob(canvas, fileName);
+      if (res) {
+        setGeneratedResult(res);
+      }
     } catch (err) {
       console.error('Error generating image flyer:', err);
     } finally {
@@ -345,8 +449,172 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
               {t.convocatoria.teamDetails}
             </button>
           )}
+
+          {/* Toggle Styles & Colors Button */}
+          <button
+            onClick={() => setShowStyleControls(!showStyleControls)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs ${
+              showStyleControls
+                ? 'bg-[#1877F2]/10 text-[#1877F2] border-[#1877F2]'
+                : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] dark:bg-white/5 dark:hover:bg-white/10 dark:text-gray-300 border-[#CED0D4] dark:border-white/10'
+            }`}
+            title="Personalizar fondo de estadio y jugar con los colores del club"
+          >
+            <Palette className="w-4 h-4 text-emerald-500" />
+            <span>Estadio & Colores</span>
+          </button>
         </div>
       </div>
+
+      {/* Accordion: Customize Stadium Background & Colors */}
+      {showStyleControls && (
+        <div className="bg-white dark:bg-[#242526] p-4 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs mb-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#CED0D4] dark:border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <h4 className="text-sm font-bold text-[#050505] dark:text-white">
+                Personalizar Fondo de Estadio y Colores del Escudo
+              </h4>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimaryColor(team.primaryColor || '#1877F2');
+                  setSecondaryColor(team.secondaryColor || '#0866FF');
+                  setSelectedBg(STADIUM_BACKGROUND_PRESETS[0].url);
+                }}
+                className="text-xs text-gray-500 hover:text-[#1877F2] flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Restaurar</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Background Stadium Selectors */}
+            <div>
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-2 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                <span>Fondo de Estadio / Campo / Jugadores</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {STADIUM_BACKGROUND_PRESETS.map((preset) => {
+                  const isSelected = selectedBg === preset.url;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setSelectedBg(preset.url)}
+                      className={`relative rounded-xl overflow-hidden text-left p-1 border transition-all cursor-pointer group ${
+                        isSelected
+                          ? 'border-amber-400 ring-2 ring-amber-400/40'
+                          : 'border-[#CED0D4] dark:border-white/10 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="h-12 rounded-lg overflow-hidden relative mb-1">
+                        <img
+                          src={preset.url}
+                          alt={preset.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-black/30" />
+                        {isSelected && (
+                          <span className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold text-[9px]">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold text-[#050505] dark:text-white block truncate">
+                        {preset.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Colors Selectors */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Colores del Club (Para Convocatoria y Alineación)</span>
+              </label>
+
+              {/* Theme chips */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {COLOR_THEME_PRESETS.map((theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => {
+                      setPrimaryColor(theme.primary);
+                      setSecondaryColor(theme.secondary);
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#F0F2F5] dark:bg-black/30 border border-[#CED0D4] dark:border-white/10 text-[11px] font-medium text-gray-700 dark:text-gray-300 hover:border-gray-400 cursor-pointer"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-white/40"
+                      style={{ backgroundColor: theme.primary }}
+                    />
+                    <span>{theme.name}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Color inputs */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="flex items-center gap-2 p-1.5 rounded-xl border border-[#CED0D4] dark:border-white/10 bg-[#F0F2F5] dark:bg-black/20">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="w-6 h-6 rounded-md cursor-pointer bg-transparent border-0"
+                  />
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase font-bold text-gray-400 block">
+                      Color Primario
+                    </span>
+                    <span className="text-xs font-mono font-bold text-gray-800 dark:text-gray-200 uppercase">
+                      {primaryColor}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-1.5 rounded-xl border border-[#CED0D4] dark:border-white/10 bg-[#F0F2F5] dark:bg-black/20">
+                  <input
+                    type="color"
+                    value={secondaryColor}
+                    onChange={(e) => setSecondaryColor(e.target.value)}
+                    className="w-6 h-6 rounded-md cursor-pointer bg-transparent border-0"
+                  />
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase font-bold text-gray-400 block">
+                      Color Secundario
+                    </span>
+                    <span className="text-xs font-mono font-bold text-gray-800 dark:text-gray-200 uppercase">
+                      {secondaryColor}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save colors to club */}
+              {isOwnerOrAdmin && (
+                <button
+                  type="button"
+                  onClick={handleSaveColorsToClub}
+                  className="w-full py-1.5 px-3 rounded-xl bg-[#1877F2]/10 hover:bg-[#1877F2]/20 text-[#1877F2] text-xs font-bold flex items-center justify-center gap-1.5 border border-[#1877F2]/30 cursor-pointer"
+                >
+                  {colorsSaved ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Shield className="w-3.5 h-3.5" />}
+                  <span>{colorsSaved ? '¡Guardado en el perfil del club!' : 'Guardar estos colores en el club'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Side: Live Visual Graphic Preview */}
@@ -365,167 +633,243 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
           <div
             ref={posterRef}
             id="convocatoria-poster"
-            className="w-full max-w-lg bg-gradient-to-b from-[#141416] via-[#0D0D0F] to-[#141416] rounded-2xl border border-white/10 p-6 shadow-2xl relative overflow-hidden"
+            className="w-full max-w-lg rounded-2xl border-2 p-6 shadow-2xl relative overflow-hidden flex flex-col justify-between"
+            style={{
+              borderColor: `${primaryColor}60`,
+              backgroundColor: '#07090E',
+            }}
           >
-            {/* Background Glows and Team Backdrop */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            {/* Team Banner / Photo Header */}
-            <div className="relative rounded-xl overflow-hidden border border-white/10 h-32 mb-5">
+            {/* Background Stadium Image */}
+            <div className="absolute inset-0 z-0">
               <img
-                src={team.bannerUrl}
-                alt={team.name}
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover brightness-50"
+                src={selectedBg}
+                alt="Estadio"
+                crossOrigin="anonymous"
+                className="w-full h-full object-cover brightness-[0.30] contrast-125 scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-
-              <div className="absolute bottom-3 left-4 right-4 flex items-center gap-3">
-                <img
-                  src={team.logoUrl}
-                  alt={team.name}
-                  referrerPolicy="no-referrer"
-                  className="w-12 h-12 rounded-lg object-cover border-2 border-emerald-400 shadow-lg shrink-0"
-                />
-                <div className="min-w-0">
-                  <h3 className="text-base font-bold text-white tracking-tight truncate uppercase">
-                    {team.name}
-                  </h3>
-                  <p className="text-[11px] font-semibold text-emerald-400 truncate">
-                    {team.leagueName}
-                  </p>
-                </div>
-              </div>
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(180deg, rgba(5,7,11,0.85) 0%, rgba(5,7,11,0.65) 40%, rgba(5,7,11,0.92) 100%)`,
+                }}
+              />
+              <div
+                className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-48 rounded-full blur-3xl opacity-30 pointer-events-none"
+                style={{ backgroundColor: primaryColor }}
+              />
             </div>
 
-            {/* Match info chip */}
-            {currentMatch && (
-              <div className="bg-black/50 border border-white/5 rounded-xl p-3 mb-5 text-center shadow-inner">
-                <div className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-                  ★ PARTIDO OFICIAL ★
-                </div>
-                <div className="text-base font-bold text-white my-0.5">
-                  {team.shortName} <span className="text-gray-500">VS</span> {currentMatch.rival.toUpperCase()}
-                </div>
-                <div className="text-[11px] text-gray-400 flex items-center justify-center gap-2 flex-wrap">
-                  <span>📅 {currentMatch.date}</span>
-                  <span>•</span>
-                  <span>⏰ {currentMatch.time} hrs</span>
-                  <span>•</span>
-                  <span className="truncate">📍 {currentMatch.stadium}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Callup Title Banner */}
-            <div className="text-center mb-5">
-              <span className="inline-block px-4 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold tracking-widest uppercase">
-                CONVOCATORIA OFICIAL
-              </span>
-            </div>
-
-            {/* Squad lists by position */}
-            <div className="grid grid-cols-2 gap-4 text-left">
-              {/* Left Column: POR & DEF */}
-              <div className="space-y-4">
-                <div>
-                  <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2 border-b border-white/5 pb-1">
-                    Porteros ({goalkeepers.length})
-                  </h5>
-                  <div className="space-y-1.5">
-                    {goalkeepers.length === 0 ? (
-                      <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
-                    ) : (
-                      goalkeepers.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-emerald-950 text-emerald-400 font-mono text-[10px] font-bold flex items-center justify-center border border-emerald-500/30">
-                            {p.number}
-                          </span>
-                          <span className="text-xs font-semibold text-gray-200 truncate">
-                            {p.name}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
+            {/* Foreground Content */}
+            <div className="relative z-10">
+              {/* Team Logo & Header */}
+              <div className="flex flex-col items-center text-center mb-4">
+                <div className="relative mb-2">
+                  <div
+                    className="absolute -inset-1 rounded-full blur-md opacity-70 animate-pulse"
+                    style={{ backgroundColor: primaryColor }}
+                  />
+                  <img
+                    src={team.logoUrl || DEFAULT_FACEBOOK_AVATAR}
+                    alt={team.name}
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_FACEBOOK_AVATAR;
+                    }}
+                    className="relative w-14 h-14 rounded-full object-cover border-2 shadow-xl bg-black/60"
+                    style={{ borderColor: primaryColor }}
+                  />
                 </div>
 
-                <div>
-                  <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2 border-b border-white/5 pb-1">
-                    Defensas ({defenders.length})
-                  </h5>
-                  <div className="space-y-1.5">
-                    {defenders.length === 0 ? (
-                      <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
-                    ) : (
-                      defenders.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-white/5 text-gray-200 font-mono text-[10px] font-bold flex items-center justify-center border border-white/10">
-                            {p.number}
-                          </span>
-                          <span className="text-xs font-semibold text-gray-200 truncate">
-                            {p.name}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <h3 className="text-lg sm:text-xl font-black text-white tracking-wider truncate uppercase drop-shadow-md">
+                  {team.name}
+                </h3>
+                <p
+                  className="text-xs font-bold uppercase tracking-widest mt-0.5 drop-shadow-sm"
+                  style={{ color: secondaryColor || '#60A5FA' }}
+                >
+                  {team.leagueName}
+                </p>
               </div>
 
-              {/* Right Column: MED & DEL */}
-              <div className="space-y-4">
-                <div>
-                  <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2 border-b border-white/5 pb-1">
-                    Medios ({midfielders.length})
-                  </h5>
-                  <div className="space-y-1.5">
-                    {midfielders.length === 0 ? (
-                      <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
-                    ) : (
-                      midfielders.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-white/5 text-gray-200 font-mono text-[10px] font-bold flex items-center justify-center border border-white/10">
-                            {p.number}
-                          </span>
-                          <span className="text-xs font-semibold text-gray-200 truncate">
-                            {p.name}
-                          </span>
-                        </div>
-                      ))
-                    )}
+              {/* Match info chip */}
+              {currentMatch && (
+                <div
+                  className="bg-black/60 backdrop-blur-md rounded-xl p-3 mb-4 text-center shadow-lg border"
+                  style={{ borderColor: `${primaryColor}40` }}
+                >
+                  <div className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+                    ★ PARTIDO OFICIAL ★
+                  </div>
+                  <div className="text-base font-bold text-white my-0.5">
+                    {team.shortName} <span className="text-gray-400">VS</span> {currentMatch.rival.toUpperCase()}
+                  </div>
+                  <div className="text-[11px] text-gray-300 flex items-center justify-center gap-2 flex-wrap font-medium">
+                    <span>📅 {currentMatch.date}</span>
+                    <span>•</span>
+                    <span>⏰ {currentMatch.time} hrs</span>
+                    <span>•</span>
+                    <span className="truncate">📍 {currentMatch.stadium}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Callup Title Banner */}
+              <div className="text-center mb-4">
+                <span
+                  className="inline-block px-4 py-1 rounded-full border text-xs font-black tracking-widest uppercase shadow-md"
+                  style={{
+                    backgroundColor: `${primaryColor}25`,
+                    borderColor: primaryColor,
+                    color: '#F59E0B',
+                  }}
+                >
+                  ★ CONVOCATORIA OFICIAL ★
+                </span>
+              </div>
+
+              {/* Squad lists by position */}
+              <div className="grid grid-cols-2 gap-4 text-left">
+                {/* Left Column: POR & DEF */}
+                <div className="space-y-4">
+                  <div>
+                    <h5
+                      className="text-[11px] font-black uppercase tracking-wider mb-2 border-b pb-1"
+                      style={{
+                        color: primaryColor,
+                        borderColor: `${primaryColor}30`,
+                      }}
+                    >
+                      Porteros ({goalkeepers.length})
+                    </h5>
+                    <div className="space-y-1.5">
+                      {goalkeepers.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
+                      ) : (
+                        goalkeepers.map((p) => (
+                          <div key={p.id} className="flex items-center gap-2">
+                            <span
+                              className="w-5 h-5 rounded-md text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-xs"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              {p.number}
+                            </span>
+                            <span className="text-xs font-semibold text-gray-200 truncate">
+                              {p.name}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h5
+                      className="text-[11px] font-black uppercase tracking-wider mb-2 border-b pb-1"
+                      style={{
+                        color: primaryColor,
+                        borderColor: `${primaryColor}30`,
+                      }}
+                    >
+                      Defensas ({defenders.length})
+                    </h5>
+                    <div className="space-y-1.5">
+                      {defenders.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
+                      ) : (
+                        defenders.map((p) => (
+                          <div key={p.id} className="flex items-center gap-2">
+                            <span
+                              className="w-5 h-5 rounded-md text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-xs"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              {p.number}
+                            </span>
+                            <span className="text-xs font-semibold text-gray-200 truncate">
+                              {p.name}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2 border-b border-white/5 pb-1">
-                    Delanteros ({forwards.length})
-                  </h5>
-                  <div className="space-y-1.5">
-                    {forwards.length === 0 ? (
-                      <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
-                    ) : (
-                      forwards.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-md bg-white/5 text-gray-200 font-mono text-[10px] font-bold flex items-center justify-center border border-white/10">
-                            {p.number}
-                          </span>
-                          <span className="text-xs font-semibold text-gray-200 truncate">
-                            {p.name}
-                          </span>
-                        </div>
-                      ))
-                    )}
+                {/* Right Column: MED & DEL */}
+                <div className="space-y-4">
+                  <div>
+                    <h5
+                      className="text-[11px] font-black uppercase tracking-wider mb-2 border-b pb-1"
+                      style={{
+                        color: primaryColor,
+                        borderColor: `${primaryColor}30`,
+                      }}
+                    >
+                      Medios ({midfielders.length})
+                    </h5>
+                    <div className="space-y-1.5">
+                      {midfielders.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
+                      ) : (
+                        midfielders.map((p) => (
+                          <div key={p.id} className="flex items-center gap-2">
+                            <span
+                              className="w-5 h-5 rounded-md text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-xs"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              {p.number}
+                            </span>
+                            <span className="text-xs font-semibold text-gray-200 truncate">
+                              {p.name}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h5
+                      className="text-[11px] font-black uppercase tracking-wider mb-2 border-b pb-1"
+                      style={{
+                        color: primaryColor,
+                        borderColor: `${primaryColor}30`,
+                      }}
+                    >
+                      Delanteros ({forwards.length})
+                    </h5>
+                    <div className="space-y-1.5">
+                      {forwards.length === 0 ? (
+                        <p className="text-[11px] text-gray-500 italic">Sin convocados</p>
+                      ) : (
+                        forwards.map((p) => (
+                          <div key={p.id} className="flex items-center gap-2">
+                            <span
+                              className="w-5 h-5 rounded-md text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-xs"
+                              style={{ backgroundColor: primaryColor }}
+                            >
+                              {p.number}
+                            </span>
+                            <span className="text-xs font-semibold text-gray-200 truncate">
+                              {p.name}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Poster Footer Stamp */}
-            <div className="mt-6 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-gray-500 font-medium">
-              <span>{team.stadium}</span>
-              <span className="font-bold text-emerald-400">#VamosPorLaVictoria</span>
+            <div className="relative z-10 mt-6 pt-3 border-t border-white/10 flex items-center justify-between text-[10px] text-gray-400 font-medium">
+              <span>📍 {team.stadium}</span>
+              <span
+                className="font-black uppercase tracking-wider"
+                style={{ color: secondaryColor || '#60A5FA' }}
+              >
+                #{team.shortName || 'TeamGol'} • VamosPorLaVictoria
+              </span>
             </div>
           </div>
         </div>
@@ -682,12 +1026,36 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                   <select
                     value={newPlayer.position}
                     onChange={(e) => setNewPlayer({ ...newPlayer, position: e.target.value as PlayerPosition })}
-                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-sm font-medium focus:outline-none focus:border-[#1877F2]"
+                    className="w-full px-3 py-2 bg-[#F0F2F5] dark:bg-black/50 border border-[#CED0D4] dark:border-white/10 rounded-xl text-[#050505] dark:text-white text-xs font-medium focus:outline-none focus:border-[#1877F2] cursor-pointer"
                   >
-                    <option value="POR">Portero (POR)</option>
-                    <option value="DEF">Defensa (DEF)</option>
-                    <option value="MED">Medio (MED)</option>
-                    <option value="DEL">Delantero (DEL)</option>
+                    <optgroup label="🧤 Portería">
+                      {ALL_POSITIONS.filter((p) => p.category === 'POR').map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="🛡️ Defensas">
+                      {ALL_POSITIONS.filter((p) => p.category === 'DEF').map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="⚡ Mediocampistas">
+                      {ALL_POSITIONS.filter((p) => p.category === 'MED').map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="⚽ Delanteros">
+                      {ALL_POSITIONS.filter((p) => p.category === 'DEL').map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -828,6 +1196,89 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal: Generated Convocatoria Graphic Action Center */}
+      {generatedResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg bg-[#18191A] text-white rounded-3xl border border-emerald-500/40 shadow-2xl overflow-hidden p-5 space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <Check className="w-4 h-4" />
+                </span>
+                <div>
+                  <h4 className="text-sm font-black text-white">
+                    ¡Gráfica de Convocatoria Generada!
+                  </h4>
+                  <p className="text-[11px] text-gray-400">
+                    Formato HD 1080 × 1350 px (Instagram / WhatsApp)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGeneratedResult(null)}
+                className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-gray-300 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Generated Thumbnail */}
+            <div className="relative max-h-72 rounded-xl overflow-hidden border border-white/10 bg-black flex items-center justify-center">
+              <img
+                src={generatedResult.blobUrl || generatedResult.dataUrl}
+                alt="Convocatoria Generada"
+                className="max-h-72 w-auto object-contain"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const fileName = `Convocatoria_${team.shortName}_vs_${currentMatch?.rival || 'Partido'}.png`;
+                  triggerBrowserFileDownload(generatedResult.blob, generatedResult.blobUrl || generatedResult.dataUrl, fileName);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer text-center"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Descargar</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.open(generatedResult.blobUrl, '_blank')}
+                className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center justify-center gap-1.5 border border-white/15 transition-all cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                <span>Abrir Pestaña</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (generatedResult.blob) {
+                    const ok = await copyImageToClipboard(generatedResult.blob);
+                    if (ok) {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 3000);
+                    }
+                  }
+                }}
+                className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center justify-center gap-1.5 border border-white/15 transition-all cursor-pointer"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{copied ? '¡Copiada!' : 'Copiar'}</span>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-gray-400 leading-tight text-center">
+              💡 Si la descarga automática no inició, pulsa <strong>"Abrir Pestaña"</strong> para verla en pantalla completa y guardar la imagen en tu dispositivo.
+            </p>
           </div>
         </div>
       )}

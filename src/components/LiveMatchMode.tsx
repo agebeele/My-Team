@@ -58,7 +58,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
   onBackToCalendar,
 }) => {
   const t = getT(language);
-  const isOwnerOrAdmin = currentUser.role === 'owner' || currentUser.role === 'admin';
+  const isOwnerOrAdmin = currentUser.role === 'owner';
 
   // 1. Resolve current active match
   const activeMatch =

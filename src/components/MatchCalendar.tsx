@@ -18,6 +18,8 @@ import {
   Zap,
   Download,
   Image as ImageIcon,
+  Users,
+  X,
 } from 'lucide-react';
 import { Match, MatchModality, TeamInfo, Player, AppUser, Language } from '../types';
 import { getT } from '../utils/translations';
@@ -57,13 +59,14 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   toggleMatchReminder = (_match: Match) => {},
 }) => {
   const t = getT(language);
-  const isOwnerOrAdmin = currentUser.role === 'owner' || currentUser.role === 'admin';
+  const isOwner = currentUser.role === 'owner';
   const handleGoToMvp = onOpenMvp || onNavigateToMvp || (() => {});
 
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'finished'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [showResultModal, setShowResultModal] = useState<Match | null>(null);
+  const [matchToDelete, setMatchToDelete] = useState<Match | null>(null);
 
   // Form states for creating / editing match
   const [formData, setFormData] = useState({
@@ -209,10 +212,17 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
     });
   };
 
-  const handleDeleteMatch = (matchId: string) => {
-    if (window.confirm('¿Seguro que deseas eliminar este partido?')) {
-      setMatches((prev) => prev.filter((m) => m.id !== matchId));
-    }
+  const handleDeleteMatch = (match: Match) => {
+    setMatchToDelete(match);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!matchToDelete) return;
+    const rivalName = matchToDelete.rival;
+    setMatches((prev) => prev.filter((m) => m.id !== matchToDelete.id));
+    setCalendarToast(`Partido vs ${rivalName} eliminado correctamente.`);
+    setTimeout(() => setCalendarToast(null), 3500);
+    setMatchToDelete(null);
   };
 
   const handleOpenResultModal = (match: Match) => {
@@ -321,8 +331,8 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
             </button>
           </div>
 
-          {/* New Match Button (Owner / Admin) */}
-          {isOwnerOrAdmin && (
+          {/* New Match Button (Owner) */}
+          {isOwner && (
             <button
               id="btn-new-match"
               onClick={() => {
@@ -420,9 +430,10 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 </div>
 
                 {/* Owner controls: Edit / Delete */}
-                {isOwnerOrAdmin && (
+                {isOwner && (
                   <div className="flex items-center gap-1">
                     <button
+                      id={`btn-edit-match-${match.id}`}
                       onClick={() => {
                         setEditingMatch(match);
                         setFormData({
@@ -436,14 +447,15 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                         });
                         setShowAddModal(true);
                       }}
-                      className="p-1.5 rounded-lg hover:bg-[#F0F2F5] dark:hover:bg-white/5 text-[#65676B] hover:text-[#050505] dark:text-gray-400 dark:hover:text-white transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg hover:bg-[#F0F2F5] text-[#65676B] hover:text-[#050505] transition-colors cursor-pointer"
                       title="Editar partido"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteMatch(match.id)}
-                      className="p-1.5 rounded-lg hover:bg-[#F0F2F5] dark:hover:bg-white/5 text-[#65676B] hover:text-rose-500 transition-colors cursor-pointer"
+                      id={`btn-delete-match-${match.id}`}
+                      onClick={() => handleDeleteMatch(match)}
+                      className="p-1.5 rounded-lg hover:bg-rose-50 text-[#65676B] hover:text-rose-600 transition-colors cursor-pointer"
                       title="Eliminar partido"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -606,18 +618,24 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {/* Jump to Convocatoria flyer */}
                   <button
+                    id={`btn-goto-convocatoria-${match.id}`}
                     onClick={() => onNavigateToConvocatoria(match.id)}
-                    className="text-xs text-[#1877F2] dark:text-[#60A5FA] hover:underline font-bold px-2 py-1 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#E7F3FF] hover:bg-[#D0E7FF] text-[#1877F2] text-xs font-bold border border-[#1877F2]/30 transition-all cursor-pointer shadow-xs"
+                    title="Ver afiche oficial de convocatoria para este partido"
                   >
-                    Convocatoria
+                    <Users className="w-3.5 h-3.5 text-[#1877F2]" />
+                    <span>Convocatoria</span>
                   </button>
 
                   {/* Jump to Lineup Pitch */}
                   <button
+                    id={`btn-goto-lineup-${match.id}`}
                     onClick={() => onNavigateToLineup(match.id)}
-                    className="text-xs text-[#1877F2] dark:text-[#60A5FA] hover:underline font-bold px-2 py-1 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all cursor-pointer shadow-xs"
+                    title="Ver y armar alineación táctica 7v7 en la cancha"
                   >
-                    Alineación
+                    <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Alineación</span>
                   </button>
 
                   {/* Enter Live Match Mode */}
@@ -629,8 +647,8 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                         match.status === 'live'
                           ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md'
                           : match.status === 'finished'
-                          ? 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10'
-                          : 'bg-rose-50 dark:bg-rose-500/15 hover:bg-rose-100 dark:hover:bg-rose-500/25 text-rose-600 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30'
+                          ? 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4]'
+                          : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
                       }`}
                       title={
                         match.status === 'live'
@@ -642,7 +660,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     >
                       <Zap
                         className={`w-3.5 h-3.5 ${
-                          match.status === 'live' ? 'fill-white text-white' : 'text-rose-500 dark:text-rose-400'
+                          match.status === 'live' ? 'fill-white text-white' : 'text-rose-500'
                         }`}
                       />
                       <span>
@@ -656,10 +674,10 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   )}
 
                   {/* Owner: Record Score */}
-                  {isOwnerOrAdmin && (
+                  {isOwner && (
                     <button
                       onClick={() => handleOpenResultModal(match)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-200 border border-[#CED0D4] dark:border-white/10 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4] text-xs font-bold transition-all cursor-pointer shadow-xs"
                     >
                       <Trophy className="w-3 h-3 text-amber-500" />
                       {t.calendar.recordResult}
@@ -940,6 +958,46 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 {t.calendar.saveResult}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Match Confirmation Modal */}
+      {matchToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#CED0D4] w-full max-w-sm rounded-2xl shadow-2xl p-6 text-[#050505] space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-black text-[#050505]">
+                ¿Eliminar partido?
+              </h3>
+              <p className="text-xs text-[#65676B]">
+                ¿Estás seguro de que deseas eliminar el partido contra{' '}
+                <span className="font-bold text-[#050505]">{matchToDelete.rival}</span> (
+                {matchToDelete.date})? Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setMatchToDelete(null)}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                id="btn-confirm-delete-match"
+                onClick={handleConfirmDelete}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                Sí, Eliminar
               </button>
             </div>
           </div>

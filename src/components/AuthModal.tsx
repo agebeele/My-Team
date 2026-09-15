@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Shield,
   User,
   Crown,
   Lock,
   X,
   Check,
+  UserPlus,
+  ArrowRight,
+  Sparkles,
 } from 'lucide-react';
-import { AppUser, Language } from '../types';
+import { AppUser, Language, Player, TeamInfo, PlayerPosition, DEFAULT_FACEBOOK_AVATAR, ALL_POSITIONS } from '../types';
 import { getT } from '../utils/translations';
 
 interface AuthModalProps {
@@ -16,7 +18,13 @@ interface AuthModalProps {
   currentUser: AppUser;
   setCurrentUser: (user: AppUser) => void;
   allUsers: AppUser[];
+  setUsers?: React.Dispatch<React.SetStateAction<AppUser[]>>;
+  players?: Player[];
+  setPlayers?: React.Dispatch<React.SetStateAction<Player[]>>;
+  team?: TeamInfo;
   language: Language;
+  invitedTeamName?: string | null;
+  onJoinSuccess?: (playerName: string) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -25,139 +33,333 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   currentUser,
   setCurrentUser,
   allUsers,
+  setUsers,
+  players = [],
+  setPlayers,
+  team,
   language,
+  invitedTeamName,
+  onJoinSuccess,
 }) => {
   const t = getT(language);
+  const [activeMode, setActiveMode] = useState<'switch' | 'register'>(
+    invitedTeamName ? 'register' : 'switch'
+  );
+
+  // New Player Registration state
+  const [newPlayerForm, setNewPlayerForm] = useState({
+    name: '',
+    nickname: '',
+    email: '',
+    number: '',
+    position: 'DEL' as PlayerPosition,
+  });
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
-  const handleSocialLogin = (provider: string) => {
-    // Switch or create authenticated session
-    alert(`Sesión iniciada con éxito vía ${provider}. Sesión segura activa.`);
+  const handleRegisterNewPlayer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPlayerForm.name.trim()) {
+      setRegistrationError('Por favor ingresa tu nombre completo.');
+      return;
+    }
+    const num = parseInt(newPlayerForm.number, 10) || Math.floor(Math.random() * 89) + 10;
+    const cleanEmail = newPlayerForm.email.trim() || `${newPlayerForm.name.toLowerCase().replace(/\s+/g, '.')}@club.com`;
+    const newPlayerId = `p-${Date.now()}`;
+    const newUserId = `u-${Date.now()}`;
+
+    const newPlayer: Player = {
+      id: newPlayerId,
+      name: newPlayerForm.name.trim(),
+      nickname: newPlayerForm.nickname.trim() || undefined,
+      number: num,
+      position: newPlayerForm.position,
+      avatarUrl: DEFAULT_FACEBOOK_AVATAR,
+      matches: 0,
+      goals: 0,
+      assists: 0,
+      yellowCards: 0,
+      redCards: 0,
+      isCalledUp: true,
+      isStarter: false,
+      mvpHistory: [],
+      phone: '',
+    };
+
+    const newUser: AppUser = {
+      id: newUserId,
+      name: newPlayerForm.name.trim(),
+      email: cleanEmail,
+      role: 'player',
+      avatarUrl: newPlayer.avatarUrl,
+      playerId: newPlayerId,
+      provider: 'email',
+    };
+
+    if (setPlayers) {
+      setPlayers((prev) => [...prev, newPlayer]);
+    }
+    if (setUsers) {
+      setUsers((prev) => [...prev, newUser]);
+    }
+
+    setCurrentUser(newUser);
+    if (onJoinSuccess) {
+      onJoinSuccess(newPlayer.name);
+    }
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-5 relative text-[#050505] dark:text-white">
+      <div className="bg-white border border-[#CED0D4] w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-4 relative text-[#050505]">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl text-[#65676B] hover:text-[#050505] dark:text-gray-400 dark:hover:text-white bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-2 rounded-xl text-[#65676B] hover:text-[#050505] bg-[#F0F2F5] hover:bg-[#E4E6EB] transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
 
+        {/* Header */}
         <div className="text-center space-y-1">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-[#1877F2]/20 text-[#1877F2] flex items-center justify-center mx-auto border border-[#1877F2]/30 shadow-xs">
+          <div className="w-12 h-12 rounded-2xl bg-[#E7F3FF] text-[#1877F2] flex items-center justify-center mx-auto border border-[#1877F2]/20 shadow-xs">
             <Lock className="w-6 h-6" />
           </div>
-          <h3 className="text-xl font-black text-[#050505] dark:text-white">
-            {t.auth.login} / Cambiar Perfil
+          <h3 className="text-xl font-black text-[#050505]">
+            {activeMode === 'register' ? 'Unirse al Equipo' : 'Iniciar Sesión / Cambiar Perfil'}
           </h3>
-          <p className="text-xs text-[#65676B] dark:text-gray-400 font-medium">
-            {t.auth.socialAuthDesc}
+          <p className="text-xs text-[#65676B] font-medium">
+            {team ? `${team.name} • Fútbol 7` : 'Gestión de Club'}
           </p>
         </div>
 
-        {/* Social Login Options */}
-        <div className="space-y-2.5">
-          {/* Google Login */}
-          <button
-            onClick={() => handleSocialLogin('Google')}
-            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl bg-white hover:bg-gray-50 text-black font-bold text-xs border border-[#CED0D4] shadow-xs transition-all cursor-pointer"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            {t.auth.loginWithGoogle}
-          </button>
-
-          {/* Facebook Login */}
-          <button
-            onClick={() => handleSocialLogin('Facebook')}
-            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
-          >
-            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            Continuar con Facebook
-          </button>
-        </div>
-
-        {/* Demo Fast Switch Profile */}
-        <div className="pt-3 border-t border-[#CED0D4]/70 dark:border-white/10 space-y-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#65676B] dark:text-gray-400 block">
-            Seleccionar Cuenta de Prueba Rápida:
-          </span>
-
-          <div className="space-y-1.5">
-            {allUsers.map((user) => {
-              const isSelected = user.id === currentUser.id;
-              return (
-                <button
-                  key={user.id}
-                  onClick={() => {
-                    setCurrentUser(user);
-                    onClose();
-                  }}
-                  className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-blue-50 dark:bg-emerald-500/10 border-[#1877F2]/40 dark:border-emerald-500/30 text-[#050505] dark:text-white'
-                      : 'bg-[#F0F2F5] dark:bg-black/40 border-[#CED0D4]/70 dark:border-white/5 hover:border-[#1877F2]/40 dark:hover:border-white/15 text-[#050505] dark:text-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name}
-                      referrerPolicy="no-referrer"
-                      className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"
-                    />
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold block truncate">
-                        {user.name}
-                      </span>
-                      <span className="text-[10px] text-[#65676B] dark:text-gray-400 flex items-center gap-1 font-medium">
-                        {user.role === 'owner' ? (
-                          <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-0.5">
-                            <Crown className="w-2.5 h-2.5" /> Dueño
-                          </span>
-                        ) : user.role === 'admin' ? (
-                          <span className="text-purple-600 dark:text-purple-400 font-bold flex items-center gap-0.5">
-                            <Shield className="w-2.5 h-2.5" /> Admin
-                          </span>
-                        ) : (
-                          <span className="text-[#1877F2] dark:text-emerald-400 font-bold flex items-center gap-0.5">
-                            <User className="w-2.5 h-2.5" /> Jugador
-                          </span>
-                        )}
-                        <span>• {user.email}</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {isSelected && (
-                    <Check className="w-4 h-4 text-[#1877F2] dark:text-emerald-400 shrink-0" />
-                  )}
-                </button>
-              );
-            })}
+        {/* Invite Banner if applicable */}
+        {invitedTeamName && (
+          <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl flex items-start gap-2.5">
+            <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="text-xs text-emerald-900 leading-relaxed">
+              <span className="font-black">¡Invitación Especial!</span> Has recibido un enlace para unirte como jugador a <strong className="text-emerald-700">{invitedTeamName}</strong>. Completa tus datos para ver convocatorias, alineaciones y calendario.
+            </div>
           </div>
+        )}
+
+        {/* Mode Selector Tabs */}
+        <div className="flex bg-[#F0F2F5] p-1 rounded-xl border border-[#E4E6EB]">
+          <button
+            type="button"
+            onClick={() => setActiveMode('switch')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              activeMode === 'switch'
+                ? 'bg-white text-[#1877F2] shadow-xs'
+                : 'text-[#65676B] hover:text-[#050505]'
+            }`}
+          >
+            Cuentas del Equipo
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMode('register')}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeMode === 'register'
+                ? 'bg-[#1877F2] text-white shadow-xs'
+                : 'text-[#65676B] hover:text-[#050505]'
+            }`}
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            Nuevo Jugador
+          </button>
         </div>
+
+        {/* Tab 1: Fast Switch Profile */}
+        {activeMode === 'switch' && (
+          <div className="space-y-2 pt-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#65676B] block">
+              Selecciona tu cuenta activa:
+            </span>
+
+            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+              {allUsers.map((user) => {
+                const isSelected = user.id === currentUser.id;
+                return (
+                  <button
+                    key={user.id}
+                    onClick={() => {
+                      setCurrentUser(user);
+                      onClose();
+                    }}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#E7F3FF] border-[#1877F2]/40 text-[#050505]'
+                        : 'bg-[#F0F2F5] border-[#CED0D4]/70 hover:border-[#1877F2]/40 text-[#050505]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.name}
+                        referrerPolicy="no-referrer"
+                        className="w-9 h-9 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4]"
+                      />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold block truncate">
+                          {user.name}
+                        </span>
+                        <span className="text-[11px] text-[#65676B] flex items-center gap-1 font-medium">
+                          {user.role === 'owner' ? (
+                            <span className="text-amber-600 font-bold flex items-center gap-0.5">
+                              <Crown className="w-2.5 h-2.5" /> Dueño
+                            </span>
+                          ) : (
+                            <span className="text-[#1877F2] font-bold flex items-center gap-0.5">
+                              <User className="w-2.5 h-2.5" /> Jugador
+                            </span>
+                          )}
+                          <span>• {user.email}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <Check className="w-4 h-4 text-[#1877F2] shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Register New Player & Join Team */}
+        {activeMode === 'register' && (
+          <form onSubmit={handleRegisterNewPlayer} className="space-y-3 pt-1">
+            {registrationError && (
+              <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                {registrationError}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-bold text-[#050505] mb-1">
+                Nombre Completo *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. Santiago Cruz"
+                value={newPlayerForm.name}
+                onChange={(e) =>
+                  setNewPlayerForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-bold text-[#050505] mb-1">
+                  Apodo / Nickname
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej. El Tanque"
+                  value={newPlayerForm.nickname}
+                  onChange={(e) =>
+                    setNewPlayerForm((prev) => ({ ...prev, nickname: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#050505] mb-1">
+                  Dorsal (Número)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={99}
+                  placeholder="Ej. 10"
+                  value={newPlayerForm.number}
+                  onChange={(e) =>
+                    setNewPlayerForm((prev) => ({ ...prev, number: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-bold text-[#050505] mb-1">
+                  Posición en Cancha
+                </label>
+                <select
+                  value={newPlayerForm.position}
+                  onChange={(e) =>
+                    setNewPlayerForm((prev) => ({
+                      ...prev,
+                      position: e.target.value as PlayerPosition,
+                    }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden cursor-pointer"
+                >
+                  <optgroup label="🧤 Portería">
+                    {ALL_POSITIONS.filter((p) => p.category === 'POR').map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="🛡️ Defensas (Centrales, Laterales, Carrileros)">
+                    {ALL_POSITIONS.filter((p) => p.category === 'DEF').map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="⚡ Mediocampo (MCD, MC, MCO, MI, MD)">
+                    {ALL_POSITIONS.filter((p) => p.category === 'MED').map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="⚽ Delantera (Extremos, Centro, Segundos)">
+                    {ALL_POSITIONS.filter((p) => p.category === 'DEL').map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#050505] mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={newPlayerForm.email}
+                  onChange={(e) =>
+                    setNewPlayerForm((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full mt-2 py-2.5 px-4 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Unirme al Equipo y Ver Todo</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

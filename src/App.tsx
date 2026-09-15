@@ -52,25 +52,31 @@ export default function App() {
     currentUser.playerId || initial.players?.[0]?.id || 'p1'
   );
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [invitedTeamName, setInvitedTeamName] = useState<string | null>(null);
+  const [joinSuccessAlert, setJoinSuccessAlert] = useState<string | null>(null);
 
-  // Dark Mode state: persist to localStorage & reflect on <html>
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    return localStorage.getItem('app_theme') === 'dark';
-  });
-
+  // Ensure clean light theme by removing any stored dark mode class
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('app_theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('app_theme', 'light');
-    }
-  }, [isDarkMode]);
+    document.documentElement.classList.remove('dark');
+    localStorage.removeItem('app_theme');
+  }, []);
 
-  const toggleDarkMode = () => {
-    setIsDarkMode((prev) => !prev);
-  };
+  // Detect invite link in URL: ?joinTeam=...&teamName=...
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const joinTeamId = params.get('joinTeam');
+      const teamNameParam = params.get('teamName');
+
+      if (joinTeamId || teamNameParam) {
+        const targetTeamName = teamNameParam ? decodeURIComponent(teamNameParam) : team.name;
+        setInvitedTeamName(targetTeamName);
+        setIsAuthModalOpen(true);
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+  }, [team.name]);
 
   // Auto-save changes to storage
   useEffect(() => {
@@ -109,7 +115,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'dark bg-[#18191A] text-white' : 'bg-[#F0F2F5] text-[#050505]'} flex flex-col selection:bg-[#1877F2] selection:text-white transition-colors duration-200`}>
+    <div className="min-h-screen bg-[#F0F2F5] text-[#050505] flex flex-col selection:bg-[#1877F2] selection:text-white">
       {/* Top Main Navigation Bar */}
       <Navbar
         team={team}
@@ -122,9 +128,20 @@ export default function App() {
         language={language}
         setLanguage={setLanguage}
         onOpenAuth={() => setIsAuthModalOpen(true)}
-        isDarkMode={isDarkMode}
-        onToggleDarkMode={toggleDarkMode}
       />
+
+      {/* Welcome Join Alert Banner if joined via invite */}
+      {joinSuccessAlert && (
+        <div className="bg-emerald-500 text-white px-4 py-2.5 text-center text-xs font-bold shadow-md animate-in slide-in-from-top duration-200 flex items-center justify-center gap-2">
+          <span>⚽ {joinSuccessAlert}</span>
+          <button
+            onClick={() => setJoinSuccessAlert(null)}
+            className="text-white/80 hover:text-white underline text-[11px] ml-2 cursor-pointer"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10">
@@ -139,6 +156,14 @@ export default function App() {
             language={language}
             onOpenMvp={handleOpenMvpForMatch}
             onStartLiveMatch={handleStartLiveMatch}
+            onNavigateToConvocatoria={(matchId) => {
+              setSelectedMatchId(matchId);
+              setActiveTab('convocatoria');
+            }}
+            onNavigateToLineup={(matchId) => {
+              setSelectedMatchId(matchId);
+              setActiveTab('lineup');
+            }}
           />
         )}
 
@@ -179,6 +204,8 @@ export default function App() {
         {/* TAB 3: Interactive Tactical Pitch Lineup */}
         {activeTab === 'lineup' && (
           <TacticalPitch
+            team={team}
+            setTeam={setTeam}
             players={players}
             matches={matches}
             setMatches={setMatches}
@@ -244,6 +271,7 @@ export default function App() {
             users={users}
             setUsers={setUsers}
             players={players}
+            setPlayers={setPlayers}
             matches={matches}
             currentUser={currentUser}
             language={language}
@@ -260,14 +288,26 @@ export default function App() {
         language={language}
       />
 
-      {/* Social Login & Role Profile Switcher Modal */}
+      {/* Auth & Join Team Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setInvitedTeamName(null);
+        }}
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
         allUsers={users}
+        setUsers={setUsers}
+        players={players}
+        setPlayers={setPlayers}
+        team={team}
         language={language}
+        invitedTeamName={invitedTeamName}
+        onJoinSuccess={(playerName) => {
+          setJoinSuccessAlert(`¡Bienvenido al equipo, ${playerName}! Ya formas parte de ${team.name} y puedes ver todas las convocatorias y alineaciones.`);
+          setTimeout(() => setJoinSuccessAlert(null), 7000);
+        }}
       />
     </div>
   );
