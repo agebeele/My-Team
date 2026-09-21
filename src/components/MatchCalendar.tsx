@@ -82,11 +82,11 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   });
 
   // Form states for registering score
-  const [resultScoreUs, setResultScoreUs] = useState<number>(0);
-  const [resultScoreThem, setResultScoreThem] = useState<number>(0);
+  const [resultScoreUs, setResultScoreUs] = useState<number | string>(0);
+  const [resultScoreThem, setResultScoreThem] = useState<number | string>(0);
   const [scorersList, setScorersList] = useState<Array<{ playerId: string; playerName: string; minute: number }>>([]);
   const [selectedScorerPlayerId, setSelectedScorerPlayerId] = useState<string>(players[0]?.id || '');
-  const [scorerMinute, setScorerMinute] = useState<number>(15);
+  const [scorerMinute, setScorerMinute] = useState<number | string>('');
 
   // Gallery image download states
   const [downloadingMatchId, setDownloadingMatchId] = useState<string | null>(null);
@@ -255,15 +255,21 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
     setResultScoreUs(match.scoreUs ?? 0);
     setResultScoreThem(match.scoreThem ?? 0);
     setScorersList(match.scorersUs || []);
+    setSelectedScorerPlayerId(players[0]?.id || '');
+    setScorerMinute(''); // Start completely blank so the user can easily type without an unwanted 1!
   };
 
   const handleAddScorer = () => {
     const pl = players.find((p) => p.id === selectedScorerPlayerId);
     if (!pl) return;
+    const parsed = typeof scorerMinute === 'number' ? scorerMinute : parseInt(scorerMinute, 10);
+    const validMin = !isNaN(parsed) && parsed > 0 ? Math.min(130, parsed) : 20;
+
     setScorersList((prev) => [
       ...prev,
-      { playerId: pl.id, playerName: pl.name, minute: scorerMinute },
+      { playerId: pl.id, playerName: pl.name, minute: validMin },
     ]);
+    setScorerMinute(''); // Reset to blank after adding, ready for next goal
   };
 
   const handleRemoveScorer = (idx: number) => {
@@ -272,13 +278,15 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
   const handleSaveResult = () => {
     if (!showResultModal) return;
+    const finalScoreUs = typeof resultScoreUs === 'number' ? resultScoreUs : parseInt(resultScoreUs, 10) || 0;
+    const finalScoreThem = typeof resultScoreThem === 'number' ? resultScoreThem : parseInt(resultScoreThem, 10) || 0;
     setMatches((prev) =>
       prev.map((m) =>
         m.id === showResultModal.id
           ? {
               ...m,
-              scoreUs: resultScoreUs,
-              scoreThem: resultScoreThem,
+              scoreUs: Math.max(0, finalScoreUs),
+              scoreThem: Math.max(0, finalScoreThem),
               scorersUs: scorersList,
               status: 'finished',
             }
@@ -939,9 +947,22 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   <input
                     type="number"
                     min={0}
+                    max={99}
                     value={resultScoreUs}
-                    onChange={(e) => setResultScoreUs(parseInt(e.target.value) || 0)}
-                    className="w-16 h-14 bg-white dark:bg-[#242526] border-2 border-[#1877F2] rounded-xl text-center text-2xl font-black text-[#050505] dark:text-white font-sport mt-1 shadow-xs"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setResultScoreUs('');
+                      } else {
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num)) setResultScoreUs(Math.max(0, Math.min(99, num)));
+                      }
+                    }}
+                    onBlur={() => {
+                      if (resultScoreUs === '') setResultScoreUs(0);
+                    }}
+                    className="w-16 h-14 bg-white dark:bg-[#242526] border-2 border-[#1877F2] rounded-xl text-center text-2xl font-black text-[#050505] dark:text-white font-sport mt-1 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#1877F2]/40"
                   />
                 </div>
 
@@ -954,9 +975,22 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   <input
                     type="number"
                     min={0}
+                    max={99}
                     value={resultScoreThem}
-                    onChange={(e) => setResultScoreThem(parseInt(e.target.value) || 0)}
-                    className="w-16 h-14 bg-white dark:bg-[#242526] border-2 border-[#CED0D4] dark:border-white/10 rounded-xl text-center text-2xl font-black text-[#050505] dark:text-white font-sport mt-1 shadow-xs"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setResultScoreThem('');
+                      } else {
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num)) setResultScoreThem(Math.max(0, Math.min(99, num)));
+                      }
+                    }}
+                    onBlur={() => {
+                      if (resultScoreThem === '') setResultScoreThem(0);
+                    }}
+                    className="w-16 h-14 bg-white dark:bg-[#242526] border-2 border-[#CED0D4] dark:border-white/10 rounded-xl text-center text-2xl font-black text-[#050505] dark:text-white font-sport mt-1 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#1877F2]/40"
                   />
                 </div>
               </div>
@@ -981,25 +1015,56 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   ))}
                 </select>
 
-                <div className="w-24 flex items-center bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl px-2">
+                <div className="w-28 flex items-center bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl px-2.5 focus-within:border-[#1877F2] transition-colors">
                   <input
                     type="number"
                     min={1}
                     max={120}
+                    placeholder="Min (ej. 20)"
                     value={scorerMinute}
-                    onChange={(e) => setScorerMinute(parseInt(e.target.value) || 1)}
-                    className="w-full bg-transparent text-[#050505] dark:text-white text-xs font-bold text-center focus:outline-none"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setScorerMinute('');
+                      } else {
+                        const num = parseInt(val, 10);
+                        if (!isNaN(num)) {
+                          setScorerMinute(Math.max(1, Math.min(120, num)));
+                        }
+                      }
+                    }}
+                    className="w-full bg-transparent text-[#050505] dark:text-white text-xs font-bold text-center focus:outline-none placeholder:text-[#65676B]/60 placeholder:font-normal"
                   />
-                  <span className="text-[10px] text-[#65676B] dark:text-gray-500 font-bold">'</span>
+                  <span className="text-[11px] text-[#65676B] dark:text-gray-500 font-bold ml-0.5">'</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleAddScorer}
-                  className="px-3.5 py-2 bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+                  className="px-3.5 py-2 bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer shrink-0"
                 >
                   + Gol
                 </button>
+              </div>
+
+              {/* Quick minute pills so coaches can pick minute with one tap */}
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-bold">Minutos rápidos:</span>
+                {[5, 10, 15, 20, 25, 30, 35, 40].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setScorerMinute(m)}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                      Number(scorerMinute) === m
+                        ? 'bg-[#1877F2] text-white shadow-xs'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/15 text-[#050505] dark:text-gray-200'
+                    }`}
+                  >
+                    {m}'
+                  </button>
+                ))}
               </div>
 
               {/* Scorers List */}

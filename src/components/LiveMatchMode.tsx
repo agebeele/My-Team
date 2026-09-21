@@ -167,16 +167,16 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
   const [goalScorerId, setGoalScorerId] = useState<string>('');
   const [goalRivalScorer, setGoalRivalScorer] = useState<string>('');
   const [goalAssistId, setGoalAssistId] = useState<string>('none');
-  const [goalMinute, setGoalMinute] = useState<number>(currentMinute);
+  const [goalMinute, setGoalMinute] = useState<number | string>(currentMinute);
 
   // Substitution form
   const [subOutId, setSubOutId] = useState<string>('');
   const [subInId, setSubInId] = useState<string>('');
-  const [subMinute, setSubMinute] = useState<number>(currentMinute);
+  const [subMinute, setSubMinute] = useState<number | string>(currentMinute);
 
   // Card form
   const [cardPlayerId, setCardPlayerId] = useState<string>('');
-  const [cardMinute, setCardMinute] = useState<number>(currentMinute);
+  const [cardMinute, setCardMinute] = useState<number | string>(currentMinute);
   const [cardReason, setCardReason] = useState<string>('Falta táctica');
 
   // Track players currently on pitch vs on bench based on lineup and substitutions
@@ -1310,11 +1310,39 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                   type="number"
                   min="1"
                   max="120"
+                  placeholder="Ej. 20"
                   value={goalMinute}
-                  onChange={(e) => setGoalMinute(Number(e.target.value))}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setGoalMinute('');
+                    } else {
+                      const num = parseInt(val, 10);
+                      if (!isNaN(num)) setGoalMinute(Math.max(1, Math.min(120, num)));
+                    }
+                  }}
                   className="w-24 bg-[#F0F2F5] dark:bg-black/60 border border-[#CED0D4] dark:border-white/15 rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#050505] dark:text-white focus:outline-none focus:border-emerald-500"
                 />
                 <span className="text-xs text-[#65676B] dark:text-gray-400">minutos de juego</span>
+              </div>
+              {/* Quick minute pills */}
+              <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-bold">Rápido:</span>
+                {[5, 10, 15, 20, 25, 30, 35, 40].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setGoalMinute(m)}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer ${
+                      Number(goalMinute) === m
+                        ? 'bg-emerald-500 text-white shadow-xs'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/15 text-[#050505] dark:text-gray-200'
+                    }`}
+                  >
+                    {m}'
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1393,10 +1421,38 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                 type="number"
                 min="1"
                 max="120"
+                placeholder="Ej. 20"
                 value={subMinute}
-                onChange={(e) => setSubMinute(Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setSubMinute('');
+                  } else {
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num)) setSubMinute(Math.max(1, Math.min(120, num)));
+                  }
+                }}
                 className="w-24 bg-[#F0F2F5] dark:bg-black/60 border border-[#CED0D4] dark:border-white/15 rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#050505] dark:text-white focus:outline-none focus:border-blue-500"
               />
+              {/* Quick minute pills */}
+              <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-bold">Rápido:</span>
+                {[5, 10, 15, 20, 25, 30, 35, 40].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setSubMinute(m)}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer ${
+                      Number(subMinute) === m
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/15 text-[#050505] dark:text-gray-200'
+                    }`}
+                  >
+                    {m}'
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Submit */}
@@ -1505,10 +1561,38 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                 type="number"
                 min="1"
                 max="120"
+                placeholder="Ej. 20"
                 value={cardMinute}
-                onChange={(e) => setCardMinute(Number(e.target.value))}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setCardMinute('');
+                  } else {
+                    const num = parseInt(val, 10);
+                    if (!isNaN(num)) setCardMinute(Math.max(1, Math.min(120, num)));
+                  }
+                }}
                 className="w-24 bg-[#F0F2F5] dark:bg-black/60 border border-[#CED0D4] dark:border-white/15 rounded-xl px-3 py-2 text-xs font-mono font-bold text-[#050505] dark:text-white focus:outline-none"
               />
+              {/* Quick minute pills */}
+              <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-bold">Rápido:</span>
+                {[5, 10, 15, 20, 25, 30, 35, 40].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setCardMinute(m)}
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer ${
+                      Number(cardMinute) === m
+                        ? 'bg-amber-400 text-black shadow-xs'
+                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/15 text-[#050505] dark:text-gray-200'
+                    }`}
+                  >
+                    {m}'
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Submit */}
