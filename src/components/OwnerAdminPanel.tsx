@@ -153,7 +153,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
   const inviteUrl = `${window.location.origin}${window.location.pathname}?joinTeam=${encodeURIComponent(
     team.id || 'team-1'
-  )}&teamName=${encodeURIComponent(team.name)}`;
+  )}&teamName=${encodeURIComponent(team.name)}&teamLogo=${encodeURIComponent(team.logoUrl || '')}`;
 
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteUrl).then(() => {

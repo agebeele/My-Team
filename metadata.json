@@ -1,6 +1,6 @@
 {
-  "name": "TeamGol - App de Fútbol 7",
-  "description": "Plataforma de gestión exclusiva para equipos de Fútbol 7 con diseño estilo Facebook: partidos de 2 tiempos de 20 min, pizarra táctica de 7 jugadores, convocatoria gráfica, votación MVP con cámara y muro social del club.",
+  "name": "Dream Team",
+  "description": "Plataforma oficial Dream Team para gestión de equipos de Fútbol 7: convocatorias, alineaciones tácticas, partidos en vivo, votación MVP y comunidad del club.",
   "requestFramePermissions": [
     "camera"
   ],

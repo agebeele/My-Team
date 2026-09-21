@@ -30,11 +30,13 @@ import { OwnerAdminPanel } from './components/OwnerAdminPanel';
 import { LiveMatchMode } from './components/LiveMatchMode';
 import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
+import { AppSplashAnimation } from './components/AppSplashAnimation';
 
 export default function App() {
   // Persistence state
   const initial = loadInitialData();
 
+  const [showSplash, setShowSplash] = useState(true);
   const [team, setTeam] = useState<TeamInfo>(initial.team || INITIAL_TEAM);
   const [players, setPlayers] = useState<Player[]>(initial.players || INITIAL_PLAYERS);
   const [matches, setMatches] = useState<Match[]>(initial.matches || INITIAL_MATCHES);
@@ -54,7 +56,27 @@ export default function App() {
     initial.currentUser?.playerId || initial.players?.[0]?.id || 'p1'
   );
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [invitedTeamName, setInvitedTeamName] = useState<string | null>(null);
+  const [invitedTeam, setInvitedTeam] = useState<{ id?: string; name: string; logoUrl?: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem('teamgol_invited_team');
+      if (stored) return JSON.parse(stored);
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+  const [invitedTeamName, setInvitedTeamName] = useState<string | null>(() => {
+    try {
+      const stored = localStorage.getItem('teamgol_invited_team');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed?.name || null;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
   const [joinSuccessAlert, setJoinSuccessAlert] = useState<string | null>(null);
 
   // Ensure clean light theme by removing any stored dark mode class
@@ -63,22 +85,39 @@ export default function App() {
     localStorage.removeItem('app_theme');
   }, []);
 
-  // Detect invite link in URL: ?joinTeam=...&teamName=...
+  // Detect invite link in URL: ?joinTeam=...&teamName=...&teamLogo=...
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const joinTeamId = params.get('joinTeam');
       const teamNameParam = params.get('teamName');
+      const teamLogoParam = params.get('teamLogo');
 
       if (joinTeamId || teamNameParam) {
         const targetTeamName = teamNameParam ? decodeURIComponent(teamNameParam) : team.name;
+        const targetTeamLogo = teamLogoParam
+          ? decodeURIComponent(teamLogoParam)
+          : team.id === joinTeamId
+          ? team.logoUrl
+          : '';
+        const inviteObj = {
+          id: joinTeamId || undefined,
+          name: targetTeamName,
+          logoUrl: targetTeamLogo || undefined,
+        };
+        setInvitedTeam(inviteObj);
         setInvitedTeamName(targetTeamName);
+        try {
+          localStorage.setItem('teamgol_invited_team', JSON.stringify(inviteObj));
+        } catch {
+          // ignore
+        }
         setIsAuthModalOpen(true);
       }
     } catch {
       // Ignore URL parsing errors
     }
-  }, [team.name]);
+  }, [team.name, team.id, team.logoUrl]);
 
   // Auto-save changes to storage
   useEffect(() => {
@@ -119,26 +158,46 @@ export default function App() {
   // If no saved device session exists, prompt user to log in or register directly
   if (!currentUser) {
     return (
-      <LoginScreen
-        team={team}
-        allUsers={users}
-        setUsers={setUsers}
-        players={players}
-        setPlayers={setPlayers}
-        language={language}
-        invitedTeamName={invitedTeamName}
-        onLoginSuccess={(user, rememberDevice) => {
-          setCurrentUser(user);
-          if (rememberDevice) {
-            saveDeviceSession(user);
-          }
-        }}
-      />
+      <>
+        {showSplash && (
+          <AppSplashAnimation
+            onComplete={() => setShowSplash(false)}
+            teamName={invitedTeam?.name || team?.shortName || team?.name}
+          />
+        )}
+        <LoginScreen
+          team={team}
+          setTeam={setTeam}
+          allUsers={users}
+          setUsers={setUsers}
+          players={players}
+          setPlayers={setPlayers}
+          language={language}
+          invitedTeam={invitedTeam}
+          invitedTeamName={invitedTeamName}
+          onLoginSuccess={(user, rememberDevice) => {
+            setCurrentUser(user);
+            if (rememberDevice) {
+              saveDeviceSession(user);
+            }
+          }}
+          onTeamCreated={(newTeam) => {
+            setTeam(newTeam);
+            setActiveTab('owner_admin');
+          }}
+        />
+      </>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-[#050505] flex flex-col selection:bg-[#1877F2] selection:text-white">
+      {showSplash && (
+        <AppSplashAnimation
+          onComplete={() => setShowSplash(false)}
+          teamName={team?.shortName || team?.name}
+        />
+      )}
       {/* Top Main Navigation Bar */}
       <Navbar
         team={team}
