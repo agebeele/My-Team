@@ -18,6 +18,7 @@ import confetti from 'canvas-confetti';
 import { Match, Player, AppUser, Language, MVPRecord, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
+import { PhotoPreviewModal } from './PhotoPreviewModal';
 
 interface MVPVotingAndCameraProps {
   team: TeamInfo;
@@ -68,6 +69,12 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
   const [isDownloadingMvp, setIsDownloadingMvp] = useState(false);
   const [mvpToast, setMvpToast] = useState<string | null>(null);
   const framedMvpCardRef = useRef<HTMLDivElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    fileName: string;
+    title: string;
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -362,7 +369,13 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
         spread: 70,
         origin: { y: 0.6 },
       });
-      setMvpToast(`¡Foto oficial con marco de MVP guardada en tu galería!`);
+      setPhotoPreview({
+        isOpen: true,
+        imageUrl: res,
+        fileName,
+        title: `Distinción MVP: ${leader.player?.name || 'Jugador del Partido'}`,
+      });
+      setMvpToast(`¡Foto oficial con marco de MVP lista para guardar!`);
       setTimeout(() => setMvpToast(null), 3500);
     }
   };
@@ -802,6 +815,18 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
           </div>
         </div>
       </div>
+
+      {/* MVP Card HD Preview Modal */}
+      {photoPreview && (
+        <PhotoPreviewModal
+          isOpen={photoPreview.isOpen}
+          onClose={() => setPhotoPreview(null)}
+          title={photoPreview.title}
+          subtitle="Marco oficial de distinción MVP con estrellas y escudo"
+          imageUrl={photoPreview.imageUrl}
+          fileName={photoPreview.fileName}
+        />
+      )}
     </div>
   );
 };

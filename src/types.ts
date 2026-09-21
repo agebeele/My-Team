@@ -247,6 +247,18 @@ export interface AppUser {
   avatarUrl: string;
   playerId?: string;
   provider: 'google' | 'apple' | 'email' | 'guest';
+  username?: string;
+  password?: string;
+}
+
+export interface TeamInvitation {
+  id: string;
+  email: string;
+  playerName: string;
+  teamName: string;
+  sentAt: string;
+  role: UserRole;
+  status: 'sent' | 'accepted';
 }
 
 export type Language = 'es' | 'en';

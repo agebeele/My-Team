@@ -26,6 +26,8 @@ import { getT } from '../utils/translations';
 import { exportMatchToPdf } from '../utils/pdfExport';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { getModalityInfo, ALL_MODALITIES } from '../utils/modalityHelper';
+import { generateMatchPosterCanvas } from '../utils/matchPosterGenerator';
+import { PhotoPreviewModal } from './PhotoPreviewModal';
 
 interface MatchCalendarProps {
   matches: Match[];
@@ -59,7 +61,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   toggleMatchReminder = (_match: Match) => {},
 }) => {
   const t = getT(language);
-  const isOwner = currentUser.role === 'owner';
+  const isOwner = currentUser.role === 'owner' || currentUser.role === 'admin';
   const handleGoToMvp = onOpenMvp || onNavigateToMvp || (() => {});
 
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'finished'>('all');
@@ -88,29 +90,52 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 
   // Gallery image download states
   const [downloadingMatchId, setDownloadingMatchId] = useState<string | null>(null);
+  const [exportingPdfId, setExportingPdfId] = useState<string | null>(null);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [calendarToast, setCalendarToast] = useState<string | null>(null);
   const calendarContainerRef = useRef<HTMLDivElement>(null);
 
+  // Photo Preview Modal state
+  const [photoPreview, setPhotoPreview] = useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    blob?: Blob | null;
+    fileName: string;
+    title: string;
+  } | null>(null);
+
   const handleDownloadMatchImage = async (match: Match) => {
-    const cardEl = document.getElementById(`match-card-${match.id}`);
-    if (!cardEl) return;
-
     setDownloadingMatchId(match.id);
-    const cleanRival = match.rival.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    const cleanTeam = team.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    const fileName = `partido_${cleanTeam}_vs_${cleanRival}_${match.date}.png`;
+    try {
+      const res = await generateMatchPosterCanvas(match, team, players);
+      if (res) {
+        const cleanRival = match.rival.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        const cleanTeam = team.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+        const fileName = `partido_${cleanTeam}_vs_${cleanRival}_${match.date}.png`;
 
-    const res = await downloadElementAsImage(cardEl, {
-      fileName,
-      backgroundColor: '#141416',
-      scale: 2.5,
-    });
+        setPhotoPreview({
+          isOpen: true,
+          imageUrl: res.blobUrl || res.dataUrl,
+          blob: res.blob,
+          fileName,
+          title: `Tarjeta Oficial: ${team.shortName} vs ${match.rival}`,
+        });
+      }
+    } catch (err) {
+      console.error('Error generating match photo flyer:', err);
+    } finally {
+      setDownloadingMatchId(null);
+    }
+  };
 
-    setDownloadingMatchId(null);
-    if (res) {
-      setCalendarToast(`¡Foto del partido guardada en tu galería!`);
-      setTimeout(() => setCalendarToast(null), 3500);
+  const handleExportPdf = async (match: Match) => {
+    setExportingPdfId(match.id);
+    try {
+      await exportMatchToPdf(match, team, players);
+    } catch (err) {
+      console.error('Error exporting match PDF:', err);
+    } finally {
+      setExportingPdfId(null);
     }
   };
 
@@ -368,7 +393,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
               </p>
             </div>
           </div>
-          {onStartLiveMatch && (
+          {isOwner && onStartLiveMatch && (
             <button
               onClick={() => {
                 const liveM = matches.find((m) => m.status === 'live');
@@ -542,148 +567,203 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
               </div>
 
               {/* 50-Minute MVP Rule Banner if active */}
-              {mvpActive ? (
-                <div className="bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 rounded-xl p-3 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 animate-spin" />
-                    <div>
-                      <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
-                        {match.mvpPlayerName
-                          ? `MVP: ${match.mvpPlayerName}`
-                          : '¡Votación de MVP Abierta! (+50m transcurridos)'}
-                      </p>
-                      <p className="text-[10px] text-amber-700/80 dark:text-amber-200/80">
-                        {match.mvpPlayerName
-                          ? 'Foto oficial capturada y archivada en su perfil'
-                          : 'Vota al jugador destacado y toma su foto oficial con la cámara'}
-                      </p>
+              {/* MVP Section: Admin voting flow vs Player read-only badge */}
+              {isOwner ? (
+                mvpActive ? (
+                  <div className="bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 rounded-xl p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 animate-spin" />
+                      <div>
+                        <p className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                          {match.mvpPlayerName
+                            ? `MVP: ${match.mvpPlayerName}`
+                            : '¡Votación de MVP Abierta! (+50m transcurridos)'}
+                        </p>
+                        <p className="text-[10px] text-amber-700/80 dark:text-amber-200/80">
+                          {match.mvpPlayerName
+                            ? 'Foto oficial capturada y archivada en su perfil'
+                            : 'Vota al jugador destacado y toma su foto oficial con la cámara'}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <button
-                    onClick={() => handleGoToMvp(match.id)}
-                    className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs shrink-0 shadow-xs transition-all cursor-pointer"
-                  >
-                    {match.mvpPlayerName ? 'Ver MVP' : t.calendar.voteMvp}
-                  </button>
-                </div>
+                    <button
+                      onClick={() => handleGoToMvp(match.id)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs shrink-0 shadow-xs transition-all cursor-pointer"
+                    >
+                      {match.mvpPlayerName ? 'Ver MVP' : t.calendar.voteMvp}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-[#F0F2F5] dark:bg-black/40 border border-[#CED0D4] dark:border-white/5 rounded-xl p-2.5 text-[11px] text-[#65676B] dark:text-gray-400 flex items-center justify-between">
+                    <span>Votación MVP: disponible a los 50 min de partido</span>
+                    <span className="font-mono text-[#1877F2] dark:text-emerald-400 font-bold">{minutesElapsed > 0 ? `${minutesElapsed} min jugados` : 'Previa'}</span>
+                  </div>
+                )
               ) : (
-                <div className="bg-[#F0F2F5] dark:bg-black/40 border border-[#CED0D4] dark:border-white/5 rounded-xl p-2.5 text-[11px] text-[#65676B] dark:text-gray-400 flex items-center justify-between">
-                  <span>Votación MVP: disponible a los 50 min de partido</span>
-                  <span className="font-mono text-[#1877F2] dark:text-emerald-400 font-bold">{minutesElapsed > 0 ? `${minutesElapsed} min jugados` : 'Previa'}</span>
-                </div>
+                match.mvpPlayerName && (
+                  <div className="bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 rounded-xl p-2.5 flex items-center gap-2 text-xs text-amber-900 dark:text-amber-300 font-bold">
+                    <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>MVP Oficial: {match.mvpPlayerName}</span>
+                  </div>
+                )
               )}
 
-              {/* Footer Quick Action Buttons */}
+              {/* Action Buttons: Strict RBAC for Players vs Owner */}
               <div className="flex items-center justify-between pt-3 border-t border-[#CED0D4] dark:border-white/5 gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {/* Download Match Photo / Image to Gallery Button */}
-                  <button
-                    id={`btn-download-img-${match.id}`}
-                    onClick={() => handleDownloadMatchImage(match)}
-                    disabled={downloadingMatchId === match.id}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#E7F3FF] dark:bg-[#1877F2]/20 hover:bg-[#DBEAFE] text-[#1877F2] dark:text-[#60A5FA] text-xs font-bold border border-[#1877F2]/30 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-                    title="Descargar imagen del partido a tu galería"
-                  >
-                    <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-[#60A5FA]" />
-                    <span>{downloadingMatchId === match.id ? 'Guardando...' : 'Guardar Foto'}</span>
-                  </button>
-
-                  {/* Push Notification Button */}
-                  <button
-                    id={`btn-reminder-${match.id}`}
-                    onClick={() => toggleMatchReminder(match)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                      isReminded
-                        ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30'
-                        : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10'
-                    }`}
-                  >
-                    <Bell className={`w-3.5 h-3.5 ${isReminded ? 'fill-emerald-500 text-emerald-500' : ''}`} />
-                    {isReminded ? t.calendar.notified : t.calendar.notifyMe}
-                  </button>
-
-                  {/* Export PDF Button */}
-                  <button
-                    id={`btn-export-pdf-${match.id}`}
-                    onClick={() => exportMatchToPdf(match, team, players)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-white text-xs font-bold border border-[#CED0D4] dark:border-white/10 transition-all cursor-pointer shadow-xs"
-                    title={t.calendar.exportPdf}
-                  >
-                    <FileDown className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
-                    PDF
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {/* Jump to Convocatoria flyer */}
-                  <button
-                    id={`btn-goto-convocatoria-${match.id}`}
-                    onClick={() => onNavigateToConvocatoria(match.id)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#E7F3FF] hover:bg-[#D0E7FF] text-[#1877F2] text-xs font-bold border border-[#1877F2]/30 transition-all cursor-pointer shadow-xs"
-                    title="Ver afiche oficial de convocatoria para este partido"
-                  >
-                    <Users className="w-3.5 h-3.5 text-[#1877F2]" />
-                    <span>Convocatoria</span>
-                  </button>
-
-                  {/* Jump to Lineup Pitch */}
-                  <button
-                    id={`btn-goto-lineup-${match.id}`}
-                    onClick={() => onNavigateToLineup(match.id)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all cursor-pointer shadow-xs"
-                    title="Ver y armar alineación táctica 7v7 en la cancha"
-                  >
-                    <Shield className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Alineación</span>
-                  </button>
-
-                  {/* Enter Live Match Mode */}
-                  {onStartLiveMatch && (
+                {!isOwner ? (
+                  /* Player Role: ONLY Recordatorio, Alineación, and Guardar Foto buttons */
+                  <div className="flex items-center gap-2 flex-wrap w-full">
+                    {/* 1. Recordatorio */}
                     <button
-                      id={`btn-live-match-${match.id}`}
-                      onClick={() => onStartLiveMatch(match.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                        match.status === 'live'
-                          ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md'
-                          : match.status === 'finished'
-                          ? 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4]'
-                          : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                      id={`btn-reminder-${match.id}`}
+                      onClick={() => toggleMatchReminder(match)}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                        isReminded
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
+                          : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4]'
                       }`}
-                      title={
-                        match.status === 'live'
-                          ? 'Modo Partido en Vivo'
-                          : match.status === 'finished'
-                          ? 'Ver Resumen del Partido'
-                          : 'Iniciar Modo Partido en Vivo'
-                      }
+                      title="Activar recordatorio para el partido"
                     >
-                      <Zap
-                        className={`w-3.5 h-3.5 ${
-                          match.status === 'live' ? 'fill-white text-white' : 'text-rose-500'
-                        }`}
-                      />
-                      <span>
-                        {match.status === 'live'
-                          ? 'Modo Partido'
-                          : match.status === 'finished'
-                          ? 'Resumen'
-                          : 'Modo Partido'}
-                      </span>
+                      <Bell className={`w-3.5 h-3.5 ${isReminded ? 'fill-emerald-500 text-emerald-500' : ''}`} />
+                      <span>{isReminded ? 'Recordatorio Activo' : 'Recordatorio'}</span>
                     </button>
-                  )}
 
-                  {/* Owner: Record Score */}
-                  {isOwner && (
+                    {/* 2. Alineación */}
                     <button
-                      onClick={() => handleOpenResultModal(match)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4] text-xs font-bold transition-all cursor-pointer shadow-xs"
+                      id={`btn-goto-lineup-${match.id}`}
+                      onClick={() => onNavigateToLineup(match.id)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all cursor-pointer shadow-xs"
+                      title="Ver alineación del partido"
                     >
-                      <Trophy className="w-3 h-3 text-amber-500" />
-                      {t.calendar.recordResult}
+                      <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Alineación</span>
                     </button>
-                  )}
-                </div>
+
+                    {/* 3. Guardar Foto */}
+                    <button
+                      id={`btn-download-img-${match.id}`}
+                      onClick={() => handleDownloadMatchImage(match)}
+                      disabled={downloadingMatchId === match.id}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#E7F3FF] hover:bg-[#DBEAFE] text-[#1877F2] text-xs font-bold border border-[#1877F2]/30 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                      title="Descargar imagen oficial del partido"
+                    >
+                      <Download className="w-3.5 h-3.5 text-[#1877F2]" />
+                      <span>{downloadingMatchId === match.id ? 'Guardando...' : 'Guardar Foto'}</span>
+                    </button>
+                  </div>
+                ) : (
+                  /* Owner Role: Full administrative tool suite */
+                  <>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Download Match Photo / Image to Gallery Button */}
+                      <button
+                        id={`btn-download-img-${match.id}`}
+                        onClick={() => handleDownloadMatchImage(match)}
+                        disabled={downloadingMatchId === match.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#E7F3FF] dark:bg-[#1877F2]/20 hover:bg-[#DBEAFE] text-[#1877F2] dark:text-[#60A5FA] text-xs font-bold border border-[#1877F2]/30 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                        title="Descargar imagen del partido a tu galería"
+                      >
+                        <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-[#60A5FA]" />
+                        <span>{downloadingMatchId === match.id ? 'Guardando...' : 'Guardar Foto'}</span>
+                      </button>
+
+                      {/* Push Notification Button */}
+                      <button
+                        id={`btn-reminder-${match.id}`}
+                        onClick={() => toggleMatchReminder(match)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                          isReminded
+                            ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30'
+                            : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10'
+                        }`}
+                      >
+                        <Bell className={`w-3.5 h-3.5 ${isReminded ? 'fill-emerald-500 text-emerald-500' : ''}`} />
+                        {isReminded ? t.calendar.notified : t.calendar.notifyMe}
+                      </button>
+
+                      {/* Export PDF Button */}
+                      <button
+                        id={`btn-export-pdf-${match.id}`}
+                        onClick={() => handleExportPdf(match)}
+                        disabled={exportingPdfId === match.id}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-white text-xs font-bold border border-[#CED0D4] dark:border-white/10 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                        title={t.calendar.exportPdf}
+                      >
+                        <FileDown className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
+                        <span>{exportingPdfId === match.id ? 'Generando...' : 'PDF'}</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Jump to Convocatoria flyer */}
+                      <button
+                        id={`btn-goto-convocatoria-${match.id}`}
+                        onClick={() => onNavigateToConvocatoria(match.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#E7F3FF] hover:bg-[#D0E7FF] text-[#1877F2] text-xs font-bold border border-[#1877F2]/30 transition-all cursor-pointer shadow-xs"
+                        title="Ver afiche oficial de convocatoria para este partido"
+                      >
+                        <Users className="w-3.5 h-3.5 text-[#1877F2]" />
+                        <span>Convocatoria</span>
+                      </button>
+
+                      {/* Jump to Lineup Pitch */}
+                      <button
+                        id={`btn-goto-lineup-${match.id}`}
+                        onClick={() => onNavigateToLineup(match.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all cursor-pointer shadow-xs"
+                        title="Ver y armar alineación táctica 7v7 en la cancha"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Alineación</span>
+                      </button>
+
+                      {/* Enter Live Match Mode */}
+                      {onStartLiveMatch && (
+                        <button
+                          id={`btn-live-match-${match.id}`}
+                          onClick={() => onStartLiveMatch(match.id)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                            match.status === 'live'
+                              ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md'
+                              : match.status === 'finished'
+                              ? 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4]'
+                              : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                          }`}
+                          title={
+                            match.status === 'live'
+                              ? 'Modo Partido en Vivo'
+                              : match.status === 'finished'
+                              ? 'Ver Resumen del Partido'
+                              : 'Iniciar Modo Partido en Vivo'
+                          }
+                        >
+                          <Zap
+                            className={`w-3.5 h-3.5 ${
+                              match.status === 'live' ? 'fill-white text-white' : 'text-rose-500'
+                            }`}
+                          />
+                          <span>
+                            {match.status === 'live'
+                              ? 'Modo Partido'
+                              : match.status === 'finished'
+                              ? 'Resumen'
+                              : 'Modo Partido'}
+                          </span>
+                        </button>
+                      )}
+
+                      {/* Owner: Record Score */}
+                      <button
+                        onClick={() => handleOpenResultModal(match)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4] text-xs font-bold transition-all cursor-pointer shadow-xs"
+                      >
+                        <Trophy className="w-3 h-3 text-amber-500" />
+                        {t.calendar.recordResult}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );
@@ -1002,6 +1082,19 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Official Match Photo HD Preview Modal */}
+      {photoPreview && (
+        <PhotoPreviewModal
+          isOpen={photoPreview.isOpen}
+          onClose={() => setPhotoPreview(null)}
+          title={photoPreview.title}
+          subtitle="Tarjeta oficial en alta definición con escudos, resultado y MVP"
+          imageUrl={photoPreview.imageUrl}
+          blob={photoPreview.blob}
+          fileName={photoPreview.fileName}
+        />
       )}
     </div>
   );

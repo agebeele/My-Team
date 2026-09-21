@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Crown,
   User,
@@ -21,6 +21,9 @@ import {
   Hash,
   Pencil,
   X,
+  Camera,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import {
   TeamInfo,
@@ -35,6 +38,7 @@ import {
   getPositionBadgeClass,
 } from '../types';
 import { getT } from '../utils/translations';
+import { CameraCaptureModal } from './CameraCaptureModal';
 
 interface OwnerAdminPanelProps {
   team: TeamInfo;
@@ -104,6 +108,44 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     phone: '',
     avatarUrl: '',
   });
+  // Camera Modal State & File Upload Refs
+  const [cameraModalTarget, setCameraModalTarget] = useState<'new' | 'edit' | null>(null);
+  const newPlayerFileInputRef = useRef<HTMLInputElement>(null);
+  const editPlayerFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDeviceFileUpload = (e: React.ChangeEvent<HTMLInputElement>, target: 'new' | 'edit') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (!result) return;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 500;
+        canvas.height = 500;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const side = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height);
+        const sx = ((img.naturalWidth || img.width) - side) / 2;
+        const sy = ((img.naturalHeight || img.height) - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, 500, 500);
+        const squareData = canvas.toDataURL('image/jpeg', 0.92);
+        if (target === 'new') {
+          setNewPlayerPhoto(squareData);
+        } else {
+          setEditForm((prev) => ({ ...prev, avatarUrl: squareData }));
+        }
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be selected again if needed
+    e.target.value = '';
+  };
+
   const [editFormError, setEditFormError] = useState<string | null>(null);
 
   // Invite link state
@@ -600,9 +642,9 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
               </div>
             </div>
 
-            {/* Avatar section with real-time visual preview */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-white border border-[#CED0D4] rounded-xl">
-              <div className="relative shrink-0">
+            {/* Avatar section with real-time visual preview & Camera Capture */}
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 p-4 bg-[#F8FAFC] border border-[#CED0D4] rounded-2xl shadow-xs">
+              <div className="relative shrink-0 mx-auto md:mx-0">
                 <img
                   src={newPlayerPhoto.trim() || DEFAULT_FACEBOOK_AVATAR}
                   alt="Avatar"
@@ -610,47 +652,79 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                   onError={(e) => {
                     e.currentTarget.src = DEFAULT_FACEBOOK_AVATAR;
                   }}
-                  className="w-12 h-12 rounded-full object-cover ring-2 ring-[#CED0D4] bg-[#E4E6EB]"
+                  className="w-16 h-16 rounded-full object-cover ring-3 ring-[#1877F2]/30 shadow-md bg-[#E4E6EB]"
                 />
-                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#050505] text-white text-[10px] font-mono font-bold flex items-center justify-center border border-white">
+                <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#050505] text-white text-xs font-mono font-bold flex items-center justify-center border-2 border-white shadow-xs">
                   {newPlayerNumber || '?'}
                 </span>
               </div>
 
-              <div className="flex-1 w-full space-y-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold text-[#65676B]">
-                    Foto de Perfil del Jugador
+              <div className="flex-1 w-full space-y-2">
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <label className="block text-xs font-black text-[#050505]">
+                    Foto de Perfil del Futbolista
                   </label>
                   {newPlayerPhoto && (
                     <button
                       type="button"
                       onClick={() => setNewPlayerPhoto('')}
-                      className="text-[10px] font-bold text-[#1877F2] hover:underline cursor-pointer"
+                      className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
                     >
-                      Restablecer a foto por defecto (Facebook)
+                      Quitar foto (Usar silueta de Facebook)
                     </button>
                   )}
                 </div>
-                <input
-                  type="url"
-                  placeholder="URL de foto o déjalo vacío para silueta de Facebook por defecto"
-                  value={newPlayerPhoto}
-                  onChange={(e) => setNewPlayerPhoto(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-[#F0F2F5] border border-[#CED0D4] rounded-lg text-xs font-medium text-[#050505] focus:outline-none focus:border-[#1877F2] focus:bg-white"
-                />
-                <p className="text-[10px] text-[#65676B]">
-                  {newPlayerPhoto.trim()
-                    ? '✓ Foto personalizada lista'
-                    : '✓ Foto por defecto asignada: Silueta clásica de Facebook'}
-                </p>
+
+                {/* Camera & Upload Action Buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setCameraModalTarget('new')}
+                    className="px-3.5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Tomar Foto con Cámara</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => newPlayerFileInputRef.current?.click()}
+                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-gray-100 text-[#050505] text-xs font-bold border border-[#CED0D4] shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <ImageIcon className="w-4 h-4 text-[#1877F2]" />
+                    <span>Subir desde Galería</span>
+                  </button>
+
+                  <input
+                    ref={newPlayerFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleDeviceFileUpload(e, 'new')}
+                    className="hidden"
+                  />
+                </div>
+
+                <div className="pt-1">
+                  <input
+                    type="url"
+                    placeholder="O pega una URL de foto..."
+                    value={newPlayerPhoto}
+                    onChange={(e) => setNewPlayerPhoto(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-[#CED0D4] rounded-lg text-xs font-medium text-[#050505] focus:outline-none focus:border-[#1877F2]"
+                  />
+                  <p className="text-[10.5px] mt-1 text-[#65676B] font-medium">
+                    {newPlayerPhoto.trim()
+                      ? '✓ Foto asignada. Se guardará automáticamente en el perfil del jugador y en las actas de partido.'
+                      : 'ℹ️ Puedes tomar la foto ahora con tu cámara o se asignará la silueta oficial de Facebook.'}
+                  </p>
+                </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap self-stretch sm:self-center"
+                className="w-full md:w-auto px-6 py-3 rounded-xl bg-[#10B981] hover:bg-[#059669] text-white font-black text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap self-stretch md:self-center"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 stroke-[3]" />
                 <span>Agregar a la Plantilla</span>
               </button>
             </div>
@@ -1030,9 +1104,9 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
             )}
 
             <form onSubmit={handleSaveEditPlayer} className="space-y-4">
-              {/* Avatar Preview & Facebook Default Option */}
-              <div className="flex items-center gap-4 p-3 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]/80">
-                <div className="relative shrink-0">
+              {/* Avatar Preview & Camera/Upload Options */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-[#F8FAFC] border border-[#CED0D4] shadow-xs">
+                <div className="relative shrink-0 mx-auto sm:mx-0">
                   <img
                     src={editForm.avatarUrl.trim() || DEFAULT_FACEBOOK_AVATAR}
                     alt={editForm.name || 'Preview'}
@@ -1040,17 +1114,18 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                     onError={(e) => {
                       e.currentTarget.src = DEFAULT_FACEBOOK_AVATAR;
                     }}
-                    className="w-14 h-14 rounded-full object-cover ring-2 ring-white shadow-xs bg-[#E4E6EB]"
+                    className="w-16 h-16 rounded-full object-cover ring-3 ring-[#1877F2]/30 shadow-md bg-[#E4E6EB]"
                   />
-                  <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#050505] text-white text-xs font-mono font-bold flex items-center justify-center border border-white">
+                  <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#050505] text-white text-xs font-mono font-bold flex items-center justify-center border-2 border-white shadow-xs">
                     {editForm.number || '?'}
                   </span>
                 </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  <span className="text-xs font-bold text-[#050505] block truncate">
-                    {editForm.name || 'Nombre del futbolista'}
-                  </span>
-                  <div className="flex items-center gap-2">
+
+                <div className="flex-1 min-w-0 space-y-2 w-full">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <span className="text-xs font-black text-[#050505] block truncate">
+                      {editForm.name || 'Nombre del futbolista'}
+                    </span>
                     <button
                       type="button"
                       onClick={() =>
@@ -1061,8 +1136,37 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                       }
                       className="text-[11px] font-bold text-[#1877F2] hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      <span>Usar foto de Facebook por defecto</span>
+                      <span>Usar silueta de Facebook</span>
                     </button>
+                  </div>
+
+                  {/* Camera & Upload Buttons */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setCameraModalTarget('edit')}
+                      className="px-3 py-1.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Tomar Foto con Cámara</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => editPlayerFileInputRef.current?.click()}
+                      className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-100 text-[#050505] text-xs font-bold border border-[#CED0D4] shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <ImageIcon className="w-4 h-4 text-[#1877F2]" />
+                      <span>Subir desde Galería</span>
+                    </button>
+
+                    <input
+                      ref={editPlayerFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleDeviceFileUpload(e, 'edit')}
+                      className="hidden"
+                    />
                   </div>
                 </div>
               </div>
@@ -1210,6 +1314,26 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
           </div>
         </div>
       )}
+      {/* CAMERA CAPTURE MODAL FOR PLAYERS */}
+      <CameraCaptureModal
+        isOpen={cameraModalTarget !== null}
+        onClose={() => setCameraModalTarget(null)}
+        onCapture={(dataUrl) => {
+          if (cameraModalTarget === 'new') {
+            setNewPlayerPhoto(dataUrl);
+          } else if (cameraModalTarget === 'edit') {
+            setEditForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+          }
+        }}
+        title={
+          cameraModalTarget === 'new'
+            ? 'Tomar Foto para Nuevo Jugador'
+            : `Tomar Foto para ${editForm.name || 'el Jugador'}`
+        }
+        subtitle="Centra el rostro del jugador dentro del círculo"
+        playerName={cameraModalTarget === 'new' ? newPlayerName : editForm.name}
+        dorsal={cameraModalTarget === 'new' ? newPlayerNumber : editForm.number}
+      />
     </div>
   );
 };

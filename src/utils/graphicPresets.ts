@@ -58,24 +58,76 @@ export const COLOR_THEME_PRESETS: ColorPreset[] = [
 /**
  * Safely loads an image for HTML5 Canvas with CORS and Blob support.
  * Ensures the canvas NEVER becomes tainted by using blob URLs or safe fallbacks.
+ * Uses cache-busting to bypass browser-cached non-CORS responses for CDNs (Unsplash, etc.)
  * Returns null if the image cannot be loaded.
  */
 export async function loadCanvasImageSafe(url: string): Promise<HTMLImageElement | null> {
-  if (!url || typeof url !== 'string') return null;
+  if (!url || typeof url !== 'string' || url.trim() === '') return null;
+  const cleanUrl = url.trim();
 
   // 1. If it's already a data URL or blob URL, load directly
-  if (url.startsWith('data:') || url.startsWith('blob:')) {
+  if (cleanUrl.startsWith('data:') || cleanUrl.startsWith('blob:')) {
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = url;
+      const timer = setTimeout(() => resolve(null), 5000);
+      img.onload = () => {
+        clearTimeout(timer);
+        resolve(img);
+      };
+      img.onerror = () => {
+        clearTimeout(timer);
+        resolve(null);
+      };
+      img.src = cleanUrl;
+      if (img.complete && img.naturalWidth > 0) {
+        clearTimeout(timer);
+        resolve(img);
+      }
     });
   }
 
-  // 2. Try fetching as Blob first (converts external image to same-origin blob: URL, preventing canvas taint)
+  // 2. Helper to load via HTMLImageElement with anonymous crossOrigin
+  const loadViaImage = (srcToLoad: string): Promise<HTMLImageElement | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      const timer = setTimeout(() => {
+        resolve(null);
+      }, 3500);
+
+      img.onload = () => {
+        clearTimeout(timer);
+        resolve(img);
+      };
+
+      img.onerror = () => {
+        clearTimeout(timer);
+        resolve(null);
+      };
+
+      img.src = srcToLoad;
+      if (img.complete && img.naturalWidth > 0) {
+        clearTimeout(timer);
+        resolve(img);
+      }
+    });
+  };
+
+  // 3. Try with cache-busting CORS URL first to avoid browser-cached non-CORS response
+  const sep = cleanUrl.includes('?') ? '&' : '?';
+  const corsBustedUrl = `${cleanUrl}${sep}cors_safe=1&_t=${Date.now()}`;
+
+  const bustedImg = await loadViaImage(corsBustedUrl);
+  if (bustedImg) return bustedImg;
+
+  // 4. Try direct URL
+  const directImg = await loadViaImage(cleanUrl);
+  if (directImg) return directImg;
+
+  // 5. Fallback: try fetching as Blob with CORS to convert to same-origin objectUrl
   try {
-    const res = await fetch(url, { mode: 'cors' });
+    const res = await fetch(corsBustedUrl, { mode: 'cors' });
     if (res.ok) {
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
@@ -87,34 +139,32 @@ export async function loadCanvasImageSafe(url: string): Promise<HTMLImageElement
           resolve(null);
         };
         img.src = objectUrl;
+        if (img.complete && img.naturalWidth > 0) resolve(img);
       });
     }
   } catch {
-    // If fetch failed (e.g. strict CORS), try image element with crossOrigin and cache-buster
+    try {
+      const res2 = await fetch(cleanUrl, { mode: 'cors' });
+      if (res2.ok) {
+        const blob2 = await res2.blob();
+        const objectUrl2 = URL.createObjectURL(blob2);
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => {
+            URL.revokeObjectURL(objectUrl2);
+            resolve(null);
+          };
+          img.src = objectUrl2;
+          if (img.complete && img.naturalWidth > 0) resolve(img);
+        });
+      }
+    } catch {
+      // both fetches failed
+    }
   }
 
-  // 3. Fallback to standard Image with anonymous crossOrigin and timestamp
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-
-    const timer = setTimeout(() => {
-      resolve(null);
-    }, 4500);
-
-    img.onload = () => {
-      clearTimeout(timer);
-      resolve(img);
-    };
-
-    img.onerror = () => {
-      clearTimeout(timer);
-      resolve(null);
-    };
-
-    const separator = url.includes('?') ? '&' : '?';
-    img.src = `${url}${separator}_t=${Date.now()}`;
-  });
+  return null;
 }
 
 export interface CanvasExportResult {

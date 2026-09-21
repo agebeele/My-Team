@@ -255,7 +255,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
   selectedMatchId,
 }) => {
   const t = getT(language);
-  const isOwnerOrAdmin = currentUser.role === 'owner';
+  const isOwnerOrAdmin = currentUser.role === 'owner' || currentUser.role === 'admin';
 
   const [activeMatchId, setActiveMatchId] = useState<string>(
     selectedMatchId || matches[0]?.id || ''
@@ -459,6 +459,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   // Core swap execution between two slots on the pitch
   const executeSwap = (fromIndex: number, toIndex: number) => {
+    if (!isOwnerOrAdmin) return;
     if (fromIndex === toIndex) return;
 
     const fromSlot = pitchLineup[fromIndex];
@@ -492,6 +493,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   // Slot click handler: tap one then tap another to swap, or tap to assign bench
   const handleSlotClick = (index: number) => {
+    if (!isOwnerOrAdmin) return;
     if (selectedSlotIndex === null) {
       setSelectedSlotIndex(index);
     } else if (selectedSlotIndex === index) {
@@ -505,6 +507,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   // Desktop HTML5 Drag & Drop handlers
   const handleDragStart = (e: React.DragEvent, index: number) => {
+    if (!isOwnerOrAdmin) return;
     setDraggingIndex(index);
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
@@ -612,6 +615,16 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Informative Banner for Players */}
+      {!isOwnerOrAdmin && (
+        <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3 shadow-xs">
+          <Shield className="w-5 h-5 text-[#1877F2] shrink-0 mt-0.5" />
+          <div className="text-xs leading-relaxed">
+            <span className="font-bold text-[#050505]">Alineación Oficial (Modo Jugador):</span> Puedes consultar la formación táctica de 7 jugadores y los titulares designados por el cuerpo técnico, y descargar la imagen oficial. La edición de titulares y formaciones está reservada para el Administrador / Dueño.
+          </div>
+        </div>
+      )}
+
       {/* Top Header Card */}
       <div className="bg-white dark:bg-[#242526] p-5 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs space-y-4 transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -672,57 +685,64 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
             <span>Modalidad: Fútbol 7 (7v7 • 1 Portero + 6 en Cancha)</span>
           </div>
 
-          {/* Formations list for Fútbol 7 */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            <span className="text-[11px] font-bold text-[#65676B] dark:text-gray-400 mr-1 whitespace-nowrap">
-              Formación:
-            </span>
-            {Object.entries(allFormations).map(([fk, fConfig]) => {
-              const isCustom = Boolean(customFormations[fk]);
-              const isActive = formation === fk;
-              return (
-                <div key={fk} className="relative group/fbtn shrink-0">
-                  <button
-                    id={`formation-btn-${fk}`}
-                    onClick={() => handleApplyFormation(fk)}
-                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
-                      isActive
-                        ? 'bg-[#1877F2] text-white shadow-xs'
-                        : 'bg-[#F0F2F5] dark:bg-white/5 text-[#050505] dark:text-gray-300 hover:bg-[#E4E6EB] dark:hover:bg-white/10 border border-[#CED0D4] dark:border-white/10'
-                    }`}
-                    title={fConfig.label}
-                  >
-                    {isCustom && <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />}
-                    <span>{fk}</span>
-                  </button>
-
-                  {isCustom && (
+          {/* Formations list for Fútbol 7 - restricted for players */}
+          {isOwnerOrAdmin ? (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+              <span className="text-[11px] font-bold text-[#65676B] dark:text-gray-400 mr-1 whitespace-nowrap">
+                Formación:
+              </span>
+              {Object.entries(allFormations).map(([fk, fConfig]) => {
+                const isCustom = Boolean(customFormations[fk]);
+                const isActive = formation === fk;
+                return (
+                  <div key={fk} className="relative group/fbtn shrink-0">
                     <button
-                      onClick={(e) => handleDeleteCustomFormation(fk, e)}
-                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] opacity-0 group-hover/fbtn:opacity-100 transition-opacity cursor-pointer shadow-xs"
-                      title="Eliminar formación personalizada"
+                      id={`formation-btn-${fk}`}
+                      onClick={() => handleApplyFormation(fk)}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                        isActive
+                          ? 'bg-[#1877F2] text-white shadow-xs'
+                          : 'bg-[#F0F2F5] dark:bg-white/5 text-[#050505] dark:text-gray-300 hover:bg-[#E4E6EB] dark:hover:bg-white/10 border border-[#CED0D4] dark:border-white/10'
+                      }`}
+                      title={fConfig.label}
                     >
-                      ×
+                      {isCustom && <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />}
+                      <span>{fk}</span>
                     </button>
-                  )}
-                </div>
-              );
-            })}
 
-            {/* Button to add custom formation */}
-            <button
-              id="btn-add-custom-formation"
-              onClick={() => {
-                setIsCustomModalOpen(true);
-                setCustomError(null);
-              }}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs bg-[#E7F3FF] dark:bg-[#1877F2]/20 text-[#1877F2] dark:text-[#60A5FA] hover:bg-[#D0E7FF] dark:hover:bg-[#1877F2]/30 border border-[#1877F2]/30 transition-all cursor-pointer whitespace-nowrap shadow-xs"
-              title="Insertar alineación por números (ejemplo: 2-1-2-1)"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Insertar Alineación</span>
-            </button>
-          </div>
+                    {isCustom && (
+                      <button
+                        onClick={(e) => handleDeleteCustomFormation(fk, e)}
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] opacity-0 group-hover/fbtn:opacity-100 transition-opacity cursor-pointer shadow-xs"
+                        title="Eliminar formación personalizada"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Button to add custom formation */}
+              <button
+                id="btn-add-custom-formation"
+                onClick={() => {
+                  setIsCustomModalOpen(true);
+                  setCustomError(null);
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs bg-[#E7F3FF] dark:bg-[#1877F2]/20 text-[#1877F2] dark:text-[#60A5FA] hover:bg-[#D0E7FF] dark:hover:bg-[#1877F2]/30 border border-[#1877F2]/30 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                title="Insertar alineación por números (ejemplo: 2-1-2-1)"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Insertar Alineación</span>
+              </button>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F0F2F5] text-[#050505] text-xs font-bold border border-[#CED0D4]">
+              <span className="text-[#65676B]">Esquema Táctico del DT:</span>
+              <span className="text-[#1877F2] font-black">{formation}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -807,24 +827,24 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                 <div
                   key={index}
                   data-slot-index={index}
-                  draggable={true}
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDrop={(e) => handleDrop(e, index)}
-                  onDragEnd={handleDragEnd}
-                  onTouchStart={(e) => handleTouchStart(e, index)}
-                  onClick={() => handleSlotClick(index)}
+                  draggable={isOwnerOrAdmin}
+                  onDragStart={isOwnerOrAdmin ? (e) => handleDragStart(e, index) : undefined}
+                  onDragOver={isOwnerOrAdmin ? (e) => handleDragOver(e, index) : undefined}
+                  onDrop={isOwnerOrAdmin ? (e) => handleDrop(e, index) : undefined}
+                  onDragEnd={isOwnerOrAdmin ? handleDragEnd : undefined}
+                  onTouchStart={isOwnerOrAdmin ? (e) => handleTouchStart(e, index) : undefined}
+                  onClick={isOwnerOrAdmin ? () => handleSlotClick(index) : undefined}
                   style={{
                     left: `${slot.x}%`,
                     top: `${slot.y}%`,
                     transform: 'translate(-50%, -50%)',
                   }}
-                  className={`absolute cursor-grab active:cursor-grabbing group z-20 flex flex-col items-center touch-none transition-transform duration-150 ${
-                    isDragging ? 'opacity-40 scale-90 pointer-events-none' : ''
-                  }`}
+                  className={`absolute group z-20 flex flex-col items-center touch-none transition-transform duration-150 ${
+                    isOwnerOrAdmin ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+                  } ${isDragging ? 'opacity-40 scale-90 pointer-events-none' : ''}`}
                 >
                   {/* Floating Action Badge when Hovered/Over during drag */}
-                  {isDragOver && (
+                  {isOwnerOrAdmin && isDragOver && (
                     <div className="absolute -top-7 whitespace-nowrap bg-amber-400 text-black px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-2xl animate-bounce z-30">
                       <ArrowLeftRight className="w-3 h-3" />
                       Soltar para cambiar
@@ -832,7 +852,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                   )}
 
                   {/* Floating Badge when Slot is Selected by Tap */}
-                  {isSelected && !isDragOver && (
+                  {isOwnerOrAdmin && isSelected && !isDragOver && (
                     <div className="absolute -top-7 whitespace-nowrap bg-amber-400 text-black px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-xl animate-pulse z-30">
                       <ArrowLeftRight className="w-3 h-3" />
                       Toca otro para cambiar
@@ -850,7 +870,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                         ? 'bg-emerald-500 text-black ring-2 ring-amber-400/60 hover:scale-110 hover:ring-amber-400'
                         : player?.position === 'POR'
                         ? 'bg-amber-500 text-black ring-2 ring-white/90'
-                        : 'bg-emerald-500 text-black ring-2 ring-white/90 group-hover:scale-110'
+                        : `bg-emerald-500 text-black ring-2 ring-white/90 ${isOwnerOrAdmin ? 'group-hover:scale-110' : ''}`
                     }`}
                   >
                     {player?.avatarUrl ? (
@@ -872,9 +892,11 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                     </span>
 
                     {/* Quick drag indicator dot */}
-                    <span className="absolute -top-1 -left-1 opacity-0 group-hover:opacity-100 bg-black/80 text-gray-300 rounded-full p-0.5 transition-opacity">
-                      <Move className="w-2.5 h-2.5" />
-                    </span>
+                    {isOwnerOrAdmin && (
+                      <span className="absolute -top-1 -left-1 opacity-0 group-hover:opacity-100 bg-black/80 text-gray-300 rounded-full p-0.5 transition-opacity">
+                        <Move className="w-2.5 h-2.5" />
+                      </span>
+                    )}
                   </div>
 
                   {/* Player Name Pill */}
@@ -930,18 +952,22 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
               <div>
                 <h3 className="text-base font-black text-[#050505] dark:text-white flex items-center gap-1.5">
                   <Users className="w-4 h-4 text-[#1877F2] dark:text-emerald-400" />
-                  {selectedSlotIndex !== null
-                    ? `Asignar a Posición: ${pitchLineup[selectedSlotIndex]?.roleName || 'Titular'}`
-                    : t.lineup.bench}
+                  {isOwnerOrAdmin
+                    ? selectedSlotIndex !== null
+                      ? `Asignar a Posición: ${pitchLineup[selectedSlotIndex]?.roleName || 'Titular'}`
+                      : t.lineup.bench
+                    : 'Banca de Suplentes'}
                 </h3>
                 <p className="text-xs text-[#65676B] dark:text-gray-400">
-                  {selectedSlotIndex !== null
-                    ? 'Toca cualquier jugador de abajo para ubicarlo'
-                    : 'Toca una posición en la cancha para sustituirlo'}
+                  {isOwnerOrAdmin
+                    ? selectedSlotIndex !== null
+                      ? 'Toca cualquier jugador de abajo para ubicarlo'
+                      : 'Toca una posición en la cancha para sustituirlo'
+                    : 'Jugadores convocados a disposición del cuerpo técnico'}
                 </p>
               </div>
 
-              {selectedSlotIndex !== null && (
+              {isOwnerOrAdmin && selectedSlotIndex !== null && (
                 <button
                   onClick={() => setSelectedSlotIndex(null)}
                   className="text-xs font-bold text-[#65676B] hover:text-[#050505] dark:text-gray-400 dark:hover:text-white px-2.5 py-1 bg-[#F0F2F5] dark:bg-white/5 rounded-lg transition-colors cursor-pointer"
@@ -953,20 +979,20 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
             {/* Players List (Bench or All when slot selected) */}
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-              {(selectedSlotIndex !== null ? players : benchPlayers).map((player) => {
+              {(isOwnerOrAdmin && selectedSlotIndex !== null ? players : benchPlayers).map((player) => {
                 const isOnPitch = starterPlayerIds.includes(player.id);
                 return (
                   <button
                     key={player.id}
                     onClick={() => {
-                      if (selectedSlotIndex !== null) {
+                      if (isOwnerOrAdmin && selectedSlotIndex !== null) {
                         handleAssignPlayerToSlot(player.id);
                       }
                     }}
                     className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
-                      selectedSlotIndex !== null
+                      isOwnerOrAdmin && selectedSlotIndex !== null
                         ? 'hover:bg-[#E7F3FF] dark:hover:bg-emerald-500/10 hover:border-[#1877F2]/40 dark:hover:border-emerald-500/30 cursor-pointer bg-white dark:bg-black/40 border-[#CED0D4] dark:border-white/10'
-                        : 'bg-[#F0F2F5] dark:bg-black/40 border-[#CED0D4]/70 dark:border-white/5'
+                        : 'bg-[#F0F2F5] dark:bg-black/40 border-[#CED0D4]/70 dark:border-white/5 cursor-default'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">

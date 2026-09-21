@@ -29,6 +29,7 @@ import { Match, MatchEvent, MatchEventType, MatchModality, TeamInfo, Player, App
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { getModalityInfo, ALL_MODALITIES } from '../utils/modalityHelper';
+import { PhotoPreviewModal } from './PhotoPreviewModal';
 
 interface LiveMatchModeProps {
   team: TeamInfo;
@@ -144,6 +145,12 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
   const [activeModal, setActiveModal] = useState<MatchEventType | null>(null);
   const [showSummaryModal, setShowSummaryModal] = useState<boolean>(false);
   const [isDownloadingSummary, setIsDownloadingSummary] = useState<boolean>(false);
+  const [summaryPreviewModal, setSummaryPreviewModal] = useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    fileName: string;
+    title: string;
+  } | null>(null);
   const summaryCardRef = useRef<HTMLDivElement>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -528,13 +535,22 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
   const handleDownloadSummary = async () => {
     if (!summaryCardRef.current || !currentMatch) return;
     setIsDownloadingSummary(true);
+    const fileName = `resumen_${team.shortName}_vs_${currentMatch.rival.replace(/\s+/g, '_')}_${currentMatch.date}.png`;
     try {
-      await downloadElementAsImage(summaryCardRef.current, {
-        fileName: `resumen_${team.shortName}_vs_${currentMatch.rival.replace(/\s+/g, '_')}_${currentMatch.date}.png`,
+      const res = await downloadElementAsImage(summaryCardRef.current, {
+        fileName,
         backgroundColor: '#0A0A0B',
         scale: 2.5,
       });
-      showToast('📸 ¡Resumen del partido guardado en tu galería!');
+      if (res) {
+        setSummaryPreviewModal({
+          isOpen: true,
+          imageUrl: res,
+          fileName,
+          title: `Resumen Oficial: ${team.shortName} vs ${currentMatch.rival}`,
+        });
+        showToast('📸 ¡Resumen del partido listo para guardar!');
+      }
     } catch (err) {
       console.error(err);
       alert('No se pudo guardar la imagen del resumen.');
@@ -1791,6 +1807,18 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Official Match Summary Graphic HD Preview Modal */}
+      {summaryPreviewModal && (
+        <PhotoPreviewModal
+          isOpen={summaryPreviewModal.isOpen}
+          onClose={() => setSummaryPreviewModal(null)}
+          title={summaryPreviewModal.title}
+          subtitle="Resumen oficial del encuentro con goles, cronómetro e incidencias"
+          imageUrl={summaryPreviewModal.imageUrl}
+          fileName={summaryPreviewModal.fileName}
+        />
       )}
     </div>
   );

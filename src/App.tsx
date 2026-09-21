@@ -16,7 +16,7 @@ import {
   INITIAL_STANDINGS,
   INITIAL_USERS,
 } from './data/initialData';
-import { loadInitialData, saveToStorage } from './utils/storage';
+import { loadInitialData, saveToStorage, saveDeviceSession, clearDeviceSession } from './utils/storage';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { MatchCalendar } from './components/MatchCalendar';
@@ -29,6 +29,7 @@ import { PlayerProfileView } from './components/PlayerProfileView';
 import { OwnerAdminPanel } from './components/OwnerAdminPanel';
 import { LiveMatchMode } from './components/LiveMatchMode';
 import { AuthModal } from './components/AuthModal';
+import { LoginScreen } from './components/LoginScreen';
 
 export default function App() {
   // Persistence state
@@ -44,12 +45,13 @@ export default function App() {
   // App Navigation & Language state
   const [activeTab, setActiveTab] = useState<string>('calendar');
   const [language, setLanguage] = useState<Language>('es');
-  const [currentUser, setCurrentUser] = useState<AppUser>(initial.users?.[0] || INITIAL_USERS[0]);
+  // If the device session was saved previously, load it; otherwise null so it goes directly to Login
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(initial.currentUser || null);
 
   // Selected sub-elements
   const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>(undefined);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>(
-    currentUser.playerId || initial.players?.[0]?.id || 'p1'
+    initial.currentUser?.playerId || initial.players?.[0]?.id || 'p1'
   );
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [invitedTeamName, setInvitedTeamName] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export default function App() {
 
   // Update selected player when switching user if user has linked playerId
   useEffect(() => {
-    if (currentUser.playerId) {
+    if (currentUser?.playerId) {
       setSelectedPlayerId(currentUser.playerId);
     }
   }, [currentUser]);
@@ -114,13 +116,41 @@ export default function App() {
     setActiveTab('profile');
   };
 
+  // If no saved device session exists, prompt user to log in or register directly
+  if (!currentUser) {
+    return (
+      <LoginScreen
+        team={team}
+        allUsers={users}
+        setUsers={setUsers}
+        players={players}
+        setPlayers={setPlayers}
+        language={language}
+        invitedTeamName={invitedTeamName}
+        onLoginSuccess={(user, rememberDevice) => {
+          setCurrentUser(user);
+          if (rememberDevice) {
+            saveDeviceSession(user);
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-[#050505] flex flex-col selection:bg-[#1877F2] selection:text-white">
       {/* Top Main Navigation Bar */}
       <Navbar
         team={team}
         currentUser={currentUser}
-        setCurrentUser={setCurrentUser}
+        setCurrentUser={(u) => {
+          setCurrentUser(u);
+          saveDeviceSession(u);
+        }}
+        onLogout={() => {
+          clearDeviceSession();
+          setCurrentUser(null);
+        }}
         allUsers={users}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -296,7 +326,14 @@ export default function App() {
           setInvitedTeamName(null);
         }}
         currentUser={currentUser}
-        setCurrentUser={setCurrentUser}
+        setCurrentUser={(u) => {
+          setCurrentUser(u);
+          if (u) {
+            saveDeviceSession(u);
+          } else {
+            clearDeviceSession();
+          }
+        }}
         allUsers={users}
         setUsers={setUsers}
         players={players}

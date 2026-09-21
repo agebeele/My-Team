@@ -581,9 +581,11 @@ export const INITIAL_POSTS: Post[] = [
 
 export const INITIAL_USERS: AppUser[] = [
   {
-    id: 'u_owner',
-    name: 'Carlos Mendoza (Dueño)',
-    email: 'carlos.dueno@teamgol.com',
+    id: 'u_admin',
+    name: 'Administrador (Admin)',
+    email: 'agbl141201@gmail.com',
+    username: 'admin',
+    password: 'root',
     role: 'owner',
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
     playerId: 'p1',
@@ -593,6 +595,8 @@ export const INITIAL_USERS: AppUser[] = [
     id: 'u_p9',
     name: 'Andrés Treviño (Jugador)',
     email: 'andres.trevino@teamgol.com',
+    username: 'andres9',
+    password: '123',
     role: 'player',
     avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80',
     playerId: 'p9',
@@ -602,6 +606,8 @@ export const INITIAL_USERS: AppUser[] = [
     id: 'u_p2',
     name: 'Mateo Silva (Jugador)',
     email: 'mateo.silva@teamgol.com',
+    username: 'mateo2',
+    password: '123',
     role: 'player',
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
     playerId: 'p2',

@@ -27,6 +27,7 @@ interface NavbarProps {
   hasLiveMatch?: boolean;
   currentUser: AppUser;
   setCurrentUser: (user: AppUser) => void;
+  onLogout?: () => void;
   users?: AppUser[];
   allUsers?: AppUser[];
   team: TeamInfo;
@@ -46,6 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   hasLiveMatch = false,
   currentUser,
   setCurrentUser,
+  onLogout,
   users,
   allUsers,
   team,
@@ -349,7 +351,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       className="text-xs text-[#1877F2] hover:underline font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <User className="w-3.5 h-3.5" />
-                      {t.auth.login} / Jugador
+                      Cambiar Cuenta
                     </button>
 
                     {currentUser.role === 'owner' && (
@@ -365,6 +367,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
                   </div>
+
+                  {onLogout && (
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <button
+                        id="btn-navbar-logout"
+                        onClick={() => {
+                          setShowRoleMenu(false);
+                          onLogout();
+                        }}
+                        className="w-full py-1.5 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-rose-200"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Cerrar Sesión</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
