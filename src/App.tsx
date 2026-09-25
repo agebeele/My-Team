@@ -28,6 +28,7 @@ import { SocialWall } from './components/SocialWall';
 import { PlayerProfileView } from './components/PlayerProfileView';
 import { OwnerAdminPanel } from './components/OwnerAdminPanel';
 import { LiveMatchMode } from './components/LiveMatchMode';
+import { IoTTelemetryHub } from './components/IoTTelemetryHub';
 import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
 import { AppSplashAnimation } from './components/AppSplashAnimation';
@@ -353,7 +354,7 @@ export default function App() {
         )}
 
         {/* TAB 8: Team Owner & Admin Panel */}
-        {activeTab === 'admin' && (
+        {(activeTab === 'admin' || activeTab === 'owner_admin') && (
           <OwnerAdminPanel
             team={team}
             setTeam={setTeam}
@@ -364,6 +365,16 @@ export default function App() {
             matches={matches}
             currentUser={currentUser}
             language={language}
+          />
+        )}
+
+        {/* TAB 9: Brazalete Deportivo Inteligente (ESP32 IoT Hub) */}
+        {activeTab === 'iot' && (
+          <IoTTelemetryHub
+            team={team}
+            players={players}
+            currentUser={currentUser}
+            onViewPlayerProfile={handleViewPlayerProfile}
           />
         )}
       </main>

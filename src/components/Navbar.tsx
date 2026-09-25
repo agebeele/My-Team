@@ -232,6 +232,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               {t.nav.wall}
             </button>
+            <button
+              id="nav-btn-iot"
+              onClick={() => handleTabChange('iot')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                selectedTab === 'iot'
+                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 text-[#1877F2]" />
+              <span>{t.nav.iot || 'Brazalete IoT'}</span>
+            </button>
             {currentUser.role === 'owner' && (
               <button
                 id="nav-btn-admin"
@@ -341,6 +353,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                     >
                       <User className="w-4 h-4 text-[#1877F2]" />
                       <span>Ver mi perfil y estadísticas</span>
+                    </button>
+
+                    <button
+                      id="btn-menu-iot-armband"
+                      onClick={() => {
+                        handleTabChange('iot');
+                        setShowRoleMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                    >
+                      <Activity className="w-4 h-4 text-emerald-600" />
+                      <span>Brazalete Deportivo (ESP32 IoT)</span>
                     </button>
 
                     {currentUser.role === 'owner' && (

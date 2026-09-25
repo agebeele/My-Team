@@ -262,3 +262,36 @@ export interface TeamInvitation {
 }
 
 export type Language = 'es' | 'en';
+
+export interface ArmbandTelemetryData {
+  heartRate: number; // BPM
+  spO2: number; // %
+  accelX: number;
+  accelY: number;
+  accelZ: number;
+  gForce: number; // total resultant G
+  intensity: number; // 0 - 100%
+  sprints: number;
+  cadence: number; // steps / min
+  calories: number;
+  batteryLevel: number;
+  timestamp: number;
+}
+
+export type ArmbandConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'simulated';
+
+export interface TelemetrySessionRecord {
+  id: string;
+  playerId: string;
+  playerName: string;
+  matchId?: string;
+  rivalName?: string;
+  date: string;
+  startTime: number;
+  durationSeconds: number;
+  avgBpm: number;
+  maxBpm: number;
+  sprintsCount: number;
+  caloriesBurned: number;
+  highIntensityMinutes: number;
+}

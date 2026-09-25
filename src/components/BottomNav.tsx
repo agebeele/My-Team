@@ -11,6 +11,7 @@ import {
   X,
   ChevronRight,
   Zap,
+  Activity,
 } from 'lucide-react';
 import { AppUser, Language, UserRole } from '../types';
 import { getT } from '../utils/translations';
@@ -104,6 +105,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       icon: MessageSquare,
       badge: null,
       color: 'blue',
+    },
+    {
+      id: 'iot',
+      label: 'Brazalete IoT (ESP32)',
+      description: 'Telemetría en vivo, pulso cardíaco y aceleración',
+      icon: Activity,
+      badge: 'IoT',
+      color: 'emerald',
+      highlight: true,
     },
   ];
 

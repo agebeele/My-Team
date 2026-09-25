@@ -12,6 +12,7 @@ export const translations = {
       tables: 'Tablas',
       mvp: 'Votación MVP',
       wall: 'Muro',
+      iot: 'Brazalete IoT',
       admin: 'Configuración (Dueño)',
     },
     roles: {
@@ -183,6 +184,7 @@ export const translations = {
       tables: 'Tables',
       mvp: 'MVP Voting',
       wall: 'Social Wall',
+      iot: 'IoT Armband',
       admin: 'Owner Settings',
     },
     roles: {
