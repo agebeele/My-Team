@@ -1374,6 +1374,56 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                 <Sparkles className="w-4 h-4 fill-black" />
                 <span>Escanear Foto de Tabla con IA</span>
               </button>
+
+              {/* Standings Table Preview in Admin Panel */}
+              {standings && standings.length > 0 && (
+                <div className="bg-black/40 rounded-xl border border-white/10 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-gray-300 font-bold uppercase tracking-wider pb-1 border-b border-white/10">
+                    <span>Equipos en la Tabla ({standings.length})</span>
+                    <span>PJ / PTS</span>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto divide-y divide-white/5 space-y-1 pr-1">
+                    {standings.map((st) => (
+                      <div
+                        key={st.id}
+                        className={`flex items-center justify-between py-1.5 px-2 rounded-lg text-xs ${
+                          st.isOurTeam
+                            ? 'bg-[#1877F2]/25 text-white font-bold border border-[#1877F2]/40'
+                            : 'text-gray-300 hover:bg-white/5'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-[10px] w-4 text-center font-bold text-gray-400">
+                            #{st.rank}
+                          </span>
+                          {st.logo && (st.logo.startsWith('http') || st.logo.startsWith('/') || st.logo.startsWith('data:')) ? (
+                            <img
+                              src={st.logo}
+                              alt={st.name}
+                              className="w-5 h-5 rounded-full object-cover shrink-0 bg-white"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/fc_bayern_logo.png';
+                              }}
+                            />
+                          ) : (
+                            <span className="text-sm">{st.logo || '🛡️'}</span>
+                          )}
+                          <span className="truncate font-medium">{st.name}</span>
+                          {st.isOurTeam && (
+                            <span className="text-[9px] bg-[#1877F2] text-white px-1.5 py-0.5 rounded font-black shrink-0">
+                              TU CLUB
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2.5 font-mono shrink-0">
+                          <span className="text-[10px] text-gray-400">{st.pj} PJ</span>
+                          <span className="font-black text-amber-400">{st.pts} pts</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { StandingsRow, TeamInfo } from '../types';
-import { scanLeagueTableWithGemini, TableImageInput } from '../utils/tableAiScanner';
+import { scanLeagueTableWithGemini, TableImageInput, CLUB_CRESTS } from '../utils/tableAiScanner';
+import { FAMOUS_TEAMS_DATA } from '../utils/ocrTableParser';
 
 interface TableAiScannerModalProps {
   isOpen: boolean;
@@ -121,6 +122,40 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
       },
     ]);
     setSelectedPreviewIndex(0);
+  };
+
+  const handleLoadChampionsLeagueDataset = () => {
+    setScanError(null);
+    const fullRows: StandingsRow[] = FAMOUS_TEAMS_DATA.map((t, idx) => {
+      const isBayern = t.name.toLowerCase().includes('bayern');
+      const cleanKey = t.name.toLowerCase().trim();
+      let logoUrl = 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=150&q=80';
+      if (isBayern) {
+        logoUrl = team.logoUrl || '/fc_bayern_logo.png';
+      } else if (CLUB_CRESTS[cleanKey]) {
+        logoUrl = CLUB_CRESTS[cleanKey];
+      }
+      return {
+        id: `standing_cl_${Date.now()}_${idx}`,
+        rank: t.rank,
+        name: t.name,
+        logo: logoUrl,
+        pj: t.pj,
+        g: t.g,
+        e: t.e,
+        p: t.p,
+        gf: t.gf,
+        gc: t.gc,
+        dg: t.dg,
+        pts: t.pts,
+        isOurTeam: isBayern,
+      };
+    });
+
+    setExtractedRows(fullRows);
+    setExtractedLeagueName('UEFA CHAMPIONS LEAGUE');
+    setScanEngineUsed('Tabla Oficial de 15 Equipos');
+    setActiveStep('review');
   };
 
   const handleStartScan = async () => {
@@ -336,6 +371,17 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleLoadChampionsLeagueDataset();
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 text-xs font-bold text-[#1877F2] dark:text-blue-300 hover:bg-blue-100 transition-colors shadow-xs"
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-[#1877F2]" />
+                      Cargar los 15 Equipos Oficiales
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleUseSampleImage();
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-600 text-xs font-bold text-amber-900 dark:text-amber-300 hover:bg-amber-100 transition-colors shadow-xs"
@@ -497,13 +543,24 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                     ¡Tabla reconstruida con éxito! Se detectaron <strong>{extractedRows.length} equipos</strong> {scanEngineUsed ? `(${scanEngineUsed})` : ''}.
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveStep('upload')}
-                  className="text-xs text-[#1877F2] underline font-bold cursor-pointer self-start sm:self-auto"
-                >
-                  Subir o agregar más fotos
-                </button>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleLoadChampionsLeagueDataset}
+                    className="px-2.5 py-1 rounded-lg bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-[#1877F2] dark:text-blue-300 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    title="Cargar los 15 equipos oficiales de la tabla"
+                  >
+                    <Trophy className="w-3.5 h-3.5" />
+                    <span>Cargar los 15 Equipos Oficiales</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveStep('upload')}
+                    className="text-xs text-[#1877F2] underline font-bold cursor-pointer"
+                  >
+                    Subir o agregar más fotos
+                  </button>
+                </div>
               </div>
 
               {/* Tournament Name Input */}

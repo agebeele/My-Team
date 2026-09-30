@@ -382,8 +382,19 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">{row.logo}</span>
+                        <div className="flex items-center gap-2.5">
+                          {row.logo && (row.logo.startsWith('http') || row.logo.startsWith('/') || row.logo.startsWith('data:')) ? (
+                            <img
+                              src={row.logo}
+                              alt={row.name}
+                              className="w-6 h-6 rounded-full object-cover shrink-0 border border-gray-200 dark:border-white/10 bg-white shadow-2xs"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/fc_bayern_logo.png';
+                              }}
+                            />
+                          ) : (
+                            <span className="text-base">{row.logo || '🛡️'}</span>
+                          )}
                           <span
                             className={`font-semibold truncate ${
                               isCurrent ? 'text-[#1877F2] dark:text-emerald-400 font-bold' : 'text-[#050505] dark:text-white'
