@@ -13,8 +13,17 @@ export default async function handler(req: any, res: any) {
 
     const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
 
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(200).json({
+        fallback: true,
+        message: 'No GEMINI_API_KEY configured',
+        teams: null,
+      });
+    }
+
     const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+      apiKey,
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',

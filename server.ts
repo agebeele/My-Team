@@ -4,40 +4,59 @@ import { GoogleGenAI, Type } from '@google/genai';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
-app.use(express.json({ limit: '25mb' }));
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+app.use(express.json({ limit: '50mb' }));
 
 app.post('/api/ai/scan-table', async (req, res) => {
   try {
-    const { imageBase64, mimeType = 'image/jpeg', teamName = '' } = req.body;
-    if (!imageBase64) {
-      return res.status(400).json({ error: 'No se recibió ninguna imagen para analizar.' });
+    const { images, imageBase64, mimeType = 'image/jpeg', teamName = '' } = req.body;
+
+    // Normalize images list
+    const imageList: { base64: string; mimeType: string }[] = [];
+    if (Array.isArray(images) && images.length > 0) {
+      for (const item of images) {
+        if (item.base64 || item.url) {
+          imageList.push({
+            base64: item.base64 || item.url,
+            mimeType: item.mimeType || 'image/jpeg',
+          });
+        }
+      }
+    } else if (imageBase64) {
+      imageList.push({ base64: imageBase64, mimeType });
     }
 
-    const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+    if (imageList.length === 0) {
+      return res.status(400).json({ error: 'No se recibió ninguna foto de la tabla para analizar.' });
+    }
 
-    const promptText = `Eres un asistente de inteligencia artificial experto en digitalización de tablas y estadísticas de ligas de fútbol (fútbol 7, fútbol rápido, fútbol soccer).
-Analiza detalladamente la imagen adjunta, que contiene una tabla de clasificación o posiciones de la liga.
-Extrae todas las filas de la tabla con los siguientes datos para cada equipo:
-- rank: Posición numérica (1, 2, 3...)
-- name: Nombre del equipo tal como aparece
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // If Gemini API Key is available, try Gemini 3.8 Flash Vision
+    if (apiKey) {
+      try {
+        const ai = new GoogleGenAI({
+          apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            },
+          },
+        });
+
+        const promptText = `Eres un asistente de inteligencia artificial experto en digitalización de tablas y estadísticas de ligas de fútbol (fútbol 7, fútbol rápido, fútbol soccer).
+Analiza detalladamente las ${imageList.length} imágenes adjuntas, que corresponden a la tabla de clasificación o posiciones de la liga (pueden ser partes consecutivas de la tabla o capturas de varias secciones).
+Extrae todas las filas de la tabla combinadas en orden estricto de posición (1 a N).
+Para cada equipo extrae:
+- rank: Posición numérica consecutiva (1, 2, 3...)
+- name: Nombre oficial del equipo tal como aparece
 - pj: Partidos jugados (o JJ)
 - g: Partidos ganados (o JG, PG)
 - e: Partidos empatados (o JE, PE)
@@ -48,63 +67,74 @@ Extrae todas las filas de la tabla con los siguientes datos para cada equipo:
 - pts: Puntos totales
 
 El equipo del usuario es o contiene: "${teamName}".
-Asegúrate de calcular los valores faltantes si alguna columna estuviera borrosa o cortada (dg = gf - gc).
+Asegúrate de calcular los valores faltantes si alguna columna estuviera borrosa o cortada (dg = gf - gc, pts = g*3 + e).
 Devuelve el nombre de la liga o torneo si es visible, y la lista completa de equipos en orden de posición.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType || 'image/jpeg',
-              data: cleanBase64,
-            },
+        const parts: any[] = imageList.map((img) => ({
+          inlineData: {
+            mimeType: img.mimeType || 'image/jpeg',
+            data: img.base64.replace(/^data:[^;]+;base64,/, ''),
           },
-          {
-            text: promptText,
-          },
-        ],
-      },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            leagueName: {
-              type: Type.STRING,
-              description: 'Nombre de la liga o torneo',
-            },
-            teams: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  rank: { type: Type.INTEGER, description: 'Posición en la tabla' },
-                  name: { type: Type.STRING, description: 'Nombre del equipo' },
-                  pj: { type: Type.INTEGER, description: 'Partidos jugados' },
-                  g: { type: Type.INTEGER, description: 'Partidos ganados' },
-                  e: { type: Type.INTEGER, description: 'Partidos empatados' },
-                  p: { type: Type.INTEGER, description: 'Partidos perdidos' },
-                  gf: { type: Type.INTEGER, description: 'Goles a favor' },
-                  gc: { type: Type.INTEGER, description: 'Goles en contra' },
-                  dg: { type: Type.INTEGER, description: 'Diferencia de goles' },
-                  pts: { type: Type.INTEGER, description: 'Puntos' },
-                },
-                required: ['rank', 'name', 'pj', 'g', 'e', 'p', 'gf', 'gc', 'dg', 'pts'],
-              },
-            },
-          },
-          required: ['teams'],
-        },
-      },
-    });
+        }));
+        parts.push({ text: promptText });
 
-    const parsed = JSON.parse(response.text || '{}');
-    return res.json(parsed);
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: { parts },
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                leagueName: {
+                  type: Type.STRING,
+                  description: 'Nombre de la liga o torneo',
+                },
+                teams: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      rank: { type: Type.INTEGER, description: 'Posición en la tabla' },
+                      name: { type: Type.STRING, description: 'Nombre del equipo' },
+                      pj: { type: Type.INTEGER, description: 'Partidos jugados' },
+                      g: { type: Type.INTEGER, description: 'Partidos ganados' },
+                      e: { type: Type.INTEGER, description: 'Partidos empatados' },
+                      p: { type: Type.INTEGER, description: 'Partidos perdidos' },
+                      gf: { type: Type.INTEGER, description: 'Goles a favor' },
+                      gc: { type: Type.INTEGER, description: 'Goles en contra' },
+                      dg: { type: Type.INTEGER, description: 'Diferencia de goles' },
+                      pts: { type: Type.INTEGER, description: 'Puntos' },
+                    },
+                    required: ['rank', 'name', 'pj', 'g', 'e', 'p', 'gf', 'gc', 'dg', 'pts'],
+                  },
+                },
+              },
+              required: ['teams'],
+            },
+          },
+        });
+
+        const parsed = JSON.parse(response.text || '{}');
+        if (parsed.teams && Array.isArray(parsed.teams) && parsed.teams.length > 0) {
+          return res.json({
+            ...parsed,
+            engine: 'gemini-vision',
+          });
+        }
+      } catch (geminiError: any) {
+        console.warn('Gemini vision no disponible, delegando al motor OCR:', geminiError?.message);
+      }
+    }
+
+    // Tell the client to run client-side OCR directly on device
+    return res.json({
+      requiresClientScan: true,
+      message: 'Escaneo visual directo activado en cliente.',
+    });
   } catch (error: any) {
-    console.error('Error procesando tabla con Gemini:', error);
-    return res.status(500).json({ error: error.message || 'Error procesando la tabla con IA' });
+    console.error('Error en endpoint de escaneo:', error);
+    return res.status(500).json({ error: error.message || 'Error procesando la tabla' });
   }
 });
 
