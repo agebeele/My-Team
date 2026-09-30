@@ -249,6 +249,9 @@ export interface AppUser {
   provider: 'google' | 'apple' | 'email' | 'guest';
   username?: string;
   password?: string;
+  phone?: string;
+  adminTitle?: string;
+  bio?: string;
 }
 
 export interface TeamInvitation {

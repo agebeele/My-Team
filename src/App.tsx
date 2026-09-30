@@ -364,6 +364,10 @@ export default function App() {
             setPlayers={setPlayers}
             matches={matches}
             currentUser={currentUser}
+            setCurrentUser={(u) => {
+              setCurrentUser(u);
+              saveDeviceSession(u);
+            }}
             language={language}
           />
         )}

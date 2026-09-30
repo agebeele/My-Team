@@ -328,6 +328,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                         <p className="text-xs font-bold text-[#050505] dark:text-white truncate">
                           {currentUser.name}
                         </p>
+                        {currentUser.adminTitle && currentUser.role === 'owner' && (
+                          <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 truncate">
+                            ⭐ {currentUser.adminTitle}
+                          </p>
+                        )}
                         <p className="text-[11px] text-[#65676B] dark:text-gray-400 truncate">
                           {currentUser.email}
                         </p>
@@ -377,7 +382,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-amber-900 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors cursor-pointer"
                       >
                         <Crown className="w-4 h-4 text-amber-500" />
-                        <span>Panel de Administración DT</span>
+                        <span>Panel de Administración & Perfil DT</span>
                       </button>
                     )}
                   </div>

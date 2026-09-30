@@ -4,7 +4,7 @@ export const INITIAL_TEAM: TeamInfo = {
   id: 'team_01',
   name: 'Club Atlético Rayos',
   shortName: 'RAYOS FC',
-  logoUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=200&q=80',
+  logoUrl: '/fc_bayern_logo.png',
   bannerUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
   leagueName: 'Liga Premier Fútbol 7 - División Nocturna',
   season: 'Temporada 2026',

@@ -23,6 +23,7 @@ import {
   X,
   Camera,
   Upload,
+  Sparkles,
   Image as ImageIcon,
 } from 'lucide-react';
 import {
@@ -49,6 +50,7 @@ interface OwnerAdminPanelProps {
   setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
   matches: Match[];
   currentUser: AppUser;
+  setCurrentUser?: (user: AppUser) => void;
   language: Language;
 }
 
@@ -61,6 +63,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   setPlayers,
   matches,
   currentUser,
+  setCurrentUser,
   language,
 }) => {
   const t = getT(language);
@@ -76,6 +79,24 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     bannerUrl: team.bannerUrl,
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
+  const [showBannerUrlInput, setShowBannerUrlInput] = useState(false);
+
+  // Admin Profile Form state
+  const [adminProfileForm, setAdminProfileForm] = useState({
+    name: currentUser.name || '',
+    email: currentUser.email || '',
+    phone: currentUser.phone || '',
+    adminTitle: currentUser.adminTitle || 'Director Técnico & Dueño',
+    bio: currentUser.bio || '',
+    avatarUrl: currentUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR,
+  });
+  const [adminProfileSuccess, setAdminProfileSuccess] = useState<string | null>(null);
+
+  // File Upload Refs
+  const teamLogoFileInputRef = useRef<HTMLInputElement>(null);
+  const teamBannerFileInputRef = useRef<HTMLInputElement>(null);
+  const adminAvatarFileInputRef = useRef<HTMLInputElement>(null);
 
   // New Player Form state
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -109,7 +130,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     avatarUrl: '',
   });
   // Camera Modal State & File Upload Refs
-  const [cameraModalTarget, setCameraModalTarget] = useState<'new' | 'edit' | null>(null);
+  const [cameraModalTarget, setCameraModalTarget] = useState<'new' | 'edit' | 'admin' | null>(null);
   const newPlayerFileInputRef = useRef<HTMLInputElement>(null);
   const editPlayerFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -142,8 +163,110 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
       img.src = result;
     };
     reader.readAsDataURL(file);
-    // Reset input so same file can be selected again if needed
     e.target.value = '';
+  };
+
+  // Team Logo file upload from device
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (!result) return;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 450;
+        canvas.height = 450;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const side = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height);
+        const sx = ((img.naturalWidth || img.width) - side) / 2;
+        const sy = ((img.naturalHeight || img.height) - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, 450, 450);
+        const dataUrl = canvas.toDataURL('image/png', 0.95);
+        setTeamForm((prev) => ({ ...prev, logoUrl: dataUrl }));
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Team Banner file upload from device
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (!result) return;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1200;
+        canvas.height = 450;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, 1200, 450);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        setTeamForm((prev) => ({ ...prev, bannerUrl: dataUrl }));
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Admin Avatar file upload from device
+  const handleAdminAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (!result) return;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const side = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height);
+        const sx = ((img.naturalWidth || img.width) - side) / 2;
+        const sy = ((img.naturalHeight || img.height) - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, 400, 400);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        setAdminProfileForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Save Admin Profile
+  const handleSaveAdminProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = adminProfileForm.name.trim() || currentUser.name;
+    const updatedUser: AppUser = {
+      ...currentUser,
+      name: cleanName,
+      email: adminProfileForm.email.trim() || currentUser.email,
+      phone: adminProfileForm.phone.trim() || undefined,
+      adminTitle: adminProfileForm.adminTitle.trim() || undefined,
+      bio: adminProfileForm.bio.trim() || undefined,
+      avatarUrl: adminProfileForm.avatarUrl || currentUser.avatarUrl,
+    };
+
+    if (setCurrentUser) {
+      setCurrentUser(updatedUser);
+    }
+    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+    setAdminProfileSuccess('¡Perfil de administrador actualizado correctamente!');
+    setTimeout(() => setAdminProfileSuccess(null), 4000);
   };
 
   const [editFormError, setEditFormError] = useState<string | null>(null);
@@ -836,6 +959,166 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
         </div>
       </div>
 
+      {/* SECTION 3: MI PERFIL DE ADMINISTRADOR (DIRECTOR TÉCNICO & DUEÑO) */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#CED0D4] shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#CED0D4]">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-50 text-amber-700">
+              <Crown className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-[#050505]">
+                Mi Perfil de Administrador (Director Técnico & Dueño)
+              </h3>
+              <p className="text-xs text-[#65676B]">
+                Edita tus datos personales, foto de perfil, cargo oficial y contacto visible para el equipo
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-amber-800 bg-amber-100 border border-amber-300 px-3 py-1 rounded-full self-start sm:self-auto flex items-center gap-1.5">
+            <Crown className="w-3.5 h-3.5 text-amber-600" />
+            Propietario Principal
+          </span>
+        </div>
+
+        {/* Feedback alert */}
+        {adminProfileSuccess && (
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{adminProfileSuccess}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveAdminProfile} className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5 p-4 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]">
+            {/* Avatar preview */}
+            <div className="relative shrink-0 mx-auto sm:mx-0">
+              <img
+                src={adminProfileForm.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
+                alt={adminProfileForm.name}
+                className="w-20 h-20 rounded-full object-cover border-3 border-amber-400 shadow-md bg-white"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = DEFAULT_FACEBOOK_AVATAR;
+                }}
+              />
+              <span className="absolute -bottom-1 -right-1 bg-amber-500 text-white p-1 rounded-full shadow-xs">
+                <Crown className="w-3.5 h-3.5" />
+              </span>
+            </div>
+
+            {/* Photo upload options */}
+            <div className="space-y-2 flex-1 text-center sm:text-left">
+              <input
+                type="file"
+                ref={adminAvatarFileInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleAdminAvatarUpload}
+              />
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <button
+                  type="button"
+                  onClick={() => adminAvatarFileInputRef.current?.click()}
+                  className="px-3.5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Subir foto desde dispositivo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCameraModalTarget('admin')}
+                  className="px-3.5 py-2 rounded-xl bg-white hover:bg-gray-100 text-[#050505] border border-[#CED0D4] text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-[#1877F2]" />
+                  <span>Tomar con cámara</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-[#65676B]">
+                Sube tu foto de perfil desde el carrete o galería de tu celular o PC.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
+                Nombre de Administrador / DT *
+              </label>
+              <input
+                type="text"
+                required
+                value={adminProfileForm.name}
+                onChange={(e) => setAdminProfileForm({ ...adminProfileForm, name: e.target.value })}
+                placeholder="Ej. Benjamín López"
+                className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-bold focus:outline-none focus:border-[#1877F2]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
+                Cargo / Título Oficial
+              </label>
+              <input
+                type="text"
+                value={adminProfileForm.adminTitle}
+                onChange={(e) => setAdminProfileForm({ ...adminProfileForm, adminTitle: e.target.value })}
+                placeholder="Ej. Director Técnico & Dueño"
+                className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-bold focus:outline-none focus:border-[#1877F2]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                value={adminProfileForm.email}
+                onChange={(e) => setAdminProfileForm({ ...adminProfileForm, email: e.target.value })}
+                placeholder="dt@equipo.com"
+                className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
+                Teléfono / WhatsApp de Contacto
+              </label>
+              <input
+                type="tel"
+                value={adminProfileForm.phone}
+                onChange={(e) => setAdminProfileForm({ ...adminProfileForm, phone: e.target.value })}
+                placeholder="+52 55 1234 5678"
+                className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
+              Filosofía Táctica / Nota del Míster
+            </label>
+            <textarea
+              rows={2}
+              value={adminProfileForm.bio}
+              onChange={(e) => setAdminProfileForm({ ...adminProfileForm, bio: e.target.value })}
+              placeholder="Ej. Esquema táctico dinámico, presión en bloque medio y transiciones rápidas."
+              className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2] resize-none"
+            />
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <button
+              type="submit"
+              className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Guardar Perfil de Administrador</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Team Settings */}
         <div className="lg:col-span-6 space-y-4">
@@ -845,7 +1128,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
               Identidad Oficial del Club
             </h3>
 
-            <form onSubmit={handleUpdateTeam} className="space-y-3">
+            <form onSubmit={handleUpdateTeam} className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
                   <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
@@ -900,28 +1183,132 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
-                  URL del Escudo Oficial (Logo)
+              {/* Escudo / Logo con opción de subir imagen */}
+              <div className="p-3.5 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] space-y-3">
+                <label className="block text-[11px] font-bold uppercase text-[#050505]">
+                  Escudo Oficial del Equipo (Logo)
                 </label>
-                <input
-                  type="url"
-                  value={teamForm.logoUrl}
-                  onChange={(e) => setTeamForm({ ...teamForm, logoUrl: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
-                />
+
+                <div className="flex items-center gap-3.5">
+                  <div className="relative shrink-0">
+                    <img
+                      src={teamForm.logoUrl || '/fc_bayern_logo.png'}
+                      alt={teamForm.name}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-[#1877F2] bg-white shadow-sm"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/fc_bayern_logo.png';
+                      }}
+                    />
+                    <span className="absolute -bottom-1 -right-1 bg-[#1877F2] text-white p-1 rounded-full shadow-xs">
+                      <Shield className="w-3 h-3" />
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    {/* Hidden File Input for Logo */}
+                    <input
+                      type="file"
+                      ref={teamLogoFileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleLogoUpload}
+                    />
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => teamLogoFileInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Cargar imagen desde dispositivo</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setTeamForm((prev) => ({ ...prev, logoUrl: '/fc_bayern_logo.png' }))}
+                        className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                        title="Usar escudo oficial FC Bayern München"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Usar FC Bayern München</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowLogoUrlInput(!showLogoUrlInput)}
+                      className="text-[11px] text-[#1877F2] hover:underline cursor-pointer block pt-0.5"
+                    >
+                      {showLogoUrlInput ? 'Ocultar campo de enlace URL' : 'O ingresar enlace URL web'}
+                    </button>
+                  </div>
+                </div>
+
+                {showLogoUrlInput && (
+                  <input
+                    type="url"
+                    placeholder="https://ejemplo.com/logo.png"
+                    value={teamForm.logoUrl}
+                    onChange={(e) => setTeamForm({ ...teamForm, logoUrl: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
+                  />
+                )}
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
-                  URL de Foto del Equipo (Banner)
+              {/* Portada / Banner con opción de subir imagen */}
+              <div className="p-3.5 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] space-y-3">
+                <label className="block text-[11px] font-bold uppercase text-[#050505]">
+                  Foto de Portada del Club (Banner)
                 </label>
+
+                {teamForm.bannerUrl && (
+                  <div className="w-full h-24 rounded-xl overflow-hidden border border-[#CED0D4] shadow-xs relative">
+                    <img
+                      src={teamForm.bannerUrl}
+                      alt="Banner del equipo"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Hidden File Input for Banner */}
                 <input
-                  type="url"
-                  value={teamForm.bannerUrl}
-                  onChange={(e) => setTeamForm({ ...teamForm, bannerUrl: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
+                  type="file"
+                  ref={teamBannerFileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleBannerUpload}
                 />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => teamBannerFileInputRef.current?.click()}
+                    className="px-3 py-1.5 rounded-xl bg-white hover:bg-gray-100 text-[#050505] border border-[#CED0D4] text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[#1877F2]" />
+                    <span>Cargar portada desde dispositivo</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowBannerUrlInput(!showBannerUrlInput)}
+                    className="text-[11px] text-[#1877F2] hover:underline cursor-pointer"
+                  >
+                    {showBannerUrlInput ? 'Ocultar enlace URL' : 'O ingresar enlace URL'}
+                  </button>
+                </div>
+
+                {showBannerUrlInput && (
+                  <input
+                    type="url"
+                    placeholder="https://ejemplo.com/portada.jpg"
+                    value={teamForm.bannerUrl}
+                    onChange={(e) => setTeamForm({ ...teamForm, bannerUrl: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
+                  />
+                )}
               </div>
 
               <div className="pt-2 flex justify-end">
@@ -930,7 +1317,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                   className="px-5 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   {saveSuccess ? <Check className="w-3.5 h-3.5" /> : null}
-                  {saveSuccess ? '¡Guardado!' : 'Guardar Identidad'}
+                  {saveSuccess ? '¡Guardado!' : 'Guardar Identidad del Club'}
                 </button>
               </div>
             </form>
@@ -1323,16 +1710,20 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
             setNewPlayerPhoto(dataUrl);
           } else if (cameraModalTarget === 'edit') {
             setEditForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+          } else if (cameraModalTarget === 'admin') {
+            setAdminProfileForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
           }
         }}
         title={
-          cameraModalTarget === 'new'
+          cameraModalTarget === 'admin'
+            ? 'Tomar Foto de Perfil del Administrador / DT'
+            : cameraModalTarget === 'new'
             ? 'Tomar Foto para Nuevo Jugador'
             : `Tomar Foto para ${editForm.name || 'el Jugador'}`
         }
-        subtitle="Centra el rostro del jugador dentro del círculo"
-        playerName={cameraModalTarget === 'new' ? newPlayerName : editForm.name}
-        dorsal={cameraModalTarget === 'new' ? newPlayerNumber : editForm.number}
+        subtitle="Centra el rostro dentro del círculo para la credencial oficial"
+        playerName={cameraModalTarget === 'admin' ? adminProfileForm.name : cameraModalTarget === 'new' ? newPlayerName : editForm.name}
+        dorsal={cameraModalTarget === 'admin' ? 'DT' : cameraModalTarget === 'new' ? newPlayerNumber : editForm.number}
       />
     </div>
   );

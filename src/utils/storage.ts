@@ -45,6 +45,9 @@ export const loadInitialState = () => {
       loadedTeam.primaryColor = '#1877F2';
       loadedTeam.secondaryColor = '#0866FF';
     }
+    if (!loadedTeam.logoUrl || loadedTeam.logoUrl.includes('photo-1508098682722')) {
+      loadedTeam.logoUrl = '/fc_bayern_logo.png';
+    }
 
     const loadedMatches = savedMatches ? (JSON.parse(savedMatches) as Match[]) : INITIAL_MATCHES;
     const normalizedMatches = loadedMatches.map((m) => {
