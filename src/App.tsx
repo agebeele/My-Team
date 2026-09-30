@@ -324,8 +324,10 @@ export default function App() {
         {(activeTab === 'standings' || activeTab === 'tables') && (
           <StandingsAndScorers
             standings={standings}
+            setStandings={setStandings}
             players={players}
             team={team}
+            setTeam={setTeam}
             currentUser={currentUser}
             language={language}
             onViewPlayerProfile={handleViewPlayerProfile}
@@ -363,6 +365,8 @@ export default function App() {
             players={players}
             setPlayers={setPlayers}
             matches={matches}
+            standings={standings}
+            setStandings={setStandings}
             currentUser={currentUser}
             setCurrentUser={(u) => {
               setCurrentUser(u);

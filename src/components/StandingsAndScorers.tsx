@@ -9,15 +9,19 @@ import {
   Search,
   Download,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { StandingsRow, Player, TeamInfo, AppUser, Language } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
+import { TableAiScannerModal } from './TableAiScannerModal';
 
 interface StandingsAndScorersProps {
   standings: StandingsRow[];
+  setStandings?: React.Dispatch<React.SetStateAction<StandingsRow[]>>;
   players: Player[];
   team: TeamInfo;
+  setTeam?: React.Dispatch<React.SetStateAction<TeamInfo>>;
   currentUser: AppUser;
   language: Language;
   onViewPlayerProfile: (playerId: string) => void;
@@ -25,8 +29,10 @@ interface StandingsAndScorersProps {
 
 export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   standings,
+  setStandings,
   players,
   team,
+  setTeam,
   currentUser,
   language,
   onViewPlayerProfile,
@@ -34,6 +40,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   const t = getT(language);
   const [activeTab, setActiveTab] = useState<'scorers' | 'standings'>('scorers');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAiScanModalOpen, setIsAiScanModalOpen] = useState(false);
 
   // Gallery download states
   const [isDownloading, setIsDownloading] = useState(false);
@@ -308,15 +315,30 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
               </p>
             </div>
 
-            <button
-              onClick={handleDownloadStandings}
-              disabled={isDownloading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#E7F3FF] hover:bg-[#DBE7F2] dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-[#1877F2] dark:text-emerald-300 border border-[#1877F2]/30 dark:border-emerald-500/20 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-              title="Guardar tabla general en tu galería"
-            >
-              <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
-              <span>{isDownloading ? 'Guardando...' : 'Guardar Tabla en Galería'}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {currentUser.role === 'owner' && setStandings && (
+                <button
+                  type="button"
+                  id="btn-scan-table-ai"
+                  onClick={() => setIsAiScanModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black transition-all shadow-sm cursor-pointer"
+                  title="Escanear foto de la tabla de la liga con IA"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                  <span>Escanear Tabla con IA</span>
+                </button>
+              )}
+
+              <button
+                onClick={handleDownloadStandings}
+                disabled={isDownloading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#E7F3FF] hover:bg-[#DBE7F2] dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-[#1877F2] dark:text-emerald-300 border border-[#1877F2]/30 dark:border-emerald-500/20 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                title="Guardar tabla general en tu galería"
+              >
+                <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
+                <span>{isDownloading ? 'Guardando...' : 'Guardar Tabla en Galería'}</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -397,6 +419,23 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
             </table>
           </div>
         </div>
+      )}
+
+      {/* AI League Table Scanner Modal */}
+      {setStandings && (
+        <TableAiScannerModal
+          isOpen={isAiScanModalOpen}
+          onClose={() => setIsAiScanModalOpen(false)}
+          team={team}
+          onApplyStandings={(newRows, updatedLeague) => {
+            setStandings(newRows);
+            if (updatedLeague && setTeam) {
+              setTeam((prev) => ({ ...prev, leagueName: updatedLeague }));
+            }
+            setToastMessage('¡Tabla general actualizada con IA exitosamente!');
+            setTimeout(() => setToastMessage(null), 4000);
+          }}
+        />
       )}
     </div>
   );

@@ -24,6 +24,7 @@ import {
   Camera,
   Upload,
   Sparkles,
+  Trophy,
   Image as ImageIcon,
 } from 'lucide-react';
 import {
@@ -31,6 +32,7 @@ import {
   AppUser,
   Player,
   Match,
+  StandingsRow,
   Language,
   UserRole,
   PlayerPosition,
@@ -40,6 +42,7 @@ import {
 } from '../types';
 import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
+import { TableAiScannerModal } from './TableAiScannerModal';
 
 interface OwnerAdminPanelProps {
   team: TeamInfo;
@@ -49,6 +52,8 @@ interface OwnerAdminPanelProps {
   players: Player[];
   setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
   matches: Match[];
+  standings?: StandingsRow[];
+  setStandings?: React.Dispatch<React.SetStateAction<StandingsRow[]>>;
   currentUser: AppUser;
   setCurrentUser?: (user: AppUser) => void;
   language: Language;
@@ -62,12 +67,15 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   players,
   setPlayers,
   matches,
+  standings,
+  setStandings,
   currentUser,
   setCurrentUser,
   language,
 }) => {
   const t = getT(language);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
+  const [isAiTableModalOpen, setIsAiTableModalOpen] = useState(false);
 
   // Team identity form
   const [teamForm, setTeamForm] = useState({
@@ -1323,6 +1331,52 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
             </form>
           </div>
 
+          {/* AI League Standings Scanner Card */}
+          {setStandings && (
+            <div className="bg-gradient-to-br from-indigo-900 via-blue-900 to-purple-900 text-white p-5 rounded-2xl shadow-md border border-indigo-500/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-white/10 text-amber-300">
+                    <Trophy className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black tracking-tight text-white flex items-center gap-1.5">
+                      <span>Tabla de la Liga con IA</span>
+                      <span className="text-[10px] font-bold bg-amber-400 text-black px-2 py-0.5 rounded-full">
+                        Gemini Vision
+                      </span>
+                    </h3>
+                    <p className="text-xs text-indigo-200">
+                      Sube fotos o capturas de la tabla del torneo para actualizar puntos y estadísticas automáticamente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-black/30 rounded-xl p-3 border border-white/10 text-xs flex items-center justify-between">
+                <div>
+                  <span className="text-gray-300 text-[11px] block">Torneo Actual:</span>
+                  <span className="font-bold text-white">{team.leagueName}</span>
+                </div>
+                {standings && standings.length > 0 && (
+                  <span className="text-xs font-mono font-bold bg-white/10 px-2.5 py-1 rounded-lg">
+                    {standings.length} equipos registrados
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                id="btn-admin-scan-table-ai"
+                onClick={() => setIsAiTableModalOpen(true)}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 fill-black" />
+                <span>Escanear Foto de Tabla con IA</span>
+              </button>
+            </div>
+          )}
+
           {/* Push Notifications Reminders trigger for upcoming matches */}
           <div className="bg-white p-5 rounded-2xl border border-[#CED0D4] shadow-xs space-y-3">
             <h3 className="text-base font-black text-[#050505] flex items-center gap-2">
@@ -1725,6 +1779,23 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
         playerName={cameraModalTarget === 'admin' ? adminProfileForm.name : cameraModalTarget === 'new' ? newPlayerName : editForm.name}
         dorsal={cameraModalTarget === 'admin' ? 'DT' : cameraModalTarget === 'new' ? newPlayerNumber : editForm.number}
       />
+
+      {/* AI Table Scanner Modal */}
+      {setStandings && (
+        <TableAiScannerModal
+          isOpen={isAiTableModalOpen}
+          onClose={() => setIsAiTableModalOpen(false)}
+          team={team}
+          onApplyStandings={(newRows, updatedLeague) => {
+            setStandings(newRows);
+            if (updatedLeague) {
+              setTeam((prev) => ({ ...prev, leagueName: updatedLeague }));
+            }
+            setNotificationStatus('¡Tabla de la liga actualizada exitosamente con IA!');
+            setTimeout(() => setNotificationStatus(null), 4000);
+          }}
+        />
+      )}
     </div>
   );
 };
