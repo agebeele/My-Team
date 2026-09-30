@@ -1,0 +1,24 @@
+{
+  "name": "Dream Team - App de Fútbol 7",
+  "short_name": "Dream Team",
+  "description": "Plataforma oficial Dream Team para gestión de equipos de Fútbol 7: convocatorias, alineaciones tácticas, partidos en vivo, votación MVP y comunidad.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F0F2F5",
+  "theme_color": "#1877F2",
+  "icons": [
+    {
+      "src": "/icon-192.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
