@@ -1,12 +1,13 @@
 import { Player, TeamInfo, Match, StandingsRow, Post, AppUser } from '../types';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 export const INITIAL_TEAM: TeamInfo = {
   id: 'team_01',
-  name: 'Club Atlético Rayos',
-  shortName: 'RAYOS FC',
+  name: 'FC Bayern Munich',
+  shortName: 'BAYERN',
   logoUrl: '/fc_bayern_logo.png',
   bannerUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
-  leagueName: 'Liga Premier Fútbol 7 - División Nocturna',
+  leagueName: 'Liga Premier Fútbol 7',
   season: 'Temporada 2026',
   stadium: 'Cancha Sintética San Pedro',
   foundedYear: '2021',
@@ -506,16 +507,36 @@ export const INITIAL_MATCHES: Match[] = [
 ];
 
 export const INITIAL_STANDINGS: StandingsRow[] = [
-  { id: 't1', rank: 1, name: 'Real Frontera FC', logo: '🦁', pj: 14, g: 11, e: 2, p: 1, gf: 38, gc: 14, dg: 24, pts: 35 },
-  { id: 't2', rank: 2, name: 'Club Atlético Rayos', logo: '⚡', pj: 14, g: 10, e: 3, p: 1, gf: 45, gc: 18, dg: 27, pts: 33, isOurTeam: true },
-  { id: 't3', rank: 3, name: 'Toros Salvajes', logo: '🐂', pj: 14, g: 9, e: 2, p: 3, gf: 32, gc: 19, dg: 13, pts: 29 },
-  { id: 't4', rank: 4, name: 'Atlético Fénix', logo: '🔥', pj: 14, g: 8, e: 3, p: 3, gf: 29, gc: 20, dg: 9, pts: 27 },
-  { id: 't5', rank: 5, name: 'Inter del Norte', logo: '⭐', pj: 14, g: 7, e: 2, p: 5, gf: 26, gc: 22, dg: 4, pts: 23 },
-  { id: 't6', rank: 6, name: 'Deportivo Gladiadores', logo: '⚔️', pj: 14, g: 6, e: 3, p: 5, gf: 24, gc: 23, dg: 1, pts: 21 },
-  { id: 't7', rank: 7, name: 'Halcones Dorados', logo: '🦅', pj: 14, g: 5, e: 2, p: 7, gf: 21, gc: 28, dg: -7, pts: 17 },
-  { id: 't8', rank: 8, name: 'Lobos Guerreros', logo: '🐺', pj: 14, g: 4, e: 1, p: 9, gf: 19, gc: 31, dg: -12, pts: 13 },
-  { id: 't9', rank: 9, name: 'Real Azteca', logo: '🛡️', pj: 14, g: 3, e: 1, p: 10, gf: 16, gc: 36, dg: -20, pts: 10 },
-  { id: 't10', rank: 10, name: 'Dinamo Metropolitano', logo: '⚙️', pj: 14, g: 1, e: 1, p: 12, gf: 12, gc: 51, dg: -39, pts: 4 },
+  { id: 'st_1', rank: 1, name: 'REAL MADRID', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png', pj: 28, g: 24, e: 3, p: 1, gf: 104, gc: 35, dg: 69, pts: 75 },
+  { id: 'st_2', rank: 2, name: 'BAYERN MUNICH', logo: '/fc_bayern_logo.png', pj: 28, g: 20, e: 7, p: 1, gf: 131, gc: 41, dg: 90, pts: 67, isOurTeam: true },
+  { id: 'st_3', rank: 3, name: 'TOTTENHAM', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png', pj: 28, g: 21, e: 3, p: 4, gf: 129, gc: 46, dg: 83, pts: 66 },
+  { id: 'st_4', rank: 4, name: 'MILAN', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/103.png', pj: 28, g: 21, e: 1, p: 6, gf: 149, gc: 58, dg: 91, pts: 64 },
+  { id: 'st_5', rank: 5, name: 'INT. DE MILAN', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png', pj: 28, g: 20, e: 3, p: 5, gf: 138, gc: 58, dg: 80, pts: 63 },
+  { id: 'st_6', rank: 6, name: 'MANCHESTER CITY', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/382.png', pj: 28, g: 20, e: 3, p: 5, gf: 100, gc: 44, dg: 56, pts: 63 },
+  { id: 'st_7', rank: 7, name: 'PORTO', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/437.png', pj: 27, g: 20, e: 2, p: 5, gf: 111, gc: 44, dg: 67, pts: 62 },
+  { id: 'st_8', rank: 8, name: 'SEVILLA', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/243.png', pj: 28, g: 19, e: 5, p: 4, gf: 102, gc: 40, dg: 62, pts: 62 },
+  { id: 'st_9', rank: 9, name: 'FULLHAM', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/370.png', pj: 28, g: 20, e: 2, p: 6, gf: 96, gc: 44, dg: 52, pts: 62 },
+  { id: 'st_10', rank: 10, name: 'ARSENAL', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/359.png', pj: 28, g: 19, e: 3, p: 6, gf: 83, gc: 41, dg: 42, pts: 60 },
+  { id: 'st_11', rank: 11, name: 'FEYENOORD', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/140.png', pj: 24, g: 18, e: 2, p: 4, gf: 83, gc: 21, dg: 62, pts: 56 },
+  { id: 'st_12', rank: 12, name: 'PSG', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/160.png', pj: 20, g: 17, e: 1, p: 2, gf: 105, gc: 29, dg: 76, pts: 52 },
+  { id: 'st_13', rank: 13, name: 'AJAX', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/139.png', pj: 28, g: 16, e: 4, p: 8, gf: 81, gc: 57, dg: 24, pts: 52 },
+  { id: 'st_14', rank: 14, name: 'BORUSSIA', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/124.png', pj: 28, g: 15, e: 3, p: 10, gf: 91, gc: 60, dg: 31, pts: 48 },
+  { id: 'st_16', rank: 16, name: 'PALERMO', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/105.png', pj: 28, g: 14, e: 4, p: 10, gf: 89, gc: 58, dg: 31, pts: 46 },
+  { id: 'st_17', rank: 17, name: 'MANCHESTER UNITED', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/360.png', pj: 28, g: 15, e: 1, p: 12, gf: 70, gc: 60, dg: 10, pts: 46 },
+  { id: 'st_18', rank: 18, name: 'LIVERPOOL', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/364.png', pj: 27, g: 14, e: 3, p: 10, gf: 70, gc: 44, dg: 26, pts: 45 },
+  { id: 'st_19', rank: 19, name: 'NEW CASTLE', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/361.png', pj: 26, g: 13, e: 1, p: 12, gf: 67, gc: 66, dg: 1, pts: 40 },
+  { id: 'st_20', rank: 20, name: 'MARSELLA', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/166.png', pj: 25, g: 13, e: 0, p: 12, gf: 74, gc: 59, dg: 15, pts: 39 },
+  { id: 'st_21', rank: 21, name: 'FIORENTINA', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/109.png', pj: 26, g: 12, e: 2, p: 12, gf: 82, gc: 56, dg: 26, pts: 38 },
+  { id: 'st_22', rank: 22, name: 'SPORTING', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/440.png', pj: 21, g: 12, e: 2, p: 7, gf: 65, gc: 43, dg: 22, pts: 38 },
+  { id: 'st_23', rank: 23, name: 'AS MONACO', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/174.png', pj: 24, g: 8, e: 4, p: 12, gf: 51, gc: 58, dg: -7, pts: 28 },
+  { id: 'st_24', rank: 24, name: 'LYON', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/167.png', pj: 27, g: 7, e: 7, p: 13, gf: 68, gc: 85, dg: -17, pts: 28 },
+  { id: 'st_25', rank: 25, name: 'NAPOLI', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/114.png', pj: 19, g: 7, e: 2, p: 10, gf: 41, gc: 52, dg: -11, pts: 23 },
+  { id: 'st_26', rank: 26, name: 'ATLETICO DE MADRID', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/1068.png', pj: 28, g: 6, e: 3, p: 19, gf: 56, gc: 103, dg: -47, pts: 21 },
+  { id: 'st_27', rank: 27, name: 'CHELSEA', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/363.png', pj: 21, g: 6, e: 2, p: 13, gf: 48, gc: 64, dg: -16, pts: 20 },
+  { id: 'st_28', rank: 28, name: 'BARCELONA', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/83.png', pj: 15, g: 3, e: 1, p: 11, gf: 26, gc: 82, dg: -56, pts: 10 },
+  { id: 'st_29', rank: 29, name: 'ATL CLUB', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/93.png', pj: 5, g: 3, e: 0, p: 2, gf: 17, gc: 9, dg: 8, pts: 9 },
+  { id: 'st_30', rank: 30, name: 'JUVENTUS', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/111.png', pj: 11, g: 2, e: 2, p: 7, gf: 18, gc: 35, dg: -17, pts: 8 },
+  { id: 'st_31', rank: 31, name: 'RAFA', logo: DEFAULT_GREY_SHIELD_SVG, pj: 12, g: 2, e: 2, p: 8, gf: 15, gc: 46, dg: -31, pts: 8 },
 ];
 
 export const INITIAL_POSTS: Post[] = [

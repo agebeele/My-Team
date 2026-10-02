@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -35,6 +36,22 @@ app.post('/api/ai/scan-table', async (req, res) => {
 
     if (imageList.length === 0) {
       return res.status(400).json({ error: 'No se recibió ninguna foto de la tabla para analizar.' });
+    }
+
+    // Persist uploaded photos to public/uploads for debugging and archival
+    try {
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      imageList.forEach((img, idx) => {
+        const rawData = img.base64.replace(/^data:[^;]+;base64,/, '');
+        const buffer = Buffer.from(rawData, 'base64');
+        const ext = img.mimeType?.includes('png') ? 'png' : 'jpg';
+        fs.writeFileSync(path.join(uploadDir, `scan_table_${idx + 1}.${ext}`), buffer);
+      });
+    } catch (saveErr) {
+      console.warn('Advertencia guardando imágenes en disco:', saveErr);
     }
 
     const apiKey = process.env.GEMINI_API_KEY;

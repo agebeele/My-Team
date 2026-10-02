@@ -48,6 +48,10 @@ export const loadInitialState = () => {
     if (!loadedTeam.logoUrl || loadedTeam.logoUrl.includes('photo-1508098682722')) {
       loadedTeam.logoUrl = '/fc_bayern_logo.png';
     }
+    if (loadedTeam.name.includes('Rayos')) {
+      loadedTeam.name = 'FC Bayern Munich';
+      loadedTeam.shortName = 'BAYERN';
+    }
 
     const loadedMatches = savedMatches ? (JSON.parse(savedMatches) as Match[]) : INITIAL_MATCHES;
     const normalizedMatches = loadedMatches.map((m) => {
@@ -113,11 +117,30 @@ export const loadInitialState = () => {
       }
     }
 
+    let loadedStandings = INITIAL_STANDINGS;
+    if (savedStandings) {
+      try {
+        const parsed = JSON.parse(savedStandings) as StandingsRow[];
+        const isOldData =
+          parsed.length < 25 ||
+          parsed.some((r) => r.name.toLowerCase().includes('frontera') || r.name.toLowerCase().includes('fenix'));
+        if (!isOldData && parsed.length >= 28) {
+          loadedStandings = parsed;
+        } else {
+          localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(INITIAL_STANDINGS));
+        }
+      } catch {
+        loadedStandings = INITIAL_STANDINGS;
+      }
+    } else {
+      localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(INITIAL_STANDINGS));
+    }
+
     return {
       team: loadedTeam,
       players: normalizedPlayers,
       matches: normalizedMatches,
-      standings: savedStandings ? (JSON.parse(savedStandings) as StandingsRow[]) : INITIAL_STANDINGS,
+      standings: loadedStandings,
       posts: savedPosts ? (JSON.parse(savedPosts) as Post[]) : INITIAL_POSTS,
       users: normalizedUsers,
       currentUser: initialCurrentUser,
