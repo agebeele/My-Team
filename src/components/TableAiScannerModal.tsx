@@ -10,19 +10,26 @@ import {
   RefreshCw,
   Plus,
   Trash2,
-  Shield,
   FileImage,
   ArrowRight,
-  HelpCircle,
-  Info,
   Layers,
-  Eye,
   CheckCircle2,
+  FileText,
+  Shield,
+  HelpCircle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { StandingsRow, TeamInfo } from '../types';
-import { scanLeagueTableWithGemini, TableImageInput, CLUB_CRESTS } from '../utils/tableAiScanner';
-import { FAMOUS_TEAMS_DATA } from '../utils/ocrTableParser';
+import {
+  scanLeagueTableWithGemini,
+  TableImageInput,
+  getCrestForTeam,
+  DEFAULT_GREY_SHIELD_SVG,
+} from '../utils/tableAiScanner';
+import {
+  LEAGUE_31_TEAMS_DATA,
+  parseStandingsFromOcrText,
+} from '../utils/ocrTableParser';
 
 interface TableAiScannerModalProps {
   isOpen: boolean;
@@ -39,10 +46,6 @@ interface UploadedPhoto {
   sizeKb?: number;
 }
 
-// High quality realistic sample table graphic data for testing with 1 click
-const SAMPLE_LEAGUE_TABLE_IMAGE =
-  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iNTAwIiB2aWV3Qm94PSIwIDAgODAwIDUwMCI+PHJlY3Qgd2lkdGg9IjgwMCIgaGVpZ2h0PSI1MDAiIGZpbGw9IiMxODFhMWIiLz48dGV4dCB4PSI0MCIgeT0iNTAiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjIyIiBmb250LXdlaWdodD0iYm9sZCI+TElHQSBQUkVNSUVSIEZVVElUT0wgNyAtIFRBQkxBIERFIFBPU0lDSU9ORVM8L3RleHQ+PHJlY3QgeD0iNDAiIHk9IjgwIiB3aWR0aD0iNzIwIiBoZWlnaHQ9IjM1IiBmaWxsPSIjMmExYjFjIi8+PHRleHQgeD0iNTAiIHk9IjEwMiIgZmlsbD0iI2FhYSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPlBPUzwvdGV4dD48dGV4dCB4PSIxMDAiIHk9IjEwMiIgZmlsbD0iI2FhYSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPkVRVUlQTzwvdGV4dD48dGV4dCB4PSIzNTAiIHk9IjEwMiIgZmlsbD0iI2FhYSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPlBKPC90ZXh0Pjx0ZXh0IHg9IjQwMCIgeT0iMTAyIiBmaWxsPSIjYWFhIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCI+RzwvdGV4dD48dGV4dCB4PSI0NTAiIHk9IjEwMiIgZmlsbD0iI2FhYSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPkU8L3RleHQ+PHRleHQgeD0iNTAwIiB5PSIxMDIiIGZpbGw9IiNhYWEiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIj5QPC90ZXh0Pjx0ZXh0IHg9IjU1MCIgeT0iMTAyIiBmaWxsPSIjYWFhIiBmb250LXNpemU9IjEyIiBmb250LXdlaWdodD0iYm9sZCI+R0Y8L3RleHQ+PHRleHQgeD0iNjAwIiB5PSIxMDIiIGZpbGw9IiNhYWEiIGZvbnQtc2l6ZT0iMTIiIGZvbnQtd2VpZ2h0PSJib2xkIj5HQzwvdGV4dD48dGV4dCB4PSI2NTAiIHk9IjEwMiIgZmlsbD0iI2FhYSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPkRJRjwvdGV4dD48dGV4dCB4PSI3MTAiIHk9IjEwMiIgZmlsbD0iI2FhYSIgZm9udC1zaXplPSIxMiIgZm9udC13ZWlnaHQ9ImJvbGQiPlBUUzwvdGV4dD48IS0tIFJvdyAxIC0tPjxyZWN0IHg9IjQwIiB5PSIxMjAiIHdpZHRoPSI3MjAiIGhlaWdodD0iNDUiIGZpbGw9IiMyMzI2MjciLz48dGV4dCB4PSI1NSIgeT0iMTQ4IiBmaWxsPSIjZmZjMTA3IiBmb250LXdlaWdodD0iYm9sZCI+MTwvdGV4dD48dGV4dCB4PSIxMDAiIHk9IjE0OCIgZmlsbD0iI2ZmZiIgZm9udC13ZWlnaHQ9ImJvbGQiPkZDIEJheWVybiBNdW5pY2ggLyBSYXlvczwvdGV4dD48dGV4dCB4PSIzNTUiIHk9IjE0OCIgZmlsbD0iI2ZmZiI+MTI8L3RleHQ+PHRleHQgeD0iNDA1IiB5PSIxNDgiIGZpbGw9IiNmZmYiPjEwPC90ZXh0Pjx0ZXh0IHg9IjQ1NSIgeT0iMTQ4IiBmaWxsPSIjZmZmIj4xPC90ZXh0Pjx0ZXh0IHg9IjUwNSIgeT0iMTQ4IiBmaWxsPSIjZmZmIj4xPC90ZXh0Pjx0ZXh0IHg9IjU1NSIgeT0iMTQ4IiBmaWxsPSIjZmZmIj4zODwvdGV4dD48dGV4dCB4PSI2MDUiIHk9IjE0OCIgZmlsbD0iI2ZmZiI+MTQ8L3RleHQ+PHRleHQgeD0iNjU1IiB5PSIxNDgiIGZpbGw9IiM0Y2FmNTAiPis8dGV4dCB4PSI2NjUiIHk9IjE0OCIgZmlsbD0iIzRjYWY1MCI+MjQ8L3RleHQ+PHRleHQgeD0iNzE1IiB5PSIxNDgiIGZpbGw9IiNmZmJjMDAiIGZvbnQtd2VpZ2h0PSJib2xkIj4zMTwvdGV4dD48IS0tIFJvdyAyIC0tPjxyZWN0IHg9IjQwIiB5PSIxNzAiIHdpZHRoPSI3MjAiIGhlaWdodD0iNDUiIGZpbGw9IiMxZTJjMjQiLz48dGV4dCB4PSI1NSIgeT0iMTk4IiBmaWxsPSIjZmZmIj4yPC90ZXh0Pjx0ZXh0IHg9IjEwMCIgeT0iMTk4IiBmaWxsPSIjZmZmIj5IYWxjb25lcyBEb3JhZG9zIEZDNjwvdGV4dD48dGV4dCB4PSIzNTUiIHk9IjE5OCIgZmlsbD0iI2ZmZiI+MTI8L3RleHQ+PHRleHQgeD0iNDA1IiB5PSIxOTgiIGZpbGw9IiNmZmYiPjk8L3RleHQ+PHRleHQgeD0iNDU1IiB5PSIxOTgiIGZpbGw9IiNmZmYiPjE8L3RleHQ+PHRleHQgeD0iNTA1IiB5PSIxOTgiIGZpbGw9IiNmZmYiPjI8L3RleHQ+PHRleHQgeD0iNTU1IiB5PSIxOTgiIGZpbGw9IiNmZmYiPjMyPC90ZXh0Pjx0ZXh0IHg9IjYwNSIgeT0iMTk4IiBmaWxsPSIjZmZmIj4xNjwvdGV4dD48dGV4dCB4PSI2NTUiIHk9IjE5OCIgZmlsbD0iIzRjYWY1MCI+KzE2PC90ZXh0Pjx0ZXh0IHg9IjcxNSIgeT0iMTk4IiBmaWxsPSIjZmZmIj4yODwvdGV4dD48IS0tIFJvdyAzIC0tPjxyZWN0IHg9IjQwIiB5PSIyMjAiIHdpZHRoPSI3MjAiIGhlaWdodD0iNDUiIGZpbGw9IiMyMzI2MjciLz48dGV4dCB4PSI1NSIgeT0iMjQ4IiBmaWxsPSIjZmZmIj4zPC90ZXh0Pjx0ZXh0IHg9IjEwMCIgeT0iMjQ4IiBmaWxsPSIjZmZmIj5CYXJjZWxvbmEgTm9jdHVybm88L3RleHQ+PHRleHQgeD0iMzU1IiB5PSIyNDgiIGZpbGw9IiNmZmYiPjEyPC90ZXh0Pjx0ZXh0IHg9IjQwNSIgeT0iMjQ4IiBmaWxsPSIjZmZmIj44PC90ZXh0Pjx0ZXh0IHg9IjQ1NSIgeT0iMjQ4IiBmaWxsPSIjZmZmIj4yPC90ZXh0Pjx0ZXh0IHg9IjUwNSIgeT0iMjQ4IiBmaWxsPSIjZmZmIj4yPC90ZXh0Pjx0ZXh0IHg9IjU1NSIgeT0iMjQ4IiBmaWxsPSIjZmZmIj4yOTwvdGV4dD48dGV4dCB4PSI2MDUiIHk9IjI0OCIgZmlsbD0iI2ZmZiI+MTg8L3RleHQ+PHRleHQgeD0iNjU1IiB5PSIyNDgiIGZpbGw9IiM0Y2FmNTAiPisxMTwvdGV4dD48dGV4dCB4PSI3MTUiIHk9IjI0OCIgZmlsbD0iI2ZmZiI+MjY8L3RleHQ+PCEtLSBSb3cgNCAtLT48cmVjdCB4PSI0MCIgeT0iMjcwIiB3aWR0aD0iNzIwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjMWUyYzI0Ii8+PHRleHQgeD0iNTUiIHk9IjI5OCIgZmlsbD0iI2ZmZiI+NDwvdGV4dD48dGV4dCB4PSIxMDAiIHk9IjI5OCIgZmlsbD0iI2ZmZiI+UmVhbCBTcGFydGFuczwvdGV4dD48dGV4dCB4PSIzNTUiIHk9IjI5OCIgZmlsbD0iI2ZmZiI+MTI8L3RleHQ+PHRleHQgeD0iNDA1IiB5PSIyOTgiIGZpbGw9IiNmZmYiPjc8L3RleHQ+PHRleHQgeD0iNDU1IiB5PSIyOTgiIGZpbGw9IiNmZmYiPjE8L3RleHQ+PHRleHQgeD0iNTA1IiB5PSIyOTgiIGZpbGw9IiNmZmYiPjQ8L3RleHQ+PHRleHQgeD0iNTU1IiB5PSIyOTgiIGZpbGw9IiNmZmYiPjI1PC90ZXh0Pjx0ZXh0IHg9IjYwNSIgeT0iMjk4IiBmaWxsPSIjZmZmIj4yMTwvdGV4dD48dGV4dCB4PSI2NTUiIHk9IjI5OCIgZmlsbD0iIzRjYWY1MCI+KzQ8L3RleHQ+PHRleHQgeD0iNzE1IiB5PSIyOTgiIGZpbGw9IiNmZmYiPjIyPC90ZXh0Pjwvc3ZnPg==';
-
 export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
   isOpen,
   onClose,
@@ -56,6 +59,10 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanEngineUsed, setScanEngineUsed] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<'upload' | 'review'>('upload');
+
+  // Text paste tab
+  const [showPasteMode, setShowPasteMode] = useState<boolean>(false);
+  const [rawPastedText, setRawPastedText] = useState<string>('');
 
   // Review & Edit extracted rows
   const [extractedRows, setExtractedRows] = useState<StandingsRow[]>([]);
@@ -110,33 +117,18 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
     });
   };
 
-  const handleUseSampleImage = () => {
+  /**
+   * Directly loads the full 31 teams dataset:
+   * Maps each club to its official crest or grey shield for common names,
+   * highlights Bayern Munich as the user's team.
+   */
+  const handleLoad31TeamsDataset = () => {
     setScanError(null);
-    setPhotos([
-      {
-        id: `sample_${Date.now()}`,
-        name: 'tabla_ejemplo_liga_premier.svg',
-        base64: SAMPLE_LEAGUE_TABLE_IMAGE,
-        mimeType: 'image/svg+xml',
-        sizeKb: 45,
-      },
-    ]);
-    setSelectedPreviewIndex(0);
-  };
-
-  const handleLoadChampionsLeagueDataset = () => {
-    setScanError(null);
-    const fullRows: StandingsRow[] = FAMOUS_TEAMS_DATA.map((t, idx) => {
+    const fullRows: StandingsRow[] = LEAGUE_31_TEAMS_DATA.map((t, idx) => {
       const isBayern = t.name.toLowerCase().includes('bayern');
-      const cleanKey = t.name.toLowerCase().trim();
-      let logoUrl = 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=150&q=80';
-      if (isBayern) {
-        logoUrl = team.logoUrl || '/fc_bayern_logo.png';
-      } else if (CLUB_CRESTS[cleanKey]) {
-        logoUrl = CLUB_CRESTS[cleanKey];
-      }
+      const logoUrl = getCrestForTeam(t.name, isBayern, team.logoUrl || '/fc_bayern_logo.png');
       return {
-        id: `standing_cl_${Date.now()}_${idx}`,
+        id: `standing_31_${Date.now()}_${idx}`,
         rank: t.rank,
         name: t.name,
         logo: logoUrl,
@@ -153,11 +145,58 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
     });
 
     setExtractedRows(fullRows);
-    setExtractedLeagueName('UEFA CHAMPIONS LEAGUE');
-    setScanEngineUsed('Tabla Oficial de 15 Equipos');
+    setExtractedLeagueName(team.leagueName || 'LIGA PREMIER FÚTBOL (31 EQUIPOS)');
+    setScanEngineUsed('Tabla Completa de 31 Equipos');
     setActiveStep('review');
   };
 
+  /**
+   * Parses raw text pasted by the user (from WhatsApp, OCR apps or notes)
+   */
+  const handleProcessPastedText = () => {
+    if (!rawPastedText.trim()) {
+      setScanError('Por favor pega el texto de las filas de la tabla antes de procesar.');
+      return;
+    }
+    setScanError(null);
+
+    const parsed = parseStandingsFromOcrText(rawPastedText);
+    if (!parsed.teams || parsed.teams.length === 0) {
+      setScanError('No se pudieron reconocer equipos en el texto pegado. Verifica que contenga nombre y números.');
+      return;
+    }
+
+    const rows: StandingsRow[] = parsed.teams.map((t, idx) => {
+      const isBayern = t.name.toLowerCase().includes('bayern') || t.name.toLowerCase().includes(team.name.toLowerCase());
+      const logo = getCrestForTeam(t.name, isBayern, team.logoUrl);
+      return {
+        id: `standing_pasted_${Date.now()}_${idx}`,
+        rank: t.rank,
+        name: t.name,
+        logo,
+        pj: t.pj,
+        g: t.g,
+        e: t.e,
+        p: t.p,
+        gf: t.gf,
+        gc: t.gc,
+        dg: t.dg,
+        pts: t.pts,
+        isOurTeam: isBayern,
+      };
+    });
+
+    setExtractedRows(rows);
+    if (parsed.leagueName) {
+      setExtractedLeagueName(parsed.leagueName);
+    }
+    setScanEngineUsed(`Texto Procesado (${rows.length} equipos)`);
+    setActiveStep('review');
+  };
+
+  /**
+   * Scans all uploaded photos together (multi-image scan)
+   */
   const handleStartScan = async () => {
     if (photos.length === 0) {
       setScanError('Por favor selecciona al menos una foto de la tabla.');
@@ -198,7 +237,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
       console.error('Scan error:', err);
       setScanError(
         err.message ||
-          'No se pudo extraer la tabla automáticamente. Intenta con una foto más nítida o agrega las filas manualmente.'
+          'No se pudo extraer la tabla automáticamente. Puedes cargar los 31 equipos con 1 clic o pegar el texto de la tabla.'
       );
     } finally {
       setIsScanning(false);
@@ -213,8 +252,8 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
 
     try {
       confetti({
-        particleCount: 80,
-        spread: 80,
+        particleCount: 90,
+        spread: 85,
         origin: { y: 0.6 },
       });
     } catch {
@@ -229,6 +268,10 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
       const updated = [...prev];
       const target = { ...updated[index], [field]: value };
 
+      // If team name changed, auto update logo
+      if (field === 'name') {
+        target.logo = getCrestForTeam(String(value), target.isOurTeam, team.logoUrl);
+      }
       // Auto recalculate DG if GF or GC changed
       if (field === 'gf' || field === 'gc') {
         const gf = field === 'gf' ? Number(value) : target.gf;
@@ -252,7 +295,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
       prev.map((row, i) => ({
         ...row,
         isOurTeam: i === index,
-        logo: i === index ? team.logoUrl || '/fc_bayern_logo.png' : row.logo,
+        logo: i === index ? team.logoUrl || '/fc_bayern_logo.png' : getCrestForTeam(row.name, false),
       }))
     );
   };
@@ -263,7 +306,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
       id: `standing_manual_${Date.now()}`,
       rank: nextRank,
       name: `Nuevo Equipo ${nextRank}`,
-      logo: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=150&q=80',
+      logo: DEFAULT_GREY_SHIELD_SVG,
       pj: 0,
       g: 0,
       e: 0,
@@ -301,11 +344,11 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                   Escáner Inteligente de Tabla de Liga
                 </h3>
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-[#1877F2] dark:bg-blue-900/40 dark:text-blue-300">
-                  IA Multi-Foto & OCR
+                  31 Equipos & Logos Oficiales
                 </span>
               </div>
               <p className="text-xs text-[#65676B] dark:text-gray-400">
-                Sube una o varias fotos (ej. tabla completa o dividida en páginas) para que la IA extraiga todos los equipos, estadísticas y rehaga tu tabla oficial.
+                Sube las 2 o más fotos de la tabla, o carga directamente los <strong>31 equipos</strong> con sus escudos oficiales y escudo gris para equipos comunes.
               </p>
             </div>
           </div>
@@ -326,16 +369,76 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="flex-1">
                 <span>{scanError}</span>
-                <p className="text-[11px] text-rose-700 dark:text-rose-400 font-normal mt-0.5">
-                  Consejo: Asegúrate de que las columnas (Pos, Equipo, PJ, G, PTS) sean visibles y tengan buena iluminación. También puedes subir más fotos para completar la tabla.
-                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleLoad31TeamsDataset}
+                    className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] cursor-pointer"
+                  >
+                    Cargar los 31 Equipos de la Liga
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* STEP 1: UPLOAD MULTIPLE PHOTOS */}
+          {/* STEP 1: UPLOAD PHOTOS OR LOAD 31 TEAMS */}
           {activeStep === 'upload' && (
             <div className="space-y-4">
+              {/* Quick Action Top Banner */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-blue-950/40 border border-blue-200 dark:border-blue-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#1877F2] text-white flex items-center justify-center shrink-0">
+                    <Trophy className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white">
+                      ¿Tu liga tiene 31 equipos?
+                    </h4>
+                    <p className="text-[11px] text-[#65676B] dark:text-gray-300">
+                      Carga la tabla completa de 31 equipos con Bayern Munich en la cima y todos los escudos oficiales listos para editar o aplicar.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLoad31TeamsDataset}
+                  className="px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Trophy className="w-4 h-4" />
+                  <span>Cargar los 31 Equipos Ahora</span>
+                </button>
+              </div>
+
+              {/* Mode Switcher: Multi-photo Upload vs Paste Text */}
+              <div className="flex items-center gap-2 border-b border-[#CED0D4] dark:border-white/10 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPasteMode(false)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    !showPasteMode
+                      ? 'bg-[#1877F2] text-white'
+                      : 'text-[#65676B] dark:text-gray-400 hover:bg-[#F0F2F5] dark:hover:bg-white/5'
+                  }`}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Escanear Fotos de la Tabla ({photos.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPasteMode(true)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    showPasteMode
+                      ? 'bg-[#1877F2] text-white'
+                      : 'text-[#65676B] dark:text-gray-400 hover:bg-[#F0F2F5] dark:hover:bg-white/5'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Pegar Texto de la Tabla</span>
+                </button>
+              </div>
+
               {/* Hidden file input with MULTIPLE enabled */}
               <input
                 type="file"
@@ -346,186 +449,224 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                 onChange={(e) => handleFilesSelected(e.target.files)}
               />
 
-              {photos.length === 0 ? (
-                /* Empty state: big dropzone */
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-[#CED0D4] dark:border-white/20 hover:border-[#1877F2] dark:hover:border-blue-500 rounded-2xl p-8 sm:p-12 text-center cursor-pointer bg-[#F8FAFC] dark:bg-white/5 transition-all group"
-                >
-                  <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-[#1877F2] mx-auto flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                    <Upload className="w-8 h-8" />
-                  </div>
-                  <h4 className="text-sm font-bold text-[#050505] dark:text-white">
-                    Toca aquí para seleccionar una o varias fotos de la tabla
-                  </h4>
-                  <p className="text-xs text-[#65676B] dark:text-gray-400 mt-1 max-w-md mx-auto">
-                    Puedes seleccionar <strong>múltiples fotos al mismo tiempo</strong> (por ejemplo: si la tabla es muy larga y tomaste 2 fotos, o capturas de pantalla de WhatsApp/Facebook).
-                  </p>
-
-                  <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 text-xs font-bold text-[#050505] dark:text-white shadow-xs">
-                      <Camera className="w-3.5 h-3.5 text-[#1877F2]" />
-                      Subir fotos de la galería o cámara
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleLoadChampionsLeagueDataset();
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-600 text-xs font-bold text-[#1877F2] dark:text-blue-300 hover:bg-blue-100 transition-colors shadow-xs"
-                    >
-                      <Trophy className="w-3.5 h-3.5 text-[#1877F2]" />
-                      Cargar los 15 Equipos Oficiales
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUseSampleImage();
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-600 text-xs font-bold text-amber-900 dark:text-amber-300 hover:bg-amber-100 transition-colors shadow-xs"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                      Probar con Foto de Ejemplo
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* Multi-photo selected state */
-                <div className="space-y-4">
-                  {/* Photo Gallery Carousel / Thumbnails Bar */}
-                  <div className="flex items-center justify-between gap-2 p-3 bg-[#F0F2F5] dark:bg-black/40 rounded-xl border border-[#CED0D4] dark:border-white/10">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-[#1877F2]" />
-                      <span className="text-xs font-bold text-[#050505] dark:text-white">
-                        {photos.length} {photos.length === 1 ? 'Foto seleccionada' : 'Fotos seleccionadas'}:
-                      </span>
+              {!showPasteMode ? (
+                photos.length === 0 ? (
+                  /* Empty state: big dropzone */
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-[#CED0D4] dark:border-white/20 hover:border-[#1877F2] dark:hover:border-blue-500 rounded-2xl p-8 sm:p-10 text-center cursor-pointer bg-[#F8FAFC] dark:bg-white/5 transition-all group"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-900/30 text-[#1877F2] mx-auto flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                      <Upload className="w-8 h-8" />
                     </div>
+                    <h4 className="text-sm font-bold text-[#050505] dark:text-white">
+                      Toca aquí para seleccionar las 2 fotos de la tabla
+                    </h4>
+                    <p className="text-xs text-[#65676B] dark:text-gray-400 mt-1 max-w-md mx-auto">
+                      Puedes seleccionar <strong>las dos imágenes al mismo tiempo</strong> (ej. Foto 1 con puestos 1-16 y Foto 2 con puestos 17-31). El escáner las unirá automáticamente.
+                    </p>
 
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-[#242526] hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-bold text-[#1877F2] border border-[#CED0D4] dark:border-white/10 shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>+ Agregar otra foto / hoja</span>
-                    </button>
-                  </div>
-
-                  {/* Thumbnail Row */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-                    {photos.map((photo, idx) => {
-                      const isSelected = idx === selectedPreviewIndex;
-                      return (
-                        <div
-                          key={photo.id}
-                          onClick={() => setSelectedPreviewIndex(idx)}
-                          className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition-all p-1 bg-black/90 group ${
-                            isSelected
-                              ? 'border-[#1877F2] ring-2 ring-blue-500/20'
-                              : 'border-[#CED0D4] dark:border-white/10 hover:border-gray-400'
-                          }`}
-                        >
-                          <img
-                            src={photo.base64}
-                            alt={photo.name}
-                            className="w-full h-20 object-cover rounded-lg"
-                          />
-                          <div className="absolute top-1.5 left-1.5 bg-black/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-xs">
-                            #{idx + 1}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemovePhoto(photo.id);
-                            }}
-                            className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[10px] shadow-sm cursor-pointer"
-                            title="Eliminar esta foto"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                          <div className="mt-1 px-1">
-                            <p className="text-[10px] font-semibold text-white truncate">{photo.name}</p>
-                            {photo.sizeKb && (
-                              <span className="text-[9px] text-gray-400">{photo.sizeKb} KB</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Add More Tile */}
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="h-28 rounded-xl border-2 border-dashed border-[#CED0D4] dark:border-white/20 hover:border-[#1877F2] flex flex-col items-center justify-center p-2 text-center cursor-pointer bg-[#F8FAFC] dark:bg-white/5 transition-colors"
-                    >
-                      <Plus className="w-5 h-5 text-[#1877F2] mb-1" />
-                      <span className="text-[11px] font-bold text-[#050505] dark:text-white">
-                        + Agregar foto
+                    <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 text-xs font-bold text-[#050505] dark:text-white shadow-xs">
+                        <Camera className="w-3.5 h-3.5 text-[#1877F2]" />
+                        Subir fotos de la galería o cámara
                       </span>
-                      <span className="text-[9px] text-gray-400">página 2, etc.</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLoad31TeamsDataset();
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors"
+                      >
+                        <Trophy className="w-3.5 h-3.5" />
+                        Cargar los 31 Equipos de la Liga
+                      </button>
                     </div>
                   </div>
-
-                  {/* Active Photo Full Preview */}
-                  {currentPreviewPhoto && (
-                    <div className="relative rounded-2xl overflow-hidden border border-[#CED0D4] dark:border-white/10 bg-black/95 max-h-80 flex items-center justify-center">
-                      <img
-                        src={currentPreviewPhoto.base64}
-                        alt="Vista previa de foto"
-                        className="max-h-80 object-contain w-auto mx-auto"
-                      />
-                      <div className="absolute bottom-3 left-3 bg-black/80 text-white px-3 py-1 rounded-lg text-xs font-bold backdrop-blur-xs flex items-center gap-1.5">
-                        <FileImage className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>
-                          Viendo Foto #{selectedPreviewIndex + 1}: {currentPreviewPhoto.name}
+                ) : (
+                  /* Multi-photo selected state */
+                  <div className="space-y-4">
+                    {/* Photo Gallery Carousel / Thumbnails Bar */}
+                    <div className="flex items-center justify-between gap-2 p-3 bg-[#F0F2F5] dark:bg-black/40 rounded-xl border border-[#CED0D4] dark:border-white/10">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-[#1877F2]" />
+                        <span className="text-xs font-bold text-[#050505] dark:text-white">
+                          {photos.length} {photos.length === 1 ? 'Foto seleccionada' : 'Fotos seleccionadas'}:
                         </span>
                       </div>
-                    </div>
-                  )}
 
-                  {/* Scan Trigger Bar */}
-                  <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/40 dark:via-indigo-950/40 dark:to-purple-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-[#1877F2] text-white flex items-center justify-center shrink-0">
-                        <Sparkles className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white">
-                          Procesar {photos.length} {photos.length === 1 ? 'imagen' : 'imágenes'} con IA
-                        </h4>
-                        <p className="text-[11px] text-[#65676B] dark:text-gray-300">
-                          La IA unirá todas las fotos, extraerá la clasificación completa y buscará a <strong className="text-[#1877F2]">{team.name}</strong>.
-                        </p>
-                        {progressStatus && (
-                          <p className="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-1 flex items-center gap-1.5">
-                            <RefreshCw className="w-3 h-3 animate-spin" />
-                            <span>{progressStatus}</span>
-                          </p>
-                        )}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-[#242526] hover:bg-gray-100 dark:hover:bg-white/10 text-xs font-bold text-[#1877F2] border border-[#CED0D4] dark:border-white/10 shadow-xs cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Agregar otra foto / página</span>
+                      </button>
+                    </div>
+
+                    {/* Thumbnail Row */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                      {photos.map((photo, idx) => {
+                        const isSelected = idx === selectedPreviewIndex;
+                        return (
+                          <div
+                            key={photo.id}
+                            onClick={() => setSelectedPreviewIndex(idx)}
+                            className={`relative rounded-xl overflow-hidden border-2 cursor-pointer transition-all p-1 bg-black/90 group ${
+                              isSelected
+                                ? 'border-[#1877F2] ring-2 ring-blue-500/20'
+                                : 'border-[#CED0D4] dark:border-white/10 hover:border-gray-400'
+                            }`}
+                          >
+                            <img
+                              src={photo.base64}
+                              alt={photo.name}
+                              className="w-full h-20 object-cover rounded-lg"
+                            />
+                            <div className="absolute top-1.5 left-1.5 bg-black/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-xs">
+                              Foto #{idx + 1}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemovePhoto(photo.id);
+                              }}
+                              className="absolute top-1.5 right-1.5 p-1 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[10px] shadow-sm cursor-pointer"
+                              title="Eliminar esta foto"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                            <div className="mt-1 px-1">
+                              <p className="text-[10px] font-semibold text-white truncate">{photo.name}</p>
+                              {photo.sizeKb && (
+                                <span className="text-[9px] text-gray-400">{photo.sizeKb} KB</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Add More Tile */}
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-28 rounded-xl border-2 border-dashed border-[#CED0D4] dark:border-white/20 hover:border-[#1877F2] flex flex-col items-center justify-center p-2 text-center cursor-pointer bg-[#F8FAFC] dark:bg-white/5 transition-colors"
+                      >
+                        <Plus className="w-5 h-5 text-[#1877F2] mb-1" />
+                        <span className="text-[11px] font-bold text-[#050505] dark:text-white">
+                          + Agregar foto
+                        </span>
+                        <span className="text-[9px] text-gray-400">página 2, etc.</span>
                       </div>
                     </div>
+
+                    {/* Active Photo Full Preview */}
+                    {currentPreviewPhoto && (
+                      <div className="relative rounded-2xl overflow-hidden border border-[#CED0D4] dark:border-white/10 bg-black/95 max-h-72 flex items-center justify-center">
+                        <img
+                          src={currentPreviewPhoto.base64}
+                          alt="Vista previa de foto"
+                          className="max-h-72 object-contain w-auto mx-auto"
+                        />
+                        <div className="absolute bottom-3 left-3 bg-black/80 text-white px-3 py-1 rounded-lg text-xs font-bold backdrop-blur-xs flex items-center gap-1.5">
+                          <FileImage className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>
+                            Viendo Foto #{selectedPreviewIndex + 1}: {currentPreviewPhoto.name}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Scan Trigger Bar */}
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/40 dark:via-indigo-950/40 dark:to-purple-950/40 border border-blue-200 dark:border-blue-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#1877F2] text-white flex items-center justify-center shrink-0">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white">
+                            Escanear y Unir {photos.length} {photos.length === 1 ? 'imagen' : 'imágenes'}
+                          </h4>
+                          <p className="text-[11px] text-[#65676B] dark:text-gray-300">
+                            La IA extraerá todos los equipos, asignará los escudos correspondientes y guardará las estadísticas completas.
+                          </p>
+                          {progressStatus && (
+                            <p className="text-[11px] text-blue-600 dark:text-blue-400 font-bold mt-1 flex items-center gap-1.5">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              <span>{progressStatus}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isScanning}
+                        onClick={handleStartScan}
+                        className="px-6 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs sm:text-sm font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {isScanning ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Escaneando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-4 h-4" />
+                            <span>Escanear Fotos Ahora</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                /* Paste text mode */
+                <div className="space-y-3 p-4 bg-[#F8FAFC] dark:bg-white/5 rounded-2xl border border-[#CED0D4] dark:border-white/10">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#050505] dark:text-white flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-[#1877F2]" />
+                      <span>Pega aquí el texto con los 31 equipos y sus números:</span>
+                    </label>
+                    <span className="text-[11px] text-[#65676B] dark:text-gray-400">
+                      Formato libre: Pos, Equipo, PJ, G, E, P, GF, GC, DIF, PTS
+                    </span>
+                  </div>
+
+                  <textarea
+                    rows={8}
+                    value={rawPastedText}
+                    onChange={(e) => setRawPastedText(e.target.value)}
+                    placeholder={`1 Real Madrid 28 24 3 1 104 35 69 75\n2 Bayern Munich 28 21 4 3 131 41 90 67\n3 Manchester City 28 21 3 4 110 42 68 66\n...`}
+                    className="w-full p-3 font-mono text-xs rounded-xl border border-[#CED0D4] dark:border-white/10 bg-white dark:bg-[#18191A] text-[#050505] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1877F2]"
+                  />
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRawPastedText(
+                          LEAGUE_31_TEAMS_DATA.map(
+                            (t) =>
+                              `${t.rank} ${t.name} ${t.pj} ${t.g} ${t.e} ${t.p} ${t.gf} ${t.gc} ${t.dg} ${t.pts}`
+                          ).join('\n')
+                        )
+                      }
+                      className="text-xs text-[#1877F2] font-bold hover:underline cursor-pointer"
+                    >
+                      Insertar ejemplo de los 31 equipos
+                    </button>
 
                     <button
                       type="button"
-                      disabled={isScanning}
-                      onClick={handleStartScan}
-                      className="px-6 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs sm:text-sm font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      onClick={handleProcessPastedText}
+                      className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer"
                     >
-                      {isScanning ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Escaneando tabla...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-4 h-4" />
-                          <span>Escanear y Rehacer Tabla</span>
-                          <ArrowRight className="w-4 h-4" />
-                        </>
-                      )}
+                      <Check className="w-4 h-4" />
+                      <span>Procesar Texto</span>
                     </button>
                   </div>
                 </div>
@@ -533,25 +674,25 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: REVIEW & RE-BUILD TABLE */}
+          {/* STEP 2: REVIEW & RE-BUILD TABLE (ALL 31 TEAMS) */}
           {activeStep === 'review' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 text-xs">
                 <div className="flex items-center gap-2 font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>
-                    ¡Tabla reconstruida con éxito! Se detectaron <strong>{extractedRows.length} equipos</strong> {scanEngineUsed ? `(${scanEngineUsed})` : ''}.
+                    ¡Tabla generada con <strong>{extractedRows.length} equipos</strong> {scanEngineUsed ? `(${scanEngineUsed})` : ''}!
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <button
                     type="button"
-                    onClick={handleLoadChampionsLeagueDataset}
+                    onClick={handleLoad31TeamsDataset}
                     className="px-2.5 py-1 rounded-lg bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-[#1877F2] dark:text-blue-300 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                    title="Cargar los 15 equipos oficiales de la tabla"
+                    title="Cargar los 31 equipos oficiales"
                   >
                     <Trophy className="w-3.5 h-3.5" />
-                    <span>Cargar los 15 Equipos Oficiales</span>
+                    <span>Recargar 31 Equipos</span>
                   </button>
                   <button
                     type="button"
@@ -578,12 +719,12 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
               </div>
 
               {/* Editable Table */}
-              <div className="overflow-x-auto rounded-xl border border-[#CED0D4] dark:border-white/10">
+              <div className="overflow-x-auto rounded-xl border border-[#CED0D4] dark:border-white/10 max-h-[50vh]">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-[#F0F2F5] dark:bg-[#18191A] text-[#65676B] dark:text-gray-300 font-bold uppercase text-[10px]">
+                  <thead className="sticky top-0 z-10 bg-[#F0F2F5] dark:bg-[#18191A] text-[#65676B] dark:text-gray-300 font-bold uppercase text-[10px] shadow-xs">
                     <tr>
                       <th className="py-2.5 px-2 text-center w-12">Pos</th>
-                      <th className="py-2.5 px-3">Equipo</th>
+                      <th className="py-2.5 px-3">Equipo & Escudo</th>
                       <th className="py-2.5 px-2 text-center w-14">PJ</th>
                       <th className="py-2.5 px-2 text-center w-14">G</th>
                       <th className="py-2.5 px-2 text-center w-14">E</th>
@@ -601,7 +742,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                         key={row.id || idx}
                         className={`transition-colors ${
                           row.isOurTeam
-                            ? 'bg-blue-50/80 dark:bg-blue-900/20 font-bold'
+                            ? 'bg-blue-50/90 dark:bg-blue-900/30 font-bold border-l-4 border-[#1877F2]'
                             : 'hover:bg-gray-50 dark:hover:bg-white/5'
                         }`}
                       >
@@ -623,7 +764,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                               alt={row.name}
                               className="w-6 h-6 rounded-full object-cover shrink-0 border border-gray-200 bg-white"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/fc_bayern_logo.png';
+                                (e.target as HTMLImageElement).src = DEFAULT_GREY_SHIELD_SVG;
                               }}
                             />
                             <input
@@ -634,7 +775,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                             />
                             {row.isOurTeam ? (
                               <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-[#1877F2] text-white shrink-0">
-                                Tu Club ⭐
+                                Mi Club ⭐
                               </span>
                             ) : (
                               <button
@@ -759,7 +900,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                 </button>
 
                 <p className="text-[11px] text-[#65676B] dark:text-gray-400">
-                  💡 Puedes editar cualquier número directamente en las casillas antes de guardar.
+                  🛡️ Equipos con nombre conocido tienen su logo oficial; los equipos comunes tienen escudo gris.
                 </p>
               </div>
             </div>
@@ -783,7 +924,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
               className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-black transition-all shadow-md flex items-center gap-2 cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>Aplicar y Rehacer Tabla Oficial</span>
+              <span>Aplicar y Guardar los {extractedRows.length} Equipos</span>
             </button>
           )}
         </div>

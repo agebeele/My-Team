@@ -16,6 +16,8 @@ import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { TableAiScannerModal } from './TableAiScannerModal';
 
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
+
 interface StandingsAndScorersProps {
   standings: StandingsRow[];
   setStandings?: React.Dispatch<React.SetStateAction<StandingsRow[]>>;
@@ -316,16 +318,16 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {currentUser.role === 'owner' && setStandings && (
+              {(currentUser.role === 'owner' || currentUser.role === 'coach') && setStandings && (
                 <button
                   type="button"
                   id="btn-scan-table-ai"
                   onClick={() => setIsAiScanModalOpen(true)}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black transition-all shadow-sm cursor-pointer"
-                  title="Escanear foto de la tabla de la liga con IA"
+                  title="Escanear fotos de la tabla de la liga (31 equipos) con IA"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                  <span>Escanear Tabla con IA</span>
+                  <span>Escanear / Actualizar Tabla (31 Equipos)</span>
                 </button>
               )}
 
@@ -389,7 +391,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                               alt={row.name}
                               className="w-6 h-6 rounded-full object-cover shrink-0 border border-gray-200 dark:border-white/10 bg-white shadow-2xs"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/fc_bayern_logo.png';
+                                (e.target as HTMLImageElement).src = DEFAULT_GREY_SHIELD_SVG;
                               }}
                             />
                           ) : (

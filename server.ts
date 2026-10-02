@@ -52,10 +52,10 @@ app.post('/api/ai/scan-table', async (req, res) => {
         });
 
         const promptText = `Eres un asistente de inteligencia artificial experto en digitalización de tablas y estadísticas de ligas de fútbol (fútbol 7, fútbol rápido, fútbol soccer).
-Analiza detalladamente las ${imageList.length} imágenes adjuntas, que corresponden a la tabla de clasificación o posiciones de la liga (pueden ser partes consecutivas de la tabla o capturas de varias secciones).
-Extrae todas las filas de la tabla combinadas en orden estricto de posición (1 a N).
+Analiza detalladamente las ${imageList.length} imágenes adjuntas, que corresponden a la tabla de clasificación o posiciones de la liga (pueden ser partes consecutivas de la tabla o capturas de varias secciones, por ejemplo posiciones 1 a 16 en una foto y 17 a 31 en otra).
+Extrae absolutamente TODAS las filas de la tabla combinadas en orden estricto de posición (desde la posición 1 hasta la última, por ejemplo 31 equipos).
 Para cada equipo extrae:
-- rank: Posición numérica consecutiva (1, 2, 3...)
+- rank: Posición numérica consecutiva (1, 2, 3... hasta 31+)
 - name: Nombre oficial del equipo tal como aparece
 - pj: Partidos jugados (o JJ)
 - g: Partidos ganados (o JG, PG)
@@ -67,8 +67,9 @@ Para cada equipo extrae:
 - pts: Puntos totales
 
 El equipo del usuario es o contiene: "${teamName}".
+NO inventes datos: respeta fielmente los números de cada equipo que aparecen en las imágenes.
 Asegúrate de calcular los valores faltantes si alguna columna estuviera borrosa o cortada (dg = gf - gc, pts = g*3 + e).
-Devuelve el nombre de la liga o torneo si es visible, y la lista completa de equipos en orden de posición.`;
+Devuelve el nombre de la liga o torneo si es visible, y la lista completa de todos los equipos en orden de posición.`;
 
         const parts: any[] = imageList.map((img) => ({
           inlineData: {

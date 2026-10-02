@@ -43,6 +43,7 @@ import {
 import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { TableAiScannerModal } from './TableAiScannerModal';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface OwnerAdminPanelProps {
   team: TeamInfo;
@@ -1372,7 +1373,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                 className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 fill-black" />
-                <span>Escanear Foto de Tabla con IA</span>
+                <span>Escanear / Actualizar Tabla (31 Equipos)</span>
               </button>
 
               {/* Standings Table Preview in Admin Panel */}
@@ -1402,7 +1403,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                               alt={st.name}
                               className="w-5 h-5 rounded-full object-cover shrink-0 bg-white"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/fc_bayern_logo.png';
+                                (e.target as HTMLImageElement).src = DEFAULT_GREY_SHIELD_SVG;
                               }}
                             />
                           ) : (
