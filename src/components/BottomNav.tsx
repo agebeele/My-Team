@@ -12,6 +12,11 @@ import {
   ChevronRight,
   Zap,
   Activity,
+  Share2,
+  Bell,
+  User,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { AppUser, Language, UserRole } from '../types';
 import { getT } from '../utils/translations';
@@ -25,6 +30,12 @@ interface BottomNavProps {
   language: Language;
   userRole?: UserRole;
   currentUser?: AppUser;
+  unreadAlertsCount?: number;
+  onOpenStoryShare?: () => void;
+  onOpenNotifications?: () => void;
+  onOpenProfileModal?: () => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -36,6 +47,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   language,
   userRole,
   currentUser,
+  unreadAlertsCount = 0,
+  onOpenStoryShare,
+  onOpenNotifications,
+  onOpenProfileModal,
+  theme = 'light',
+  onToggleTheme,
 }) => {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const t = getT(language);
@@ -107,6 +124,32 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       color: 'blue',
     },
     {
+      id: 'notifications_modal',
+      label: 'Buzón de Notificaciones',
+      description: 'Invitaciones al equipo, convocatorias y premios MVP',
+      icon: Bell,
+      badge: unreadAlertsCount > 0 ? `${unreadAlertsCount} nuevas` : null,
+      color: 'rose',
+      highlight: unreadAlertsCount > 0,
+    },
+    {
+      id: 'user_profile_modal',
+      label: `Mi Perfil (@${currentUser?.username || 'usuario'})`,
+      description: 'Editar nombre, @usuario único para historias y dorsal',
+      icon: User,
+      badge: 'Perfil Activo',
+      color: 'blue',
+    },
+    {
+      id: 'theme_toggle',
+      label: theme === 'dark' ? 'Tema Claro' : 'Tema Oscuro',
+      description: theme === 'dark' ? 'Cambiar interfaz a modo claro' : 'Cambiar interfaz a modo oscuro de alto contraste',
+      icon: theme === 'dark' ? Sun : Moon,
+      badge: theme === 'dark' ? '☀️ Claro' : '🌙 Oscuro',
+      color: 'amber',
+      highlight: true,
+    },
+    {
       id: 'iot',
       label: 'Brazalete IoT (ESP32)',
       description: 'Telemetría en vivo, pulso cardíaco y aceleración',
@@ -121,7 +164,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     secondaryMenuItems.push({
       id: 'admin',
       label: 'Configuración de Equipo',
-      description: 'Gestión de club, agregar o eliminar jugadores',
+      description: 'Gestión de club, invitar jugadores y editar plantilla',
       icon: Settings,
       badge: 'Dueño',
       color: 'blue',
@@ -180,7 +223,23 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   <button
                     key={item.id}
                     id={`sheet-item-${item.id}`}
-                    onClick={() => handleTabChange(item.id)}
+                    onClick={() => {
+                      if (item.id === 'theme_toggle') {
+                        if (onToggleTheme) onToggleTheme();
+                        return;
+                      }
+                      if (item.id === 'notifications_modal') {
+                        setIsMoreMenuOpen(false);
+                        if (onOpenNotifications) onOpenNotifications();
+                        return;
+                      }
+                      if (item.id === 'user_profile_modal') {
+                        setIsMoreMenuOpen(false);
+                        if (onOpenProfileModal) onOpenProfileModal();
+                        return;
+                      }
+                      handleTabChange(item.id);
+                    }}
                     className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                       isItemActive
                         ? 'bg-[#E7F3FF] dark:bg-[#1877F2]/20 border-[#1877F2]/40 text-[#1877F2] dark:text-[#60A5FA]'
@@ -229,10 +288,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         </div>
       )}
 
-      {/* Main 3-Tab Bottom Navigation Bar */}
+      {/* Main Bottom Navigation Bar (iOS & Android Native App Feel) */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#242526]/95 backdrop-blur-lg border-t border-[#CED0D4] dark:border-white/10 pb-safe shadow-lg transition-colors">
-        <nav className="flex items-center justify-around px-3 py-2 max-w-md mx-auto">
-          {/* Tab 1: Partidos (Calendario) */}
+        <nav className="flex items-center justify-around px-2 py-1.5 max-w-md mx-auto">
+          {/* Primary Tabs */}
           {primaryTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = selectedTab === tab.id;
@@ -241,7 +300,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 key={tab.id}
                 id={`mobile-tab-${tab.id}`}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex flex-col items-center justify-center flex-1 py-1.5 px-2 rounded-xl transition-all relative cursor-pointer ${
+                className={`flex flex-col items-center justify-center flex-1 py-1 px-1.5 rounded-xl transition-all relative cursor-pointer ${
                   isActive
                     ? tab.id === 'live_match'
                       ? 'text-rose-600 font-bold bg-rose-50 dark:bg-rose-950/40'
@@ -264,18 +323,35 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] tracking-tight mt-1 font-bold truncate">
+                <span className="text-[10px] tracking-tight mt-1 font-bold truncate">
                   {tab.label}
                 </span>
               </button>
             );
           })}
 
-          {/* Tab 3: Más / Menú */}
+          {/* Direct Story Sharing Button (Central Highlight) */}
+          {onOpenStoryShare && (
+            <button
+              id="mobile-tab-stories"
+              onClick={onOpenStoryShare}
+              className="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all relative cursor-pointer group"
+              title="Subir foto a historias (9:16)"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform text-white">
+                <Sparkles className="w-4 h-4 fill-white" />
+              </div>
+              <span className="text-[10px] tracking-tight mt-1 font-black bg-gradient-to-r from-rose-500 to-amber-500 bg-clip-text text-transparent">
+                Historias
+              </span>
+            </button>
+          )}
+
+          {/* Más / Menú */}
           <button
             id="mobile-tab-more"
             onClick={() => setIsMoreMenuOpen(true)}
-            className={`flex flex-col items-center justify-center flex-1 py-1.5 px-2 rounded-xl transition-all relative cursor-pointer ${
+            className={`flex flex-col items-center justify-center flex-1 py-1 px-1.5 rounded-xl transition-all relative cursor-pointer ${
               isSecondaryActive || isMoreMenuOpen
                 ? 'text-[#1877F2] dark:text-[#60A5FA] font-bold bg-[#E7F3FF] dark:bg-[#1877F2]/20'
                 : 'text-[#65676B] dark:text-gray-400 hover:text-[#050505] dark:hover:text-white'
@@ -287,12 +363,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               ) : (
                 <MoreHorizontal className="w-5 h-5 stroke-2" />
               )}
-              {/* Notification dot indicator when secondary tab is active */}
-              {isSecondaryActive && (
-                <span className="absolute -top-1 -right-1.5 flex h-2 w-2 rounded-full bg-[#1877F2]" />
+              {/* Notification dot indicator */}
+              {(isSecondaryActive || unreadAlertsCount > 0) && (
+                <span className="absolute -top-1 -right-1.5 flex h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
               )}
             </div>
-            <span className="text-[11px] tracking-tight mt-1 font-bold truncate max-w-[80px]">
+            <span className="text-[10px] tracking-tight mt-1 font-bold truncate max-w-[80px]">
               {activeSecondaryItem ? activeSecondaryItem.label : language === 'en' ? 'More' : 'Más'}
             </span>
           </button>

@@ -5,6 +5,7 @@ import {
   StandingsRow,
   Post,
   AppUser,
+  AppNotification,
   Language,
 } from '../types';
 import {
@@ -14,6 +15,7 @@ import {
   INITIAL_STANDINGS,
   INITIAL_POSTS,
   INITIAL_USERS,
+  INITIAL_NOTIFICATIONS,
   DEFAULT_LINEUP,
 } from '../data/initialData';
 
@@ -27,6 +29,7 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'teamgol_current_user',
   LANGUAGE: 'teamgol_language',
   DEVICE_SESSION_SAVED: 'teamgol_device_session_saved',
+  NOTIFICATIONS: 'teamgol_notifications_data',
 };
 
 export const loadInitialState = () => {
@@ -136,6 +139,11 @@ export const loadInitialState = () => {
       localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(INITIAL_STANDINGS));
     }
 
+    const savedNotifications = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
+    const loadedNotifications = savedNotifications
+      ? (JSON.parse(savedNotifications) as AppNotification[])
+      : INITIAL_NOTIFICATIONS;
+
     return {
       team: loadedTeam,
       players: normalizedPlayers,
@@ -146,6 +154,7 @@ export const loadInitialState = () => {
       currentUser: initialCurrentUser,
       isDeviceAuthenticated: !!initialCurrentUser,
       language: savedLang || 'es',
+      notifications: loadedNotifications,
     };
   } catch (err) {
     console.error('Failed to parse localStorage:', err);
@@ -159,6 +168,7 @@ export const loadInitialState = () => {
       currentUser: null,
       isDeviceAuthenticated: false,
       language: 'es' as Language,
+      notifications: INITIAL_NOTIFICATIONS,
     };
   }
 };
@@ -192,6 +202,7 @@ export const saveToStorage = (state: {
   users?: AppUser[];
   currentUser?: AppUser | null;
   language?: Language;
+  notifications?: AppNotification[];
 }) => {
   try {
     if (state.team) localStorage.setItem(STORAGE_KEYS.TEAM, JSON.stringify(state.team));
@@ -200,6 +211,7 @@ export const saveToStorage = (state: {
     if (state.posts) localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(state.posts));
     if (state.standings) localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(state.standings));
     if (state.users) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
+    if (state.notifications) localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(state.notifications));
     if (state.currentUser !== undefined) {
       if (state.currentUser) {
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));

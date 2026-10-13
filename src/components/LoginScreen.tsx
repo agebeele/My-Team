@@ -19,6 +19,8 @@ import {
   Trophy,
   Palette,
   CheckCheck,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import {
   AppUser,
@@ -46,6 +48,8 @@ interface LoginScreenProps {
   language: Language;
   invitedTeam?: { id?: string; name: string; logoUrl?: string } | null;
   invitedTeamName?: string | null;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 const PRESET_CRESTS = [
@@ -88,6 +92,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onInvitationSent,
   invitedTeam,
   invitedTeamName,
+  theme = 'light',
+  onToggleTheme,
 }) => {
   // Determine if the user was invited to a specific team
   const hasInvite = Boolean(invitedTeam?.name || invitedTeamName);
@@ -488,11 +494,36 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] text-[#050505] flex flex-col justify-center items-center p-4 sm:p-6 selection:bg-[#1877F2] selection:text-white">
+    <div className="min-h-screen bg-app-bg text-app-text flex flex-col justify-center items-center p-4 sm:p-6 selection:bg-[#1877F2] selection:text-white relative transition-colors duration-200">
+      {/* Global Dark Theme Switcher Button */}
+      {onToggleTheme && (
+        <div className="absolute top-4 right-4 z-50">
+          <button
+            id="btn-login-theme-toggle"
+            type="button"
+            onClick={onToggleTheme}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-[#242526] hover:bg-gray-100 dark:hover:bg-[#3A3B3C] border border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-100 text-xs font-bold shadow-sm transition-all cursor-pointer transform hover:scale-105"
+            title={theme === 'dark' ? 'Cambiar a Modo Claro' : 'Cambiar a Modo Oscuro'}
+          >
+            {theme === 'dark' ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Modo Claro</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-blue-500" />
+                <span className="hidden sm:inline">Modo Oscuro</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       <div className="w-full max-w-md my-auto space-y-5 animate-in fade-in zoom-in-95 duration-200">
         {/* Official Dream Team App Header */}
         <div className="flex items-center justify-center gap-2 mb-1">
-          <div className="w-8 h-8 rounded-xl overflow-hidden shadow-sm border border-amber-300 ring-2 ring-white bg-white shrink-0">
+          <div className="w-8 h-8 rounded-xl overflow-hidden shadow-sm border border-amber-300 ring-2 ring-white dark:ring-white/20 bg-white shrink-0">
             <img
               src={APP_LOGO_URL}
               alt={APP_NAME}
@@ -500,10 +531,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               className="w-full h-full object-cover"
             />
           </div>
-          <span className="text-xs font-black tracking-widest text-[#1877F2] uppercase bg-[#E7F3FF] border border-[#1877F2]/25 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
+          <span className="text-xs font-black tracking-widest text-[#1877F2] uppercase bg-[#E7F3FF] dark:bg-[#1877F2]/20 border border-[#1877F2]/25 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-xs">
             <span>{APP_NAME}</span>
             <span className="text-[10px] text-amber-500 font-black">★</span>
-            <span className="text-[10px] text-[#65676B] font-semibold">FUT 7</span>
+            <span className="text-[10px] text-[#65676B] dark:text-gray-300 font-semibold">FUT 7</span>
           </span>
         </div>
 
@@ -518,10 +549,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
-                className="w-20 h-20 rounded-2xl mx-auto object-cover shadow-xl ring-4 ring-white border-2 border-[#CED0D4] bg-white transition-all"
+                className="w-20 h-20 rounded-2xl mx-auto object-cover shadow-xl ring-4 ring-white dark:ring-white/10 border-2 border-[#CED0D4] dark:border-white/10 bg-white transition-all"
               />
             ) : (
-              <div className="w-20 h-20 rounded-2xl mx-auto bg-gradient-to-tr from-[#1877F2] to-[#0866FF] text-white flex items-center justify-center shadow-xl ring-4 ring-white border-2 border-white">
+              <div className="w-20 h-20 rounded-2xl mx-auto bg-gradient-to-tr from-[#1877F2] to-[#0866FF] text-white flex items-center justify-center shadow-xl ring-4 ring-white dark:ring-white/10 border-2 border-white">
                 <Shield className="w-10 h-10" />
               </div>
             )}
@@ -531,10 +562,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
 
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-[#050505]">
+            <h1 className="text-2xl font-black tracking-tight text-[#050505] dark:text-white">
               {displayTeamName}
             </h1>
-            <p className="text-xs font-semibold text-[#65676B]">
+            <p className="text-xs font-semibold text-[#65676B] dark:text-gray-400">
               {activeTab === 'create_team'
                 ? 'Panel de Creación y Dirección de Nuevo Club'
                 : 'Portal Oficial de Convocatorias, Alineaciones y Partidos'}
@@ -544,11 +575,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
         {/* Invited Link Banner if accessed via invite URL / invitation */}
         {hasInvite && activeTab !== 'create_team' && (
-          <div className="bg-emerald-50 border border-emerald-300 p-3.5 rounded-2xl flex items-start gap-3 shadow-xs">
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/50 p-3.5 rounded-2xl flex items-start gap-3 shadow-xs">
             <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
               <Trophy className="w-4 h-4" />
             </div>
-            <div className="text-xs text-emerald-950 leading-relaxed">
+            <div className="text-xs text-emerald-950 dark:text-emerald-200 leading-relaxed">
               <span className="font-black block">¡Invitación Oficial de Equipo!</span>
               Has sido invitado a formar parte de <strong>{displayTeamName}</strong>. Crea tu cuenta o inicia sesión para ingresar al plantel.
             </div>
@@ -556,9 +587,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         )}
 
         {/* Main Card */}
-        <div className="bg-white rounded-3xl border border-[#CED0D4] shadow-xl p-6 space-y-4">
+        <div className="bg-white dark:bg-[#1E1F20] text-[#050505] dark:text-white rounded-3xl border border-[#CED0D4] dark:border-white/10 shadow-xl p-6 space-y-4">
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-3 bg-[#F0F2F5] p-1.5 rounded-2xl border border-[#E4E6EB] gap-1">
+          <div className="grid grid-cols-3 bg-[#F0F2F5] dark:bg-black/30 p-1.5 rounded-2xl border border-[#E4E6EB] dark:border-white/10 gap-1">
             <button
               type="button"
               id="tab-login-mode"

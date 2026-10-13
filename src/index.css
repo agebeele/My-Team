@@ -1,10 +1,64 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --color-bg-app: #F0F2F5;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-card: #FFFFFF;
+  --color-bg-secondary: #E4E6EB;
+  --color-bg-hover: #F2F3F5;
+  --color-text-main: #050505;
+  --color-text-sub: #65676B;
+  --color-border-main: #CED0D4;
+  --color-border-subtle: #E4E6EB;
+  --color-accent: #1877F2;
+  --color-accent-hover: #0866FF;
+  --color-navbar-bg: #FFFFFF;
+  --color-dock-bg: rgba(255, 255, 255, 0.95);
+  --color-scrollbar-track: #F0F2F5;
+  --color-scrollbar-thumb: #BCC0C4;
+}
+
+.dark,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg-app: #0E1015;
+  --color-bg-surface: #181B22;
+  --color-bg-card: #181B22;
+  --color-bg-secondary: #222631;
+  --color-bg-hover: #2B303E;
+  --color-text-main: #F3F4F6;
+  --color-text-sub: #9CA3AF;
+  --color-border-main: #2A303F;
+  --color-border-subtle: #1F2430;
+  --color-accent: #3B82F6;
+  --color-accent-hover: #2563EB;
+  --color-navbar-bg: #181B22;
+  --color-dock-bg: rgba(24, 27, 34, 0.95);
+  --color-scrollbar-track: #12141A;
+  --color-scrollbar-thumb: #3A4150;
+}
+
+@theme {
+  --color-app-bg: var(--color-bg-app);
+  --color-app-surface: var(--color-bg-surface);
+  --color-app-card: var(--color-bg-card);
+  --color-app-secondary: var(--color-bg-secondary);
+  --color-app-hover: var(--color-bg-hover);
+  --color-app-text: var(--color-text-main);
+  --color-app-subtext: var(--color-text-sub);
+  --color-app-border: var(--color-border-main);
+  --color-app-accent: var(--color-accent);
+}
+
 @layer base {
   body {
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: #F0F2F5;
-    color: #050505;
+    background-color: var(--color-bg-app);
+    color: var(--color-text-main);
+    transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 
@@ -13,19 +67,18 @@
   letter-spacing: 0.05em;
 }
 
-/* Facebook-styled scrollbars */
+/* Custom scrollbars driven by CSS variables */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #F0F2F5;
+  background: var(--color-scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #BCC0C4;
+  background: var(--color-scrollbar-thumb);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #8A8D91;
 }
-

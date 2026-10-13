@@ -16,6 +16,7 @@ import {
   Plus,
   Trash2,
   FileText,
+  Share2,
 } from 'lucide-react';
 import { StandingsRow, Player, TeamInfo, AppUser, Language } from '../types';
 import { getT } from '../utils/translations';
@@ -33,6 +34,7 @@ interface StandingsAndScorersProps {
   currentUser: AppUser;
   language: Language;
   onViewPlayerProfile: (playerId: string) => void;
+  onOpenStoryShare?: (type: 'standings' | 'scorers' | 'mvp' | 'player_card') => void;
 }
 
 export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
@@ -44,6 +46,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   currentUser,
   language,
   onViewPlayerProfile,
+  onOpenStoryShare,
 }) => {
   const t = getT(language);
   const [activeTab, setActiveTab] = useState<'scorers' | 'standings'>('scorers');
@@ -201,15 +204,27 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Share to Stories button */}
+          {onOpenStoryShare && (
+            <button
+              onClick={() => onOpenStoryShare(activeTab === 'scorers' ? 'scorers' : 'standings')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white text-xs font-black transition-all shadow-md hover:scale-105 cursor-pointer"
+              title="Compartir foto de tabla en tus historias de Instagram, WhatsApp o TikTok"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Subir a Historias (9:16)</span>
+            </button>
+          )}
+
           {/* Download button for current active tab */}
           <button
             onClick={activeTab === 'scorers' ? handleDownloadScorers : handleDownloadStandings}
             disabled={isDownloading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/15 text-[#050505] dark:text-white border border-[#CED0D4] dark:border-white/10 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/15 text-[#050505] dark:text-white border border-[#CED0D4] dark:border-white/10 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
             title={`Descargar ${activeTab === 'scorers' ? 'goleadores' : 'tabla general'} a tu galería`}
           >
             <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-emerald-400" />
-            <span>{isDownloading ? 'Guardando...' : 'Descargar Foto'}</span>
+            <span>{isDownloading ? 'Guardando...' : 'Descargar'}</span>
           </button>
 
           {/* Tab switcher */}

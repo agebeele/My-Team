@@ -36,8 +36,12 @@ interface NavbarProps {
   setLanguage: (lang: Language) => void;
   unreadAlertsCount?: number;
   onOpenNotifications?: () => void;
+  onOpenStoryShare?: () => void;
+  onOpenProfileModal?: () => void;
   onOpenAuthModal?: () => void;
   onOpenAuth?: () => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -56,8 +60,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   setLanguage,
   unreadAlertsCount = 0,
   onOpenNotifications = () => {},
+  onOpenStoryShare,
+  onOpenProfileModal,
   onOpenAuthModal,
   onOpenAuth,
+  theme = 'light',
+  onToggleTheme,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const t = getT(language);
@@ -259,8 +267,36 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </nav>
 
-          {/* Right Action Bar - Facebook Circular Action Buttons */}
+          {/* Right Action Bar - Mobile App Action Buttons */}
           <div className="flex items-center gap-2">
+            {/* Direct Story Sharing Button */}
+            {onOpenStoryShare && (
+              <button
+                id="btn-navbar-story"
+                onClick={onOpenStoryShare}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-black text-xs shadow-md transition-all cursor-pointer transform hover:scale-105"
+                title="Compartir foto de goleo, tabla o MVP directamente a tus historias de Instagram o WhatsApp"
+              >
+                <Sparkles className="w-3.5 h-3.5 fill-white" />
+                <span className="hidden sm:inline">+ Historia</span>
+              </button>
+            )}
+
+            {/* Global Dark Theme Toggle */}
+            {onToggleTheme && (
+              <button
+                id="btn-theme-toggle"
+                onClick={onToggleTheme}
+                className="w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-amber-300 transition-all flex items-center justify-center shadow-xs cursor-pointer transform hover:scale-105"
+                title={theme === 'dark' ? 'Cambiar a Tema Claro' : 'Cambiar a Tema Oscuro'}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-slate-700" />
+                )}
+              </button>
+            )}
 
             {/* Language Switcher */}
             <button
@@ -277,7 +313,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="btn-notifications-bell"
               onClick={onOpenNotifications}
               className="relative w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-white transition-colors flex items-center justify-center shadow-xs cursor-pointer"
-              title="Notificaciones de partidos"
+              title="Notificaciones de invitaciones y partidos"
             >
               <Bell className="w-4 h-4" />
               {unreadAlertsCount > 0 && (
@@ -309,30 +345,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ChevronDown className="w-3.5 h-3.5 text-[#65676B] dark:text-gray-400 hidden sm:block mr-1" />
               </button>
 
-              {/* Profile Menu - ONLY CURRENT USER */}
+              {/* Profile Menu */}
               {showRoleMenu && (
                 <div
                   id="menu-role-dropdown"
-                  className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 shadow-2xl p-3.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                  className="absolute right-0 mt-2 w-80 rounded-3xl bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
                 >
                   {/* Current Active Account Header */}
-                  <div className="p-3 bg-[#F0F2F5] dark:bg-[#18191A] rounded-xl border border-gray-100 dark:border-white/5 space-y-2">
+                  <div className="p-3 bg-[#F0F2F5] dark:bg-[#18191A] rounded-2xl border border-gray-100 dark:border-white/5 space-y-2">
                     <div className="flex items-center gap-2.5">
                       <img
                         src={currentUser.avatarUrl}
                         alt={currentUser.name}
                         referrerPolicy="no-referrer"
-                        className="w-10 h-10 rounded-full object-cover ring-2 ring-[#1877F2] shadow-xs"
+                        className="w-11 h-11 rounded-full object-cover ring-2 ring-amber-400 shadow-xs"
                       />
                       <div className="truncate min-w-0 flex-1">
-                        <p className="text-xs font-bold text-[#050505] dark:text-white truncate">
+                        <p className="text-xs font-black text-[#050505] dark:text-white truncate">
                           {currentUser.name}
                         </p>
-                        {currentUser.adminTitle && currentUser.role === 'owner' && (
-                          <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 truncate">
-                            ⭐ {currentUser.adminTitle}
-                          </p>
-                        )}
+                        <p className="text-xs font-bold text-amber-600 dark:text-amber-400 font-mono truncate">
+                          @{currentUser.username || 'usuario'}
+                        </p>
                         <p className="text-[11px] text-[#65676B] dark:text-gray-400 truncate">
                           {currentUser.email}
                         </p>
@@ -347,7 +381,70 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   {/* Direct Actions for Active User */}
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-3 space-y-1">
+                    {onOpenProfileModal && (
+                      <button
+                        onClick={() => {
+                          setShowRoleMenu(false);
+                          onOpenProfileModal();
+                        }}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-bold text-[#050505] dark:text-white hover:bg-[#F0F2F5] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <User className="w-4 h-4 text-[#1877F2]" />
+                        <span>Editar mi @Usuario y Perfil</span>
+                      </button>
+                    )}
+
+                    {onOpenStoryShare && (
+                      <button
+                        onClick={() => {
+                          setShowRoleMenu(false);
+                          onOpenStoryShare();
+                        }}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-black text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      >
+                        <Sparkles className="w-4 h-4 text-rose-500" />
+                        <span>Compartir en Historias (9:16)</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setShowRoleMenu(false);
+                        onOpenNotifications();
+                      }}
+                      className="w-full flex items-center justify-between p-2 rounded-xl text-left text-xs font-bold text-[#050505] dark:text-white hover:bg-[#F0F2F5] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Bell className="w-4 h-4 text-amber-500" />
+                        <span>Mis Notificaciones</span>
+                      </div>
+                      {unreadAlertsCount > 0 && (
+                        <span className="bg-[#E41E3F] text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                          {unreadAlertsCount}
+                        </span>
+                      )}
+                    </button>
+
+                    {onToggleTheme && (
+                      <button
+                        onClick={onToggleTheme}
+                        className="w-full flex items-center justify-between p-2 rounded-xl text-left text-xs font-bold text-[#050505] dark:text-white hover:bg-[#F0F2F5] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          {theme === 'dark' ? (
+                            <Sun className="w-4 h-4 text-amber-400" />
+                          ) : (
+                            <Moon className="w-4 h-4 text-slate-600 dark:text-gray-400" />
+                          )}
+                          <span>Tema de la App</span>
+                        </div>
+                        <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-gray-300">
+                          {theme === 'dark' ? 'Oscuro 🌙' : 'Claro ☀️'}
+                        </span>
+                      </button>
+                    )}
+
                     <button
                       id="btn-menu-my-profile"
                       onClick={() => {
@@ -356,20 +453,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                       }}
                       className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#050505] dark:text-white hover:bg-[#F0F2F5] dark:hover:bg-white/5 transition-colors cursor-pointer"
                     >
-                      <User className="w-4 h-4 text-[#1877F2]" />
-                      <span>Ver mi perfil y estadísticas</span>
-                    </button>
-
-                    <button
-                      id="btn-menu-iot-armband"
-                      onClick={() => {
-                        handleTabChange('iot');
-                        setShowRoleMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                    >
-                      <Activity className="w-4 h-4 text-emerald-600" />
-                      <span>Brazalete Deportivo (ESP32 IoT)</span>
+                      <Shield className="w-4 h-4 text-[#1877F2]" />
+                      <span>Ficha Deportiva & Credencial</span>
                     </button>
 
                     {currentUser.role === 'owner' && (
@@ -382,10 +467,43 @@ export const Navbar: React.FC<NavbarProps> = ({
                         className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-amber-900 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors cursor-pointer"
                       >
                         <Crown className="w-4 h-4 text-amber-500" />
-                        <span>Panel de Administración & Perfil DT</span>
+                        <span>Panel de Administración DT</span>
                       </button>
                     )}
                   </div>
+
+                  {/* Switch Account Section */}
+                  {userList.length > 1 && (
+                    <div className="mt-2.5 pt-2 border-t border-gray-100 dark:border-white/10">
+                      <span className="text-[10px] uppercase tracking-wider font-black text-[#65676B] dark:text-gray-400 block px-1 mb-1.5">
+                        Cambiar de Cuenta:
+                      </span>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {userList
+                          .filter((u) => u.id !== currentUser.id)
+                          .map((u) => (
+                            <button
+                              key={u.id}
+                              onClick={() => {
+                                setCurrentUser(u);
+                                setShowRoleMenu(false);
+                              }}
+                              className="w-full flex items-center gap-2 p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-left text-xs text-[#050505] dark:text-white cursor-pointer"
+                            >
+                              <img
+                                src={u.avatarUrl}
+                                alt={u.name}
+                                className="w-6 h-6 rounded-full object-cover"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-bold truncate text-[11px]">{u.name}</p>
+                                <p className="text-[9px] text-gray-500 truncate">@{u.username || 'user'}</p>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Logout Action */}
                   {onLogout && (
