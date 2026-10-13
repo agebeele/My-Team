@@ -252,47 +252,16 @@ export interface AppUser {
   phone?: string;
   adminTitle?: string;
   bio?: string;
-  position?: PlayerPosition;
-  jerseyNumber?: number;
-  favoriteClub?: string;
-  isOnline?: boolean;
 }
-
-export interface AppNotification {
-  id: string;
-  recipientUserId: string;
-  recipientUsername?: string;
-  senderUserId: string;
-  senderName: string;
-  senderAvatar: string;
-  type: 'team_invitation' | 'convocatoria' | 'mvp_award' | 'match_result';
-  title: string;
-  message: string;
-  timestamp: number;
-  isRead: boolean;
-  status?: 'pending' | 'accepted' | 'rejected';
-  teamId: string;
-  teamName: string;
-  teamLogo: string;
-  suggestedRole?: UserRole;
-  suggestedPosition?: PlayerPosition;
-  suggestedNumber?: number;
-}
-
-export type StoryType = 'standings' | 'scorers' | 'mvp' | 'player_card' | 'match_result';
-export type StoryTheme = 'champions_neon' | 'bayern_red' | 'gold_mvp' | 'emerald_turf' | 'dark_minimal';
 
 export interface TeamInvitation {
   id: string;
-  email?: string;
-  username?: string;
+  email: string;
   playerName: string;
   teamName: string;
   sentAt: string;
   role: UserRole;
-  status: 'sent' | 'accepted' | 'rejected';
-  position?: PlayerPosition;
-  jerseyNumber?: number;
+  status: 'sent' | 'accepted';
 }
 
 export type Language = 'es' | 'en';

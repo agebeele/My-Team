@@ -13,7 +13,6 @@ import {
   AlertTriangle,
   Award,
   Download,
-  Share2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Match, Player, AppUser, Language, MVPRecord, TeamInfo } from '../types';
@@ -31,7 +30,6 @@ interface MVPVotingAndCameraProps {
   language: Language;
   selectedMatchId?: string;
   onViewPlayerProfile?: (playerId: string) => void;
-  onOpenStoryShare?: (type: 'standings' | 'scorers' | 'mvp' | 'player_card') => void;
 }
 
 export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
@@ -44,7 +42,6 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
   language,
   selectedMatchId,
   onViewPlayerProfile,
-  onOpenStoryShare,
 }) => {
   const t = getT(language);
 
@@ -750,33 +747,20 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
               </div>
             </div>
 
-            {/* Story Share & Gallery Download Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {onOpenStoryShare && (
-                <button
-                  onClick={() => onOpenStoryShare('mvp')}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-black text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-                  title="Compartir MVP directamente a tus historias de Instagram, WhatsApp o TikTok"
-                >
-                  <Share2 className="w-4 h-4 text-white shrink-0" />
-                  <span>Subir MVP a Historias (9:16)</span>
-                </button>
-              )}
-
-              <button
-                id="btn-download-mvp-card"
-                onClick={handleDownloadMvpCard}
-                disabled={isDownloadingMvp}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-500 text-black font-extrabold text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-              >
-                <Download className="w-4 h-4 text-black shrink-0" />
-                <span>
-                  {isDownloadingMvp
-                    ? 'Guardando...'
-                    : 'Descargar Foto de MVP'}
-                </span>
-              </button>
-            </div>
+            {/* Gallery Download Button */}
+            <button
+              id="btn-download-mvp-card"
+              onClick={handleDownloadMvpCard}
+              disabled={isDownloadingMvp}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-500 text-black font-extrabold text-xs sm:text-sm shadow-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+            >
+              <Download className="w-4 h-4 text-black shrink-0" />
+              <span>
+                {isDownloadingMvp
+                  ? 'Guardando en Galería...'
+                  : 'Descargar Foto de MVP (Guardar en Galería)'}
+              </span>
+            </button>
 
             {/* Error Message if camera failed */}
             {cameraError && (

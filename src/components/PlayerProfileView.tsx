@@ -20,7 +20,6 @@ import {
   X,
   Sparkles,
   ShieldCheck,
-  Share2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Player, TeamInfo, AppUser, Language, DEFAULT_FACEBOOK_AVATAR, getPlayerPositionName } from '../types';
@@ -34,7 +33,6 @@ interface PlayerProfileViewProps {
   currentUser: AppUser;
   language: Language;
   onBack?: () => void;
-  onOpenStoryShare?: (type: 'standings' | 'scorers' | 'mvp' | 'player_card') => void;
 }
 
 export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
@@ -44,7 +42,6 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
   currentUser,
   language,
   onBack,
-  onOpenStoryShare,
 }) => {
   const t = getT(language);
   const isOwnerOrAdmin = currentUser.role === 'owner';
@@ -314,31 +311,18 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
           <div />
         )}
 
-        <div className="flex items-center gap-2">
-          {onOpenStoryShare && (
-            <button
-              onClick={() => onOpenStoryShare('player_card')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white text-xs font-black shadow-md transition-all cursor-pointer transform hover:scale-[1.02]"
-              title="Compartir tu ficha oficial de jugador en tus historias de Instagram, WhatsApp o TikTok"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Subir a Historias (9:16)</span>
-            </button>
-          )}
-
-          {/* Digital Credential Trigger Button */}
-          <button
-            id="btn-open-credential"
-            onClick={() => setIsCredentialOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs transition-all cursor-pointer transform hover:scale-[1.02]"
-          >
-            <CreditCard className="w-4 h-4 text-white shrink-0" />
-            <span>Ver Credencial</span>
-            <span className="text-[10px] bg-white text-[#1877F2] px-1.5 py-0.5 rounded-full font-black uppercase">
-              Fut 7
-            </span>
-          </button>
-        </div>
+        {/* Digital Credential Trigger Button */}
+        <button
+          id="btn-open-credential"
+          onClick={() => setIsCredentialOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs transition-all cursor-pointer transform hover:scale-[1.02]"
+        >
+          <CreditCard className="w-4 h-4 text-white shrink-0" />
+          <span>Ver Credencial Digital</span>
+          <span className="text-[10px] bg-white text-[#1877F2] px-1.5 py-0.5 rounded-full font-black uppercase">
+            Fut 7
+          </span>
+        </button>
       </div>
 
       {/* Main Profile Header Card */}

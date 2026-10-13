@@ -30,7 +30,6 @@ import {
 import {
   TeamInfo,
   AppUser,
-  AppNotification,
   Player,
   Match,
   StandingsRow,
@@ -59,9 +58,6 @@ interface OwnerAdminPanelProps {
   currentUser: AppUser;
   setCurrentUser?: (user: AppUser) => void;
   language: Language;
-  notifications?: AppNotification[];
-  setNotifications?: React.Dispatch<React.SetStateAction<AppNotification[]>>;
-  onOpenStoryShare?: (type: 'standings' | 'scorers' | 'mvp' | 'player_card') => void;
 }
 
 export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
@@ -77,9 +73,6 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   currentUser,
   setCurrentUser,
   language,
-  notifications = [],
-  setNotifications,
-  onOpenStoryShare,
 }) => {
   const t = getT(language);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
@@ -287,14 +280,6 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
   const [editFormError, setEditFormError] = useState<string | null>(null);
 
-  // In-App Profile Invitation State
-  const [inviteSelectedUserId, setInviteSelectedUserId] = useState<string>('');
-  const [inviteCustomUsername, setInviteCustomUsername] = useState<string>('');
-  const [invitePosition, setInvitePosition] = useState<PlayerPosition>('DEL');
-  const [inviteDorsal, setInviteDorsal] = useState<string>('11');
-  const [inviteSuccessMsg, setInviteSuccessMsg] = useState<string | null>(null);
-  const [inviteErrorMsg, setInviteErrorMsg] = useState<string | null>(null);
-
   // Invite link state
   const [copiedInvite, setCopiedInvite] = useState(false);
 
@@ -312,71 +297,6 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   const handleShareWhatsApp = () => {
     const text = `⚽ ¡Hola! Te invito a unirte a nuestro equipo *${team.name}* en TeamGol. Regístrate en este enlace para formar parte de la plantilla oficial y ver convocatorias, alineaciones tácticas y partidos:\n\n${inviteUrl}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
-  };
-
-  // Send Direct In-App Invitation to User's Notifications
-  const handleSendProfileInvitation = (e: React.FormEvent) => {
-    e.preventDefault();
-    setInviteErrorMsg(null);
-
-    let targetUser: AppUser | undefined;
-    if (inviteSelectedUserId) {
-      targetUser = users.find((u) => u.id === inviteSelectedUserId);
-    } else if (inviteCustomUsername.trim()) {
-      const clean = inviteCustomUsername.trim().replace(/^@/, '').toLowerCase();
-      targetUser = users.find((u) => u.username?.toLowerCase() === clean);
-      if (!targetUser) {
-        // Create user profile for this username so they can receive and claim it
-        targetUser = {
-          id: `u_${clean}_${Date.now()}`,
-          name: `@${clean}`,
-          email: `${clean}@teamgol.com`,
-          username: clean,
-          role: 'player',
-          avatarUrl: DEFAULT_FACEBOOK_AVATAR,
-          provider: 'email',
-          position: invitePosition,
-          jerseyNumber: Number(inviteDorsal) || 11,
-          isOnline: true,
-        };
-        setUsers((prev) => [...prev, targetUser!]);
-      }
-    }
-
-    if (!targetUser) {
-      setInviteErrorMsg('Por favor selecciona un usuario o escribe su @nombre de usuario');
-      return;
-    }
-
-    const newNotif: AppNotification = {
-      id: `notif_${Date.now()}`,
-      recipientUserId: targetUser.id,
-      recipientUsername: targetUser.username,
-      senderUserId: currentUser.id,
-      senderName: currentUser.name,
-      senderAvatar: currentUser.avatarUrl,
-      type: 'team_invitation',
-      title: `🏆 Invitación Oficial a ${team.name}`,
-      message: `${currentUser.name} te ha invitado a unirte a la plantilla oficial de ${team.name} con el dorsal #${inviteDorsal} (${invitePosition}).`,
-      timestamp: Date.now(),
-      isRead: false,
-      status: 'pending',
-      teamId: team.id,
-      teamName: team.name,
-      teamLogo: team.logoUrl,
-      suggestedRole: 'player',
-      suggestedPosition: invitePosition,
-      suggestedNumber: Number(inviteDorsal) || 11,
-    };
-
-    if (setNotifications) {
-      setNotifications((prev) => [newNotif, ...prev]);
-    }
-
-    setInviteSuccessMsg(`¡Invitación enviada directamente a las notificaciones en la app de @${targetUser.username || targetUser.name}!`);
-    setTimeout(() => setInviteSuccessMsg(null), 5000);
-    setInviteCustomUsername('');
-    setInviteSelectedUserId('');
   };
 
   const handleUpdateTeam = (e: React.FormEvent) => {
@@ -661,19 +581,19 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
         </div>
       )}
 
-      {/* SECTION 1: INVITAR JUGADOR POR PERFIL A SUS NOTIFICACIONES */}
-      <div className="bg-white dark:bg-[#242526] p-5 sm:p-6 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#CED0D4] dark:border-white/10">
+      {/* SECTION 1: TEAM INVITATION LINK FOR NEW PLAYERS */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#CED0D4]">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 text-white shadow-md">
-              <Bell className="w-5 h-5" />
+            <div className="p-2.5 rounded-xl bg-[#E7F3FF] text-[#1877F2]">
+              <Share2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-black text-[#050505] dark:text-white">
-                Invitar Jugador Directo a sus Notificaciones en la App
+              <h3 className="text-base font-black text-[#050505]">
+                Enlace de Invitación al Equipo
               </h3>
-              <p className="text-xs text-[#65676B] dark:text-gray-400">
-                Busca el perfil o @usuario del jugador registrado para enviarle la invitación oficial a su buzón en la app
+              <p className="text-xs text-[#65676B]">
+                Envía este enlace a nuevos jugadores para que se unan a <span className="font-bold text-[#1877F2]">{team.name}</span> y tengan acceso a todo el contenido del club
               </p>
             </div>
           </div>
@@ -681,176 +601,33 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyInviteLink}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F0F2F5] dark:bg-white/5 hover:bg-[#E4E6EB] dark:hover:bg-white/10 text-[#050505] dark:text-white text-xs font-bold transition-all border border-[#CED0D4] dark:border-white/10 cursor-pointer"
-              title="Copiar enlace alternativo"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
-              {copiedInvite ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />}
-              <span>{copiedInvite ? '¡Copiado!' : 'Enlace Web'}</span>
+              {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <span>{copiedInvite ? '¡Copiado!' : 'Copiar Enlace'}</span>
             </button>
             <button
               onClick={handleShareWhatsApp}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
             >
-              <MessageCircle className="w-3.5 h-3.5" />
+              <MessageCircle className="w-4 h-4" />
               <span>WhatsApp</span>
             </button>
           </div>
         </div>
 
-        {/* Feedback alerts */}
-        {inviteSuccessMsg && (
-          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/50 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{inviteSuccessMsg}</span>
+        <div className="p-3.5 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="font-mono text-xs text-[#050505] truncate font-medium">
+            {inviteUrl}
           </div>
-        )}
+          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full shrink-0 self-start sm:self-auto">
+            Activo y Listo para Compartir
+          </span>
+        </div>
 
-        {inviteErrorMsg && (
-          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-700/50 text-rose-800 dark:text-rose-200 text-xs font-bold flex items-center gap-2 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{inviteErrorMsg}</span>
-          </div>
-        )}
-
-        {/* In-App Direct Invitation Form */}
-        <form onSubmit={handleSendProfileInvitation} className="p-4 rounded-2xl bg-[#F0F2F5] dark:bg-white/5 border border-[#CED0D4] dark:border-white/10 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-            {/* Select from existing registered users */}
-            <div className="sm:col-span-5">
-              <label className="block text-[11px] font-bold text-[#65676B] dark:text-gray-300 mb-1">
-                Seleccionar Perfil Activo en la App:
-              </label>
-              <select
-                value={inviteSelectedUserId}
-                onChange={(e) => {
-                  setInviteSelectedUserId(e.target.value);
-                  if (e.target.value) setInviteCustomUsername('');
-                }}
-                className="w-full px-3 py-2 bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-xs font-bold text-[#050505] dark:text-white focus:outline-none focus:border-[#1877F2]"
-              >
-                <option value="">-- Elige un usuario registrado --</option>
-                {users
-                  .filter((u) => u.id !== currentUser.id)
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} (@{u.username || 'usuario'}) {u.role === 'owner' ? '👑 DT' : '⚽ Jugador'}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            {/* OR type custom @username */}
-            <div className="sm:col-span-3">
-              <label className="block text-[11px] font-bold text-[#65676B] dark:text-gray-300 mb-1">
-                O escribe su @Usuario:
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-2 text-xs font-bold text-gray-400">@</span>
-                <input
-                  type="text"
-                  placeholder="ej. santi_chaquito"
-                  value={inviteCustomUsername}
-                  onChange={(e) => {
-                    setInviteCustomUsername(e.target.value);
-                    if (e.target.value) setInviteSelectedUserId('');
-                  }}
-                  className="w-full pl-7 pr-3 py-2 bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-xs font-bold text-[#050505] dark:text-white font-mono focus:outline-none focus:border-[#1877F2]"
-                />
-              </div>
-            </div>
-
-            {/* Position */}
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-bold text-[#65676B] dark:text-gray-300 mb-1">
-                Posición:
-              </label>
-              <select
-                value={invitePosition}
-                onChange={(e) => setInvitePosition(e.target.value as PlayerPosition)}
-                className="w-full px-3 py-2 bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-xs font-bold text-[#050505] dark:text-white focus:outline-none focus:border-[#1877F2]"
-              >
-                {ALL_POSITIONS.map((pos) => (
-                  <option key={pos.value} value={pos.value}>
-                    {pos.value}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Dorsal */}
-            <div className="sm:col-span-2">
-              <label className="block text-[11px] font-bold text-[#65676B] dark:text-gray-300 mb-1">
-                Dorsal (#):
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={99}
-                value={inviteDorsal}
-                onChange={(e) => setInviteDorsal(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl text-xs font-black text-[#050505] dark:text-white font-mono focus:outline-none focus:border-[#1877F2]"
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-gray-200 dark:border-white/10">
-            <p className="text-[11px] text-[#65676B] dark:text-gray-400 leading-relaxed">
-              🔔 <span className="font-bold">Entrega Inmediata:</span> La invitación llegará directamente con campanita roja al perfil del usuario dentro de la app para que la acepte con un clic.
-            </p>
-
-            <button
-              type="submit"
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
-            >
-              <Bell className="w-4 h-4" />
-              <span>Enviar Invitación al Perfil</span>
-            </button>
-          </div>
-        </form>
-
-        {/* Recent In-App Invitations List */}
-        {notifications.filter((n) => n.type === 'team_invitation').length > 0 && (
-          <div className="space-y-2 pt-2">
-            <h4 className="text-xs font-bold text-[#050505] flex items-center gap-1.5">
-              <span>Invitaciones Enviadas a Perfiles:</span>
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {notifications
-                .filter((n) => n.type === 'team_invitation')
-                .slice(0, 4)
-                .map((inv) => (
-                  <div
-                    key={inv.id}
-                    className="p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between text-xs"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-bold text-[#050505] truncate">
-                        @{inv.recipientUsername || inv.recipientUserId}
-                      </p>
-                      <p className="text-[10px] text-[#65676B]">
-                        Dorsal #{inv.suggestedNumber} • {inv.suggestedPosition}
-                      </p>
-                    </div>
-                    <span
-                      className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                        inv.status === 'accepted'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : inv.status === 'rejected'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {inv.status === 'accepted'
-                        ? 'Aceptada ✓'
-                        : inv.status === 'rejected'
-                        ? 'Declinada'
-                        : 'Pendiente ⏳'}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
+        <p className="text-[11px] text-[#65676B] leading-relaxed">
+          💡 <span className="font-bold">¿Cómo funciona?</span> Cuando un jugador nuevo ingrese a través de este enlace, la app detectará la invitación de <span className="font-bold">{team.name}</span> y le permitirá registrar su perfil o iniciar sesión, integrándose inmediatamente a la plantilla con acceso completo a convocatorias, alineaciones tácticas y calendario.
+        </p>
       </div>
 
       {/* SECTION 2: SQUAD MANAGEMENT (ADD AND DELETE PLAYERS) */}
