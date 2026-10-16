@@ -9,6 +9,7 @@ import {
 } from '../types';
 import {
   INITIAL_TEAM,
+  INITIAL_TEAMS,
   INITIAL_PLAYERS,
   INITIAL_MATCHES,
   INITIAL_STANDINGS,
@@ -19,6 +20,7 @@ import {
 
 const STORAGE_KEYS = {
   TEAM: 'teamgol_team_data',
+  ALL_TEAMS: 'teamgol_all_teams_data',
   PLAYERS: 'teamgol_players_data',
   MATCHES: 'teamgol_matches_data',
   STANDINGS: 'teamgol_standings_data',
@@ -31,6 +33,7 @@ const STORAGE_KEYS = {
 
 export const loadInitialState = () => {
   try {
+    const savedAllTeams = localStorage.getItem(STORAGE_KEYS.ALL_TEAMS);
     const savedTeam = localStorage.getItem(STORAGE_KEYS.TEAM);
     const savedPlayers = localStorage.getItem(STORAGE_KEYS.PLAYERS);
     const savedMatches = localStorage.getItem(STORAGE_KEYS.MATCHES);
@@ -40,17 +43,35 @@ export const loadInitialState = () => {
     const savedCurrentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     const savedLang = localStorage.getItem(STORAGE_KEYS.LANGUAGE) as Language | null;
 
-    const loadedTeam = savedTeam ? (JSON.parse(savedTeam) as TeamInfo) : INITIAL_TEAM;
-    if (loadedTeam.primaryColor === '#10B981') {
-      loadedTeam.primaryColor = '#1877F2';
-      loadedTeam.secondaryColor = '#0866FF';
+    let loadedAllTeams: TeamInfo[] = INITIAL_TEAMS;
+    if (savedAllTeams) {
+      try {
+        const parsed = JSON.parse(savedAllTeams) as TeamInfo[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          loadedAllTeams = parsed;
+        }
+      } catch {
+        loadedAllTeams = INITIAL_TEAMS;
+      }
     }
-    if (!loadedTeam.logoUrl || loadedTeam.logoUrl.includes('photo-1508098682722')) {
-      loadedTeam.logoUrl = '/fc_bayern_logo.png';
-    }
-    if (loadedTeam.name.includes('Rayos')) {
-      loadedTeam.name = 'FC Bayern Munich';
-      loadedTeam.shortName = 'BAYERN';
+
+    let loadedTeam: TeamInfo = loadedAllTeams[0] || INITIAL_TEAM;
+    if (savedTeam) {
+      try {
+        const parsedTeam = JSON.parse(savedTeam) as TeamInfo;
+        if (parsedTeam && parsedTeam.name) {
+          loadedTeam = parsedTeam;
+          // Ensure this team is included in allTeams
+          const exists = loadedAllTeams.some((t) => t.id === loadedTeam.id);
+          if (!exists) {
+            loadedAllTeams = [loadedTeam, ...loadedAllTeams];
+          } else {
+            loadedAllTeams = loadedAllTeams.map((t) => (t.id === loadedTeam.id ? loadedTeam : t));
+          }
+        }
+      } catch {
+        loadedTeam = loadedAllTeams[0] || INITIAL_TEAM;
+      }
     }
 
     const loadedMatches = savedMatches ? (JSON.parse(savedMatches) as Match[]) : INITIAL_MATCHES;
@@ -138,6 +159,7 @@ export const loadInitialState = () => {
 
     return {
       team: loadedTeam,
+      allTeams: loadedAllTeams,
       players: normalizedPlayers,
       matches: normalizedMatches,
       standings: loadedStandings,
@@ -151,6 +173,7 @@ export const loadInitialState = () => {
     console.error('Failed to parse localStorage:', err);
     return {
       team: INITIAL_TEAM,
+      allTeams: INITIAL_TEAMS,
       players: INITIAL_PLAYERS,
       matches: INITIAL_MATCHES,
       standings: INITIAL_STANDINGS,
@@ -185,6 +208,7 @@ export const clearDeviceSession = () => {
 
 export const saveToStorage = (state: {
   team?: TeamInfo;
+  allTeams?: TeamInfo[];
   players?: Player[];
   matches?: Match[];
   posts?: Post[];
@@ -194,7 +218,28 @@ export const saveToStorage = (state: {
   language?: Language;
 }) => {
   try {
-    if (state.team) localStorage.setItem(STORAGE_KEYS.TEAM, JSON.stringify(state.team));
+    if (state.team) {
+      localStorage.setItem(STORAGE_KEYS.TEAM, JSON.stringify(state.team));
+    }
+    if (state.allTeams) {
+      localStorage.setItem(STORAGE_KEYS.ALL_TEAMS, JSON.stringify(state.allTeams));
+    } else if (state.team) {
+      // Sync into allTeams
+      try {
+        const stored = localStorage.getItem(STORAGE_KEYS.ALL_TEAMS);
+        let list: TeamInfo[] = stored ? JSON.parse(stored) : INITIAL_TEAMS;
+        if (!Array.isArray(list)) list = INITIAL_TEAMS;
+        const exists = list.some((t) => t.id === state.team!.id);
+        if (exists) {
+          list = list.map((t) => (t.id === state.team!.id ? state.team! : t));
+        } else {
+          list = [state.team!, ...list];
+        }
+        localStorage.setItem(STORAGE_KEYS.ALL_TEAMS, JSON.stringify(list));
+      } catch {
+        // ignore
+      }
+    }
     if (state.players) localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(state.players));
     if (state.matches) localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(state.matches));
     if (state.posts) localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(state.posts));

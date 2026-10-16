@@ -7,6 +7,7 @@ interface EmailInvitationModalProps {
   onClose: () => void;
   invitation: TeamInvitation | null;
   team: TeamInfo;
+  onAcceptInvitation?: (invitation: TeamInvitation) => void;
 }
 
 export const EmailInvitationModal: React.FC<EmailInvitationModalProps> = ({
@@ -14,6 +15,7 @@ export const EmailInvitationModal: React.FC<EmailInvitationModalProps> = ({
   onClose,
   invitation,
   team,
+  onAcceptInvitation,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -26,6 +28,12 @@ export const EmailInvitationModal: React.FC<EmailInvitationModalProps> = ({
     navigator.clipboard.writeText(`Asunto: ${invitationSubject}\n\n${invitationBody}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleAccept = () => {
+    if (onAcceptInvitation && invitation) {
+      onAcceptInvitation(invitation);
+    }
   };
 
   const mailtoLink = `mailto:${encodeURIComponent(invitation.email)}?subject=${encodeURIComponent(invitationSubject)}&body=${encodeURIComponent(invitationBody)}`;
@@ -101,7 +109,7 @@ export const EmailInvitationModal: React.FC<EmailInvitationModalProps> = ({
                 {team.leagueName} • Modalidad Fútbol 7 Oficial
               </p>
               <p className="text-[10px] text-[#65676B] mt-0.5">
-                Sede: {team.stadium}
+                Sede: {team.stadium} {team.location ? `(${team.location})` : ''}
               </p>
             </div>
           </div>
@@ -175,10 +183,10 @@ export const EmailInvitationModal: React.FC<EmailInvitationModalProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4] font-bold text-xs shadow-xs transition-all cursor-pointer"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copied ? '¡Copiado al portapapeles!' : 'Copiar Texto del Correo'}</span>
+            <span>{copied ? '¡Copiado!' : 'Copiar Correo'}</span>
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <a
               href={mailtoLink}
               target="_blank"
@@ -186,14 +194,24 @@ export const EmailInvitationModal: React.FC<EmailInvitationModalProps> = ({
               className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white hover:bg-[#E4E6EB] text-[#1877F2] border border-[#1877F2]/30 font-bold text-xs shadow-xs transition-all cursor-pointer"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span>Abrir en Cliente de Correo</span>
+              <span>Abrir Correo</span>
             </a>
+
+            {onAcceptInvitation && (
+              <button
+                onClick={handleAccept}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>Aceptar Invitación (Ver Bienvenida)</span>
+              </button>
+            )}
 
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
             >
-              Entendido
+              Cerrar
             </button>
           </div>
         </div>

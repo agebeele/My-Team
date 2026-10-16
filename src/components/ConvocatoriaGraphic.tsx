@@ -29,6 +29,7 @@ import {
   getPositionCategory,
   ALL_POSITIONS,
   DEFAULT_FACEBOOK_AVATAR,
+  ClubStory,
 } from '../types';
 import { getT } from '../utils/translations';
 import {
@@ -51,6 +52,8 @@ interface ConvocatoriaGraphicProps {
   currentUser: AppUser;
   language: Language;
   selectedMatchId?: string;
+  stories?: ClubStory[];
+  setStories?: React.Dispatch<React.SetStateAction<ClubStory[]>>;
 }
 
 export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
@@ -62,6 +65,8 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
   currentUser,
   language,
   selectedMatchId,
+  stories,
+  setStories,
 }) => {
   const t = getT(language);
   const isOwnerOrAdmin = currentUser.role === 'owner' || currentUser.role === 'admin';
@@ -567,8 +572,110 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
     }
   };
 
+  const [isSharingStory, setIsSharingStory] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleShareConvocatoriaToStories = async () => {
+    setIsSharingStory(true);
+    try {
+      // Re-generate canvas data URL for posting as story
+      const canvas = document.createElement('canvas');
+      const width = 1080;
+      const height = 1350;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const bgImg = await loadCanvasImageSafe(selectedBg);
+      if (bgImg) {
+        ctx.drawImage(bgImg, 0, 0, width, height);
+      } else {
+        ctx.fillStyle = '#0F172A';
+        ctx.fillRect(0, 0, width, height);
+      }
+      ctx.fillStyle = 'rgba(10, 15, 30, 0.78)';
+      ctx.fillRect(0, 0, width, height);
+
+      // Club & Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 48px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(team.name.toUpperCase(), width / 2, 130);
+
+      ctx.fillStyle = primaryColor || '#1877F2';
+      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText('CONVOCATORIA OFICIAL', width / 2, 175);
+
+      // Match info
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
+      ctx.fillText(
+        `${team.shortName} VS ${currentMatch ? currentMatch.rival.toUpperCase() : 'RIVAL'}`,
+        width / 2,
+        270
+      );
+
+      // Squad list preview
+      const calledUp = players.filter((p) => p.isCalledUp);
+      let y = 360;
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+      calledUp.slice(0, 12).forEach((p, idx) => {
+        const col = idx % 2 === 0 ? width / 4 : (width * 3) / 4;
+        ctx.fillText(`#${p.number} ${p.name} (${p.position})`, col, y);
+        if (idx % 2 !== 0) y += 45;
+      });
+
+      const dataUrl = canvas.toDataURL('image/png', 0.9);
+
+      if (setStories) {
+        const newStory: ClubStory = {
+          id: `story_${Date.now()}`,
+          authorId: currentUser.id,
+          authorName: currentUser.name,
+          authorUsername: currentUser.username || currentUser.name.split(' ')[0].toLowerCase(),
+          authorAvatar: currentUser.avatarUrl,
+          authorRole: currentUser.role,
+          type: 'lineup',
+          title: `📋 Convocatoria Oficial vs ${currentMatch?.rival || 'Rival'}`,
+          caption: `Convocatoria compartida por @${currentUser.username || currentUser.name.split(' ')[0]}`,
+          imageUrl: dataUrl,
+          createdAt: Date.now(),
+          likesCount: 0,
+          likedByUserIds: [],
+        };
+
+        setStories((prev) => [newStory, ...prev]);
+
+        if (typeof (window as any).AndroidNativeBridge?.shareStoryNative === 'function') {
+          (window as any).AndroidNativeBridge.shareStoryNative(
+            newStory.title,
+            newStory.caption || '',
+            dataUrl
+          );
+        }
+
+        setToastMessage(`¡Convocatoria publicada en tus Historias bajo @${currentUser.username || currentUser.name.split(' ')[0]}!`);
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Error sharing convocatoria to stories:', err);
+    } finally {
+      setIsSharingStory(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Toast Alert */}
+      {toastMessage && (
+        <div className="fixed top-20 right-4 z-50 bg-emerald-500 text-white px-4 py-3 rounded-xl shadow-2xl font-bold text-xs sm:text-sm flex items-center gap-2 border border-white/20 animate-fade-in">
+          <Check className="w-5 h-5 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Top Header Card */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-[#242526] p-5 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs transition-colors">
         <div>
@@ -604,6 +711,18 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
           >
             <Download className="w-4 h-4" />
             {isGenerating ? 'Generando...' : t.convocatoria.downloadGraphic}
+          </button>
+
+          {/* Share to Stories Button */}
+          <button
+            id="btn-share-convocatoria-stories"
+            onClick={handleShareConvocatoriaToStories}
+            disabled={isSharingStory}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+            title="Compartir póster de convocatoria a mis historias de la app"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>{isSharingStory ? 'Publicando...' : 'Compartir a mis Historias'}</span>
           </button>
 
           {/* Team Identity Button (Owner) */}

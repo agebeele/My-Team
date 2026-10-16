@@ -19,6 +19,10 @@ import {
   Trophy,
   Palette,
   CheckCheck,
+  MapPin,
+  Building2,
+  Search,
+  ExternalLink,
 } from 'lucide-react';
 import {
   AppUser,
@@ -30,12 +34,15 @@ import {
   ALL_POSITIONS,
   TeamInvitation,
 } from '../types';
+import { INITIAL_TEAMS } from '../data/initialData';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
 
 interface LoginScreenProps {
   team: TeamInfo;
   setTeam?: React.Dispatch<React.SetStateAction<TeamInfo>>;
+  allTeams?: TeamInfo[];
+  setAllTeams?: React.Dispatch<React.SetStateAction<TeamInfo[]>>;
   allUsers: AppUser[];
   setUsers?: React.Dispatch<React.SetStateAction<AppUser[]>>;
   players: Player[];
@@ -79,6 +86,8 @@ const PRESET_COLORS = [
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   team,
   setTeam,
+  allTeams,
+  setAllTeams,
   allUsers,
   setUsers,
   players,
@@ -89,14 +98,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   invitedTeam,
   invitedTeamName,
 }) => {
+  const teamList = allTeams && allTeams.length > 0 ? allTeams : INITIAL_TEAMS;
+
   // Determine if the user was invited to a specific team
   const hasInvite = Boolean(invitedTeam?.name || invitedTeamName);
   const invitedName = invitedTeam?.name || invitedTeamName || '';
   const invitedLogo = invitedTeam?.logoUrl;
 
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'create_team'>(
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'create_team' | 'teams_list'>(
     hasInvite ? 'register' : 'login'
   );
+
+  // Selected team state for registration (never hardcoded to Bayern!)
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
+    if (invitedTeam?.id) return invitedTeam.id;
+    if (invitedName) {
+      const match = teamList.find((t) => t.name.toLowerCase() === invitedName.toLowerCase());
+      if (match) return match.id;
+    }
+    return teamList[0]?.id || team.id || '';
+  });
+
+  const selectedTeam = teamList.find((t) => t.id === selectedTeamId) || teamList[0] || team;
 
   // Login form state (no placeholders, clean credentials)
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -124,6 +147,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [newTeamForm, setNewTeamForm] = useState({
     name: '',
     leagueName: 'Liga Premier Fútbol 7',
+    stadium: 'Cancha Sintética San Pedro',
+    location: 'Av. Vasconcelos #300, Col. Del Valle, San Pedro Garza García, N.L.',
     primaryColor: '#1877F2',
     secondaryColor: '#0866FF',
     logoUrl: PRESET_CRESTS[0].url,
@@ -141,9 +166,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const fileInputPlayerRef = useRef<HTMLInputElement>(null);
   const fileInputTeamRef = useRef<HTMLInputElement>(null);
 
+  // Teams directory filter state
+  const [teamsFilter, setTeamsFilter] = useState('');
+
+  const filteredTeams = teamList.filter((t) => {
+    if (!teamsFilter.trim()) return true;
+    const q = teamsFilter.toLowerCase();
+    return (
+      t.name.toLowerCase().includes(q) ||
+      t.leagueName.toLowerCase().includes(q) ||
+      t.stadium.toLowerCase().includes(q) ||
+      (t.location && t.location.toLowerCase().includes(q))
+    );
+  });
+
   // Dynamic team branding for header based on mode
-  let displayTeamName = team.name;
-  let displayTeamLogo: string | undefined = team.logoUrl;
+  let displayTeamName = selectedTeam?.name || team.name;
+  let displayTeamLogo: string | undefined = selectedTeam?.logoUrl || team.logoUrl;
 
   if (activeTab === 'create_team') {
     displayTeamName = newTeamForm.name.trim() || 'Nuevo Equipo Fut 7';
@@ -151,6 +190,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   } else if (hasInvite) {
     displayTeamName = invitedName;
     displayTeamLogo = invitedLogo || team.logoUrl;
+  } else if (activeTab === 'teams_list') {
+    displayTeamName = 'Equipos Registrados';
+    displayTeamLogo = undefined;
   }
 
   // Handle Login Submit
@@ -343,11 +385,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setUsers((prev) => [...prev, newUser]);
     }
 
+    // Determine the chosen team
+    const chosenTeam = teamList.find((t) => t.id === selectedTeamId) || teamList[0] || team;
+    if (setTeam) {
+      setTeam(chosenTeam);
+    }
+    try {
+      localStorage.setItem('teamgol_team_data', JSON.stringify(chosenTeam));
+    } catch {
+      // ignore
+    }
+
     const invitation: TeamInvitation = {
       id: `inv_${Date.now()}`,
       email,
       playerName: name,
-      teamName: displayTeamName,
+      teamId: chosenTeam.id,
+      teamName: chosenTeam.name,
+      teamLogo: chosenTeam.logoUrl,
+      stadium: chosenTeam.stadium,
       sentAt: new Date().toLocaleDateString('es-MX', {
         day: '2-digit',
         month: 'short',
@@ -356,14 +412,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         minute: '2-digit',
       }),
       role: 'player',
-      status: 'sent',
+      status: 'accepted',
     };
 
     if (onInvitationSent) {
       onInvitationSent(invitation);
     }
 
-    setLoginSuccess(`¡Cuenta creada con éxito! Se registró tu acceso a ${displayTeamName}.`);
+    setLoginSuccess(`¡Cuenta creada con éxito! Bienvenido a ${chosenTeam.name} (${chosenTeam.stadium}).`);
     setTimeout(() => {
       onLoginSuccess(newUser, rememberDevice);
     }, 600);
@@ -411,15 +467,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
     // 1. Create the new Team
     const newTeamId = `team_${Date.now()}`;
+    const cleanStadium = newTeamForm.stadium.trim() || 'Cancha Local San Pedro';
+    const cleanLocation = newTeamForm.location.trim() || 'Av. Vasconcelos #300, Col. Del Valle, San Pedro Garza García, N.L.';
+
     const createdTeam: TeamInfo = {
       id: newTeamId,
       name: teamName,
       shortName: teamName.length <= 4 ? teamName.toUpperCase() : teamName.substring(0, 3).toUpperCase(),
       logoUrl: newTeamForm.logoUrl || PRESET_CRESTS[0].url,
       bannerUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
-      leagueName: newTeamForm.leagueName.trim() || 'Liga de Fútbol 7',
+      leagueName: newTeamForm.leagueName.trim() || 'Liga Premier Fútbol 7',
       season: 'Temporada 2026',
-      stadium: 'Cancha Local',
+      stadium: cleanStadium,
+      location: cleanLocation,
       foundedYear: new Date().getFullYear().toString(),
       primaryColor: newTeamForm.primaryColor,
       secondaryColor: newTeamForm.secondaryColor,
@@ -467,10 +527,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       // ignore
     }
 
-    // Update global state
+    // Update global state and teams list
     if (setTeam) {
       setTeam(createdTeam);
     }
+    if (setAllTeams) {
+      setAllTeams((prev) => [...prev.filter((t) => t.id !== createdTeam.id), createdTeam]);
+    }
+    try {
+      const stored = localStorage.getItem('teamgol_all_teams_data');
+      let currentTeams: TeamInfo[] = stored ? JSON.parse(stored) : teamList;
+      const updated = [...currentTeams.filter((t) => t.id !== createdTeam.id), createdTeam];
+      localStorage.setItem('teamgol_all_teams_data', JSON.stringify(updated));
+      localStorage.setItem('teamgol_team_data', JSON.stringify(createdTeam));
+    } catch {
+      // ignore
+    }
+
     if (setUsers) {
       setUsers((prev) => [ownerUser, ...prev]);
     }
@@ -558,7 +631,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         {/* Main Card */}
         <div className="bg-white rounded-3xl border border-[#CED0D4] shadow-xl p-6 space-y-4">
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-3 bg-[#F0F2F5] p-1.5 rounded-2xl border border-[#E4E6EB] gap-1">
+          <div className="grid grid-cols-4 bg-[#F0F2F5] p-1.5 rounded-2xl border border-[#E4E6EB] gap-1">
             <button
               type="button"
               id="tab-login-mode"
@@ -568,14 +641,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 setRegisterError(null);
                 setTeamCreateError(null);
               }}
-              className={`py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
                 activeTab === 'login'
                   ? 'bg-white text-[#1877F2] shadow-xs'
                   : 'text-[#65676B] hover:text-[#050505]'
               }`}
             >
-              <Lock className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Iniciar Sesión</span>
+              <Lock className="w-3 h-3 shrink-0" />
+              <span className="truncate">Ingresar</span>
             </button>
 
             <button
@@ -587,14 +660,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 setRegisterError(null);
                 setTeamCreateError(null);
               }}
-              className={`py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
                 activeTab === 'register'
                   ? 'bg-[#1877F2] text-white shadow-xs'
                   : 'text-[#65676B] hover:text-[#050505]'
               }`}
             >
-              <UserPlus className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Crear Cuenta</span>
+              <UserPlus className="w-3 h-3 shrink-0" />
+              <span className="truncate">Registro</span>
             </button>
 
             <button
@@ -606,14 +679,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 setRegisterError(null);
                 setTeamCreateError(null);
               }}
-              className={`py-2 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
                 activeTab === 'create_team'
                   ? 'bg-amber-500 text-white shadow-xs'
                   : 'text-amber-800 hover:text-amber-900'
               }`}
             >
-              <Crown className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-              <span className="truncate font-black">Mi Equipo</span>
+              <Crown className="w-3 h-3 shrink-0 text-amber-500" />
+              <span className="truncate font-black">Mi Club</span>
+            </button>
+
+            <button
+              type="button"
+              id="tab-teams-list-mode"
+              onClick={() => {
+                setActiveTab('teams_list');
+                setLoginError(null);
+                setRegisterError(null);
+                setTeamCreateError(null);
+              }}
+              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+                activeTab === 'teams_list'
+                  ? 'bg-[#1877F2] text-white shadow-xs'
+                  : 'text-[#65676B] hover:text-[#050505]'
+              }`}
+            >
+              <MapPin className="w-3 h-3 shrink-0" />
+              <span className="truncate">Equipos ({teamList.length})</span>
             </button>
           </div>
 
@@ -872,6 +964,80 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
               </div>
 
+              {/* Seleccionar a qué equipo unirse */}
+              <div className="space-y-2 pt-2 border-t border-[#CED0D4]/70">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-[#050505] flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-[#1877F2]" />
+                    <span>Selecciona tu Equipo (¿Dónde juegas?) *</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('create_team')}
+                    className="text-[11px] font-bold text-amber-600 hover:text-amber-700 underline cursor-pointer"
+                  >
+                    + Crear mi propio equipo
+                  </button>
+                </div>
+                <p className="text-[10px] text-[#65676B]">
+                  Elige en la lista el equipo y la cancha donde juegas tus partidos de Fútbol 7:
+                </p>
+
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {teamList.map((t) => {
+                    const isSelected = selectedTeamId === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedTeamId(t.id)}
+                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between gap-3 ${
+                          isSelected
+                            ? 'bg-[#E7F3FF] border-[#1877F2] ring-2 ring-[#1877F2]/30 shadow-xs'
+                            : 'bg-white hover:bg-gray-50 border-[#CED0D4]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={t.logoUrl}
+                            alt={t.name}
+                            className="w-10 h-10 rounded-lg object-cover border border-[#CED0D4] bg-white shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <div className="font-bold text-[#050505] flex items-center gap-1.5 truncate">
+                              <span className="truncate">{t.name}</span>
+                              {isSelected && (
+                                <span className="text-[10px] bg-[#1877F2] text-white px-1.5 py-0.2 rounded font-black shrink-0">
+                                  Elegido
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-[#65676B] font-medium truncate flex items-center gap-1 mt-0.5">
+                              <MapPin className="w-3 h-3 text-[#1877F2] shrink-0" />
+                              <span className="truncate"><strong>{t.stadium}</strong> • {t.location || 'Sede Local'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                              isSelected
+                                ? 'border-[#1877F2] bg-[#1877F2] text-white'
+                                : 'border-[#CED0D4] bg-white'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Remember on this device checkbox */}
               <label className="flex items-center gap-2 cursor-pointer pt-1">
                 <input
@@ -890,7 +1056,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 id="btn-submit-register"
                 className="w-full py-3 px-4 rounded-2xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Registrarme y Unirme al Club</span>
+                <span>Registrarme y Unirme a {selectedTeam?.name || 'mi Club'}</span>
                 <CheckCircle2 className="w-4 h-4" />
               </button>
             </form>
@@ -903,7 +1069,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <Crown className="w-5 h-5 text-amber-600 shrink-0" />
                 <div className="text-xs text-amber-950">
                   <span className="font-black block">Crea tu Club como Director Técnico</span>
-                  Tendrás control total para configurar convocatorias, armar alineaciones tácticas e invitar a tus jugadores por enlace o WhatsApp.
+                  Tendrás control total para configurar convocatorias, armar alineaciones tácticas e invitar a tus jugadores por correo electrónico oficial con bienvenida en la app.
                 </div>
               </div>
 
@@ -1136,6 +1302,126 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
+          )}
+
+          {/* ================= TAB 4: LIST OF ALL CREATED TEAMS AND LOCATIONS ================= */}
+          {activeTab === 'teams_list' && (
+            <div className="space-y-4">
+              <div className="bg-[#E7F3FF] p-3 rounded-2xl border border-[#1877F2]/25 text-xs text-[#050505] space-y-1">
+                <div className="font-bold text-[#1877F2] flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 shrink-0 text-[#1877F2]" />
+                  <span>Todos los Equipos Registrados y Dónde Juegan</span>
+                </div>
+                <p className="text-[11px] text-[#65676B]">
+                  Explora los {teamList.length} equipos dados de alta en el sistema, consulta sus sedes y canchas de juego, o únete al tuyo.
+                </p>
+              </div>
+
+              {/* Search filter for teams */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Buscar por equipo, cancha o ciudad..."
+                  value={teamsFilter}
+                  onChange={(e) => setTeamsFilter(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-medium text-[#050505] focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
+                />
+                <Search className="w-3.5 h-3.5 text-[#65676B] absolute left-3 top-2.5" />
+              </div>
+
+              {/* List of cards */}
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {filteredTeams.map((t) => {
+                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${t.stadium} ${t.location || ''}`)}`;
+                  return (
+                    <div
+                      key={t.id}
+                      className="p-3.5 rounded-2xl bg-white border border-[#CED0D4] shadow-xs hover:border-[#1877F2]/60 hover:shadow-md transition-all space-y-2.5"
+                    >
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={t.logoUrl}
+                          alt={t.name}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = 'none';
+                          }}
+                          className="w-12 h-12 rounded-xl object-cover border border-[#CED0D4] shadow-xs bg-white shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <h4 className="text-sm font-black text-[#050505] truncate uppercase tracking-tight">
+                              {t.name}
+                            </h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#1877F2] border border-[#1877F2]/20 shrink-0">
+                              {t.shortName}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#65676B] font-medium">
+                            {t.leagueName}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Location & Stadium Information */}
+                      <div className="bg-[#F0F2F5] p-2.5 rounded-xl border border-[#CED0D4]/70 text-xs space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-[#050505]">
+                          <Shield className="w-3.5 h-3.5 text-[#1877F2] shrink-0" />
+                          <span>Cancha / Estadio: {t.stadium}</span>
+                        </div>
+                        <div className="flex items-start gap-1.5 text-[11px] text-[#65676B]">
+                          <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                          <span className="leading-snug">{t.location || 'Sede deportiva oficial de la liga'}</span>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-gray-100 text-[#65676B] hover:text-[#050505] border border-[#CED0D4] text-[11px] font-semibold transition-all cursor-pointer"
+                        >
+                          <ExternalLink className="w-3 h-3 text-[#1877F2]" />
+                          <span>Ver en Maps</span>
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTeamId(t.id);
+                            setActiveTab('register');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs transition-all cursor-pointer ml-auto"
+                        >
+                          <span>Unirme a este Equipo</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bottom CTA to create a new team */}
+              <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl text-center space-y-1.5">
+                <div className="text-xs font-black text-amber-950 flex items-center justify-center gap-1.5">
+                  <Crown className="w-4 h-4 text-amber-600" />
+                  <span>¿No encuentras tu equipo o quieres registrar uno nuevo?</span>
+                </div>
+                <p className="text-[11px] text-amber-800">
+                  Registra tu propio club con su escudo, nombre y ubicación donde juegan.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('create_team')}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                >
+                  Crear mi Equipo Ahora
+                </button>
+              </div>
+            </div>
           )}
         </div>
 

@@ -26,6 +26,8 @@ import {
   Sparkles,
   Trophy,
   Image as ImageIcon,
+  Mail,
+  Send,
 } from 'lucide-react';
 import {
   TeamInfo,
@@ -39,10 +41,13 @@ import {
   DEFAULT_FACEBOOK_AVATAR,
   ALL_POSITIONS,
   getPositionBadgeClass,
+  TeamInvitation,
 } from '../types';
 import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { TableAiScannerModal } from './TableAiScannerModal';
+import { EmailInvitationModal } from './EmailInvitationModal';
+import { WelcomeModal } from './WelcomeModal';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface OwnerAdminPanelProps {
@@ -280,12 +285,87 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
   const [editFormError, setEditFormError] = useState<string | null>(null);
 
-  // Invite link state
+  // Email Invitation state
+  const [inviteEmailInput, setInviteEmailInput] = useState('');
+  const [invitePlayerNameInput, setInvitePlayerNameInput] = useState('');
+  const [activeEmailInvitation, setActiveEmailInvitation] = useState<TeamInvitation | null>(null);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
+    try {
+      const stored = localStorage.getItem('teamgol_sent_invitations');
+      if (stored) return JSON.parse(stored);
+    } catch {
+      // ignore
+    }
+    return [
+      {
+        id: 'inv_init_1',
+        email: 'luis.garcia@futbol7.mx',
+        playerName: 'Luis García',
+        teamId: team.id,
+        teamName: team.name,
+        teamLogo: team.logoUrl,
+        stadium: team.stadium,
+        sentAt: 'Ayer',
+        role: 'player',
+        status: 'sent',
+      },
+    ];
+  });
 
-  const inviteUrl = `${window.location.origin}${window.location.pathname}?joinTeam=${encodeURIComponent(
-    team.id || 'team-1'
-  )}&teamName=${encodeURIComponent(team.name)}&teamLogo=${encodeURIComponent(team.logoUrl || '')}`;
+  const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
+  const [acceptedInvitationForWelcome, setAcceptedInvitationForWelcome] = useState<TeamInvitation | null>(null);
+
+  const handleAcceptInvitation = (invitation: TeamInvitation) => {
+    const updated = sentInvitations.map((inv) =>
+      inv.id === invitation.id ? { ...inv, status: 'accepted' as const } : inv
+    );
+    setSentInvitations(updated);
+    try {
+      localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+
+    // Ensure player is in the squad
+    const exists = players.some((p) => p.name.toLowerCase() === invitation.playerName.toLowerCase());
+    if (!exists) {
+      const newPlayer: Player = {
+        id: `p_inv_${Date.now()}`,
+        name: invitation.playerName,
+        nickname: invitation.playerName.split(' ')[0],
+        number: Math.floor(Math.random() * 80) + 11,
+        position: 'MED',
+        avatarUrl: DEFAULT_FACEBOOK_AVATAR,
+        goals: 0,
+        assists: 0,
+        matches: 0,
+        yellowCards: 0,
+        redCards: 0,
+        isCalledUp: true,
+        isStarter: false,
+        mvpHistory: [],
+      };
+      setPlayers((prev) => [...prev, newPlayer]);
+    }
+
+    setIsEmailModalOpen(false);
+    setAcceptedInvitationForWelcome({ ...invitation, status: 'accepted' });
+    setWelcomeModalOpen(true);
+  };
+
+  const getInviteUrlForEmail = (email?: string, name?: string) => {
+    const params = new URLSearchParams();
+    params.set('joinTeam', team.id || 'team-1');
+    params.set('teamName', team.name);
+    if (team.logoUrl) params.set('teamLogo', team.logoUrl);
+    if (email) params.set('inviteEmail', email);
+    if (name) params.set('inviteName', name);
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  };
+
+  const inviteUrl = getInviteUrlForEmail();
 
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteUrl).then(() => {
@@ -294,9 +374,49 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     });
   };
 
-  const handleShareWhatsApp = () => {
-    const text = `⚽ ¡Hola! Te invito a unirte a nuestro equipo *${team.name}* en TeamGol. Regístrate en este enlace para formar parte de la plantilla oficial y ver convocatorias, alineaciones tácticas y partidos:\n\n${inviteUrl}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  const handleSendEmailInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = inviteEmailInput.trim();
+    if (!email || !email.includes('@')) {
+      setNotificationStatus('Ingresa un correo electrónico válido para enviar la invitación.');
+      setTimeout(() => setNotificationStatus(null), 4000);
+      return;
+    }
+
+    const playerName = invitePlayerNameInput.trim() || email.split('@')[0];
+    const newInvitation: TeamInvitation = {
+      id: `inv_${Date.now()}`,
+      email,
+      playerName,
+      teamId: team.id,
+      teamName: team.name,
+      teamLogo: team.logoUrl,
+      stadium: team.stadium,
+      sentAt: new Date().toLocaleDateString('es-MX', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      role: 'player',
+      status: 'sent',
+    };
+
+    const updated = [newInvitation, ...sentInvitations];
+    setSentInvitations(updated);
+    try {
+      localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+
+    setActiveEmailInvitation(newInvitation);
+    setIsEmailModalOpen(true);
+    setInviteEmailInput('');
+    setInvitePlayerNameInput('');
+    setNotificationStatus(`Invitación oficial por correo generada para ${email}`);
+    setTimeout(() => setNotificationStatus(null), 5000);
   };
 
   const handleUpdateTeam = (e: React.FormEvent) => {
@@ -581,52 +701,137 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
         </div>
       )}
 
-      {/* SECTION 1: TEAM INVITATION LINK FOR NEW PLAYERS */}
+      {/* SECTION 1: INVITATION BY EMAIL FOR NEW PLAYERS (NO WHATSAPP) */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#CED0D4]">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-[#E7F3FF] text-[#1877F2]">
-              <Share2 className="w-5 h-5" />
+              <Mail className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-black text-[#050505]">
-                Enlace de Invitación al Equipo
+                Invitación Oficial de Jugadores por Correo Electrónico
               </h3>
               <p className="text-xs text-[#65676B]">
-                Envía este enlace a nuevos jugadores para que se unan a <span className="font-bold text-[#1877F2]">{team.name}</span> y tengan acceso a todo el contenido del club
+                Envía una invitación formal al correo de los futbolistas para que se incorporen a <span className="font-bold text-[#1877F2]">{team.name}</span> y reciban la bienvenida oficial en la app
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopyInviteLink}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-            >
-              {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedInvite ? '¡Copiado!' : 'Copiar Enlace'}</span>
-            </button>
-            <button
-              onClick={handleShareWhatsApp}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>WhatsApp</span>
-            </button>
-          </div>
+          <button
+            onClick={handleCopyInviteLink}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
+          >
+            {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            <span>{copiedInvite ? '¡Enlace Copiado!' : 'Copiar Enlace Directo'}</span>
+          </button>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="font-mono text-xs text-[#050505] truncate font-medium">
-            {inviteUrl}
+        {/* Email Invite Form */}
+        <form onSubmit={handleSendEmailInvite} className="bg-[#F0F2F5] p-4 rounded-xl border border-[#CED0D4] space-y-3">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[#050505] flex items-center gap-1.5">
+            <Send className="w-3.5 h-3.5 text-[#1877F2]" />
+            Generar y Enviar Invitación Oficial
+          </h4>
+
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div className="sm:col-span-5">
+              <label className="block text-[11px] font-bold text-[#65676B] mb-1">
+                Correo Electrónico del Jugador *
+              </label>
+              <input
+                type="email"
+                required
+                value={inviteEmailInput}
+                onChange={(e) => setInviteEmailInput(e.target.value)}
+                placeholder="jugador@ejemplo.com"
+                className="w-full px-3 py-2 bg-white border border-[#CED0D4] rounded-xl text-xs font-medium text-[#050505] focus:outline-none focus:border-[#1877F2]"
+              />
+            </div>
+
+            <div className="sm:col-span-4">
+              <label className="block text-[11px] font-bold text-[#65676B] mb-1">
+                Nombre del Jugador (Opcional)
+              </label>
+              <input
+                type="text"
+                value={invitePlayerNameInput}
+                onChange={(e) => setInvitePlayerNameInput(e.target.value)}
+                placeholder="ej. Mateo Sandoval"
+                className="w-full px-3 py-2 bg-white border border-[#CED0D4] rounded-xl text-xs font-medium text-[#050505] focus:outline-none focus:border-[#1877F2]"
+              />
+            </div>
+
+            <div className="sm:col-span-3 flex items-end">
+              <button
+                type="submit"
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              >
+                <Mail className="w-4 h-4" />
+                <span>Enviar por Correo</span>
+              </button>
+            </div>
           </div>
-          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full shrink-0 self-start sm:self-auto">
-            Activo y Listo para Compartir
+        </form>
+
+        {/* Current Active Invite Link Box */}
+        <div className="p-3 rounded-xl bg-white border border-[#CED0D4] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[11px] font-bold text-[#65676B] shrink-0">Enlace base:</span>
+            <span className="font-mono text-xs text-[#050505] truncate">{inviteUrl}</span>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0 self-start sm:self-auto">
+            Email Ready
           </span>
         </div>
 
+        {/* Sent invitations list */}
+        {sentInvitations.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <h5 className="text-[11px] font-bold uppercase tracking-wider text-[#65676B]">
+              Historial de Invitaciones Enviadas por Correo ({sentInvitations.length})
+            </h5>
+            <div className="border border-[#CED0D4] rounded-xl overflow-hidden divide-y divide-[#CED0D4]">
+              {sentInvitations.slice(0, 5).map((inv) => (
+                <div key={inv.id} className="p-2.5 bg-white flex items-center justify-between gap-3 text-xs">
+                  <div className="min-w-0">
+                    <span className="font-bold text-[#050505] block truncate">{inv.playerName} ({inv.email})</span>
+                    <span className="text-[10px] text-[#65676B]">{inv.sentAt} • Equipo: {inv.teamName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] border ${
+                      inv.status === 'accepted'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-blue-50 text-[#1877F2] border-blue-200'
+                    }`}>
+                      {inv.status === 'accepted' ? 'Aceptada en la App' : 'Enviada por Correo'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setActiveEmailInvitation(inv);
+                        setIsEmailModalOpen(true);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] font-semibold text-[11px] cursor-pointer"
+                    >
+                      Ver Correo
+                    </button>
+                    <button
+                      onClick={() => handleAcceptInvitation(inv)}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer flex items-center gap-1 shadow-xs"
+                      title="Simular aceptación del jugador y ver pantalla de bienvenida"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-300" />
+                      <span>Aceptar y Ver Bienvenida</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <p className="text-[11px] text-[#65676B] leading-relaxed">
-          💡 <span className="font-bold">¿Cómo funciona?</span> Cuando un jugador nuevo ingrese a través de este enlace, la app detectará la invitación de <span className="font-bold">{team.name}</span> y le permitirá registrar su perfil o iniciar sesión, integrándose inmediatamente a la plantilla con acceso completo a convocatorias, alineaciones tácticas y calendario.
+          💡 <span className="font-bold">¿Cómo funciona?</span> Al enviar la invitación por correo, el futbolista recibe los datos oficiales de <span className="font-bold">{team.name}</span> y el estadio donde juegan (<span className="font-semibold">{team.stadium}</span>). Al hacer clic en el enlace del correo y aceptar en la app, se le desplegará una pantalla de bienvenida especial y se integrará de inmediato al plantel.
         </p>
       </div>
 
@@ -1847,6 +2052,23 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
           }}
         />
       )}
+
+      {/* Official Email Invitation Modal Preview */}
+      <EmailInvitationModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        invitation={activeEmailInvitation}
+        team={team}
+        onAcceptInvitation={handleAcceptInvitation}
+      />
+
+      {/* Welcome Celebration Modal when invitation is accepted */}
+      <WelcomeModal
+        isOpen={welcomeModalOpen}
+        onClose={() => setWelcomeModalOpen(false)}
+        team={team}
+        invitation={acceptedInvitationForWelcome}
+      />
     </div>
   );
 };

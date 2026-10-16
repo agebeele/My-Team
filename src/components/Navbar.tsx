@@ -15,6 +15,7 @@ import {
   Activity,
   Moon,
   Sun,
+  Download,
 } from 'lucide-react';
 import { AppUser, Language, TeamInfo, UserRole } from '../types';
 import { getT } from '../utils/translations';
@@ -38,6 +39,10 @@ interface NavbarProps {
   onOpenNotifications?: () => void;
   onOpenAuthModal?: () => void;
   onOpenAuth?: () => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
+  onOpenAndroidUsb?: () => void;
+  onOpenInstallModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -58,6 +63,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotifications = () => {},
   onOpenAuthModal,
   onOpenAuth,
+  theme = 'light',
+  onToggleTheme,
+  onOpenAndroidUsb,
+  onOpenInstallModal,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const t = getT(language);
@@ -244,6 +253,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Activity className="w-3.5 h-3.5 text-[#1877F2]" />
               <span>{t.nav.iot || 'Brazalete IoT'}</span>
             </button>
+            <button
+              id="nav-btn-android-usb"
+              onClick={() => handleTabChange('android_usb')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                selectedTab === 'android_usb'
+                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                  : 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Android USB</span>
+            </button>
             {currentUser.role === 'owner' && (
               <button
                 id="nav-btn-admin"
@@ -261,6 +282,50 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Bar - Facebook Circular Action Buttons */}
           <div className="flex items-center gap-2">
+
+            {/* Quick Install on Android Button */}
+            {onOpenInstallModal && (
+              <button
+                id="btn-navbar-install-app"
+                onClick={onOpenInstallModal}
+                className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-[#1877F2] hover:bg-[#0866FF] text-white transition-all flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-black shadow-md hover:shadow-lg cursor-pointer"
+                title="Instalar en tu teléfono Android (1 Clic, QR o APK)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline sm:inline">Instalar App</span>
+                <span className="inline xs:hidden sm:hidden">Instalar</span>
+              </button>
+            )}
+
+            {/* Android USB Debugging / Native App Hub Button */}
+            {onOpenAndroidUsb && (
+              <button
+                id="btn-android-usb-modal"
+                onClick={onOpenAndroidUsb}
+                className="h-8 sm:h-9 px-2 sm:px-3 rounded-full bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/70 text-emerald-800 dark:text-emerald-300 border border-emerald-400 dark:border-emerald-500/50 transition-colors flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-black shadow-xs cursor-pointer"
+                title="Depuración USB & App Móvil Nativa (Android Kotlin)"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 animate-pulse" />
+                <span className="hidden xs:inline sm:inline">Android USB</span>
+                <span className="inline xs:hidden sm:hidden">USB</span>
+              </button>
+            )}
+
+            {/* Global Dark / Light Theme Toggle Switch */}
+            {onToggleTheme && (
+              <button
+                id="btn-theme-toggle"
+                onClick={onToggleTheme}
+                className="w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-amber-400 transition-colors flex items-center justify-center shadow-xs cursor-pointer"
+                title={theme === 'dark' ? 'Cambiar a Tema Claro' : 'Cambiar a Tema Oscuro'}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400 fill-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-[#050505]" />
+                )}
+              </button>
+            )}
 
             {/* Language Switcher */}
             <button

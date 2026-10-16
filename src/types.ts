@@ -127,6 +127,7 @@ export interface TeamInfo {
   leagueName: string;
   season?: string;
   stadium: string;
+  location?: string;
   foundedYear: string;
   primaryColor: string;
   secondaryColor: string;
@@ -190,6 +191,7 @@ export interface Match {
   mvpVotes?: Record<string, number>;
   createdAtTimestamp: number;
   matchStartTimestamp: number;
+  finishedAtTimestamp?: number;
 }
 
 export interface StandingsRow {
@@ -228,6 +230,8 @@ export interface Post {
   title: string;
   content: string;
   imageUrl?: string;
+  mediaType?: 'image' | 'video';
+  status?: 'approved' | 'pending' | 'rejected';
   createdAt: string;
   reactions: {
     likes: number;
@@ -258,7 +262,10 @@ export interface TeamInvitation {
   id: string;
   email: string;
   playerName: string;
+  teamId?: string;
   teamName: string;
+  teamLogo?: string;
+  stadium?: string;
   sentAt: string;
   role: UserRole;
   status: 'sent' | 'accepted';

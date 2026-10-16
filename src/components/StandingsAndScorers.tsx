@@ -14,12 +14,14 @@ import {
   Save,
   RotateCcw,
   Plus,
-  Trash2,
   FileText,
+  Camera,
+  Share2,
+  Trash2,
 } from 'lucide-react';
-import { StandingsRow, Player, TeamInfo, AppUser, Language } from '../types';
+import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory } from '../types';
 import { getT } from '../utils/translations';
-import { downloadElementAsImage } from '../utils/imageDownloader';
+import { downloadElementAsImage, captureElementAsDataUrl } from '../utils/imageDownloader';
 import { TableAiScannerModal } from './TableAiScannerModal';
 import { getCrestForTeam } from '../utils/tableAiScanner';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
@@ -33,6 +35,8 @@ interface StandingsAndScorersProps {
   currentUser: AppUser;
   language: Language;
   onViewPlayerProfile: (playerId: string) => void;
+  stories?: ClubStory[];
+  setStories?: React.Dispatch<React.SetStateAction<ClubStory[]>>;
 }
 
 export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
@@ -44,6 +48,8 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   currentUser,
   language,
   onViewPlayerProfile,
+  stories,
+  setStories,
 }) => {
   const t = getT(language);
   const [activeTab, setActiveTab] = useState<'scorers' | 'standings'>('scorers');
@@ -173,6 +179,62 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
     }
   };
 
+  const [isSharingStory, setIsSharingStory] = useState(false);
+
+  const handleShareToStories = async () => {
+    const targetElement = activeTab === 'scorers' ? scorersSectionRef.current : standingsSectionRef.current;
+    if (!targetElement) return;
+
+    setIsSharingStory(true);
+    try {
+      const dataUrl = await captureElementAsDataUrl(targetElement, {
+        backgroundColor: '#0A0A0B',
+        scale: 2.2,
+      });
+
+      if (dataUrl && setStories) {
+        const isScorers = activeTab === 'scorers';
+        const storyTitle = isScorers
+          ? `⚽ Tabla de Goleo Oficial (${team.leagueName})`
+          : `📊 Clasificación General (${team.leagueName})`;
+
+        const newStory: ClubStory = {
+          id: `story_${Date.now()}`,
+          authorId: currentUser.id,
+          authorName: currentUser.name,
+          authorUsername: currentUser.username || currentUser.name.split(' ')[0].toLowerCase(),
+          authorAvatar: currentUser.avatarUrl,
+          authorRole: currentUser.role,
+          type: isScorers ? 'scorers' : 'standings',
+          title: storyTitle,
+          caption: isScorers
+            ? `Tabla de goleo compartida por @${currentUser.username || currentUser.name.split(' ')[0]}`
+            : `Tabla general compartida por @${currentUser.username || currentUser.name.split(' ')[0]}`,
+          imageUrl: dataUrl,
+          createdAt: Date.now(),
+          likesCount: 0,
+          likedByUserIds: [],
+        };
+
+        setStories((prev) => [newStory, ...prev]);
+
+        // Native Android Bridge support
+        if (typeof (window as any).AndroidNativeBridge?.shareStoryNative === 'function') {
+          (window as any).AndroidNativeBridge.shareStoryNative(storyTitle, newStory.caption || '', dataUrl);
+        }
+
+        setToastMessage(
+          `¡${isScorers ? 'Tabla de goleo' : 'Tabla general'} publicada en tus Historias bajo @${currentUser.username || currentUser.name.split(' ')[0]}!`
+        );
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+    } catch (err) {
+      console.error('Error sharing story:', err);
+    } finally {
+      setIsSharingStory(false);
+    }
+  };
+
   // Sort players by goals descending, then assists
   const sortedScorers = [...players]
     .sort((a, b) => b.goals - a.goals || b.assists - a.assists)
@@ -180,7 +242,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Toast Notification when image is saved to gallery */}
+      {/* Toast Notification when image is saved to gallery or shared */}
       {toastMessage && (
         <div className="fixed top-20 right-4 z-50 bg-emerald-500 text-black px-4 py-3 rounded-xl shadow-2xl font-bold text-xs sm:text-sm flex items-center gap-2 border border-white animate-fade-in">
           <CheckCircle2 className="w-5 h-5 shrink-0" />
@@ -201,6 +263,17 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Share to Stories button */}
+          <button
+            onClick={handleShareToStories}
+            disabled={isSharingStory}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+            title={`Compartir ${activeTab === 'scorers' ? 'tabla de goleo' : 'tabla general'} directamente a tus historias`}
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>{isSharingStory ? 'Publicando...' : 'Compartir a mis Historias'}</span>
+          </button>
+
           {/* Download button for current active tab */}
           <button
             onClick={activeTab === 'scorers' ? handleDownloadScorers : handleDownloadStandings}

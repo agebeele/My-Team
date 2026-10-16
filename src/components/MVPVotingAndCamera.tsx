@@ -60,6 +60,7 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
 
   // Camera & Automatic Photo state
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
@@ -80,12 +81,26 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const countdownIntervalRef = useRef<any>(null);
 
-  // Elapsed minutes since kickoff
-  const now = Date.now();
-  const elapsedMinutes = activeMatch
-    ? Math.floor((now - activeMatch.matchStartTimestamp) / (1000 * 60))
-    : 0;
-  const is50MinElapsed = elapsedMinutes >= 50 || activeMatch?.status === 'finished';
+  // Real-time ticking for post-match 5 minute cooldown
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 5 Minutes After Match Finished Rule
+  const isMatchFinished = activeMatch?.status === 'finished';
+  const finishedAt =
+    activeMatch?.finishedAtTimestamp ||
+    (isMatchFinished && activeMatch?.matchStartTimestamp
+      ? activeMatch.matchStartTimestamp + 50 * 60 * 1000
+      : 0);
+  const msSinceFinish = isMatchFinished ? Math.max(0, currentTime - finishedAt) : 0;
+  const fiveMinCooldownMs = 5 * 60 * 1000;
+  const is5MinElapsed = isMatchFinished && msSinceFinish >= fiveMinCooldownMs;
+  const secondsRemaining = Math.max(0, Math.ceil((fiveMinCooldownMs - msSinceFinish) / 1000));
+  const minsRemaining = Math.floor(secondsRemaining / 60);
+  const secsRemaining = secondsRemaining % 60;
 
   // Stop camera when unmounting
   useEffect(() => {
@@ -106,15 +121,30 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
     }
   }, [activeMatchId]);
 
-  const handleSimulate50Min = () => {
+  const handleFinishMatch = () => {
     if (!activeMatch) return;
     setMatches((prev) =>
       prev.map((m) =>
         m.id === activeMatch.id
           ? {
               ...m,
-              matchStartTimestamp: Date.now() - 55 * 60 * 1000,
-              status: m.status === 'scheduled' ? 'live' : m.status,
+              status: 'finished' as const,
+              finishedAtTimestamp: Date.now(),
+            }
+          : m
+      )
+    );
+  };
+
+  const handleQuickUnlock5Min = () => {
+    if (!activeMatch) return;
+    setMatches((prev) =>
+      prev.map((m) =>
+        m.id === activeMatch.id
+          ? {
+              ...m,
+              status: 'finished' as const,
+              finishedAtTimestamp: Date.now() - 5.5 * 60 * 1000,
             }
           : m
       )
@@ -160,8 +190,9 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
 
   const leader = getLeaderCandidate();
 
-  // Start Camera Feed
-  const startCamera = async () => {
+  // Start Camera Feed with specified facing mode
+  const startCamera = async (facingOverride?: 'user' | 'environment') => {
+    const targetFacing = facingOverride || cameraFacing;
     setCameraError(null);
     setCapturedPhotoUrl(null);
     setIsSavedSuccessfully(false);
@@ -170,7 +201,7 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'user',
+          facingMode: targetFacing,
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
@@ -187,10 +218,19 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
     } catch (err: any) {
       console.warn('Camera access issue:', err);
       setCameraError(
-        'No se pudo acceder a la cámara automáticamente. Puedes usar el botón de subir foto o permitir permisos.'
+        'No se pudo acceder a la cámara en vivo. Puedes voltear la cámara, subir una foto o conceder permisos en el navegador.'
       );
       setIsCameraActive(false);
     }
+  };
+
+  const handleFlipCamera = () => {
+    const nextFacing: 'user' | 'environment' = cameraFacing === 'user' ? 'environment' : 'user';
+    setCameraFacing(nextFacing);
+    stopCamera();
+    setTimeout(() => {
+      startCamera(nextFacing);
+    }, 150);
   };
 
   const stopCamera = () => {
@@ -238,8 +278,16 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Draw camera image
-    ctx.drawImage(video, 0, 0, width, height);
+    // Draw camera image (mirror if front camera, normal if back/environment)
+    if (cameraFacing === 'user') {
+      ctx.save();
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, width, height);
+      ctx.restore();
+    } else {
+      ctx.drawImage(video, 0, 0, width, height);
+    }
 
     // Overlay stylish soccer card frame
     ctx.strokeStyle = '#F59E0B';
@@ -416,24 +464,35 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
             ))}
           </select>
 
-          {/* Simulate 50min elapsed helper */}
-          {!is50MinElapsed && (
+          {/* Match Status Helpers */}
+          {!isMatchFinished && (
             <button
-              onClick={handleSimulate50Min}
+              onClick={handleFinishMatch}
+              className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Marcar partido como terminado para iniciar los 5 minutos de enfriamiento reglamentario"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Finalizar Partido
+            </button>
+          )}
+
+          {isMatchFinished && !is5MinElapsed && (
+            <button
+              onClick={handleQuickUnlock5Min}
               className="px-3 py-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-              title="Simular que transcurrieron 50m para probar la votación"
+              title="Adelantar los 5 minutos post-partido (para pruebas)"
             >
               <Clock className="w-3.5 h-3.5" />
-              Simular 50 min
+              Habilitar Ahora (Saltar 5m)
             </button>
           )}
         </div>
       </div>
 
-      {/* 50-Minute Rule Status Banner */}
+      {/* 5-Minutes After Match Finished Rule Status Banner */}
       <div
         className={`p-4 rounded-2xl border transition-all shadow-xs ${
-          is50MinElapsed
+          is5MinElapsed
             ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30 text-amber-900 dark:text-amber-300'
             : 'bg-white dark:bg-[#242526] border-[#CED0D4] dark:border-white/10 text-[#65676B] dark:text-gray-400'
         }`}
@@ -442,17 +501,32 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
           <div className="flex items-center gap-3">
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                is50MinElapsed ? 'bg-amber-400 text-black shadow-xs' : 'bg-[#F0F2F5] dark:bg-white/5 text-[#65676B] dark:text-gray-400 border border-[#CED0D4] dark:border-white/10'
+                is5MinElapsed
+                  ? 'bg-amber-400 text-black shadow-xs'
+                  : 'bg-[#F0F2F5] dark:bg-white/5 text-[#65676B] dark:text-gray-400 border border-[#CED0D4] dark:border-white/10'
               }`}
             >
               <Clock className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-[#050505] dark:text-white">
-                {t.mvp.rule50Min}: {is50MinElapsed ? '¡Habilitada!' : 'En Espera'}
+              <h4 className="text-sm font-bold text-[#050505] dark:text-white flex items-center gap-2">
+                <span>Regla MVP Post-Partido:</span>
+                {is5MinElapsed ? (
+                  <span className="text-emerald-600 font-extrabold">¡Habilitada! (5 min cumplidos)</span>
+                ) : !isMatchFinished ? (
+                  <span className="text-rose-600 font-extrabold">Partido en Juego / No Terminado</span>
+                ) : (
+                  <span className="text-amber-600 font-extrabold">
+                    En Espera ({minsRemaining}:{secsRemaining < 10 ? '0' : ''}{secsRemaining})
+                  </span>
+                )}
               </h4>
-              <p className="text-xs text-[#65676B] dark:text-gray-400 max-w-xl font-medium">
-                {t.mvp.rule50Desc} (Minutos transcurridos: {elapsedMinutes} min)
+              <p className="text-xs text-[#65676B] dark:text-gray-400 max-w-xl font-medium mt-0.5">
+                {!isMatchFinished
+                  ? 'La votación de MVP se habilitará automáticamente 5 minutos después del silbatazo final para evaluar el rendimiento completo del partido.'
+                  : !is5MinElapsed
+                  ? `El partido ha finalizado. La votación se abrirá en ${minsRemaining} min ${secsRemaining} seg (5 minutos de enfriamiento reglamentario).`
+                  : '¡El partido ha terminado y han transcurrido los 5 minutos reglamentarios! Los jugadores y aficionados ya pueden votar por el MVP y tomar la foto oficial.'}
               </p>
             </div>
           </div>
@@ -460,12 +534,16 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
           <div className="flex items-center gap-2">
             <span
               className={`px-3 py-1 rounded-full text-xs font-bold ${
-                is50MinElapsed
+                is5MinElapsed
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30'
                   : 'bg-[#F0F2F5] text-[#65676B] dark:bg-white/5 dark:text-gray-400 border border-[#CED0D4] dark:border-white/10'
               }`}
             >
-              {is50MinElapsed ? '✓ Votación Disponible' : `Bloqueada (${50 - elapsedMinutes}m restantes)`}
+              {is5MinElapsed
+                ? '✓ Votación y Cámara Abiertas'
+                : !isMatchFinished
+                ? 'Bloqueada (Esperando fin de juego)'
+                : `Habilita en ${minsRemaining}:${secsRemaining < 10 ? '0' : ''}${secsRemaining}`}
             </span>
           </div>
         </div>
@@ -666,11 +744,24 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
                       autoPlay
                       playsInline
                       muted
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${cameraFacing === 'user' ? '-scale-x-100' : ''}`}
                     />
 
                     {/* Golden Overlay Frame */}
                     <div className="absolute inset-0 border-4 border-amber-500/50 pointer-events-none" />
+
+                    {/* Top Right Flip Camera Button */}
+                    <div className="absolute top-3 right-3 z-20">
+                      <button
+                        type="button"
+                        onClick={handleFlipCamera}
+                        className="px-3 py-1.5 rounded-xl bg-black/80 hover:bg-black text-amber-400 font-bold text-xs border border-amber-400/50 shadow-xl flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all active:scale-95"
+                        title="Voltear entre cámara frontal y trasera"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Voltear ({cameraFacing === 'user' ? 'Frontal' : 'Trasera'})</span>
+                      </button>
+                    </div>
 
                     {/* Countdown overlay */}
                     {countdown !== null && (
@@ -685,17 +776,26 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
                     )}
 
                     {/* Bottom manual snap control */}
-                    <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
+                    <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-2.5 z-20">
+                      <button
+                        type="button"
+                        onClick={handleFlipCamera}
+                        className="px-3 py-2 rounded-lg bg-black/80 hover:bg-black text-amber-400 font-bold text-xs border border-amber-400/40 shadow-lg flex items-center gap-1.5 cursor-pointer"
+                        title="Cambiar de cámara"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Voltear Cámara</span>
+                      </button>
                       <button
                         onClick={takeSnapshot}
-                        className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs shadow-lg flex items-center gap-1.5"
+                        className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs shadow-lg flex items-center gap-1.5 cursor-pointer"
                       >
                         <Camera className="w-4 h-4" />
                         {t.mvp.snapPhoto}
                       </button>
                       <button
                         onClick={stopCamera}
-                        className="px-3 py-2 rounded-lg bg-black/80 hover:bg-black text-white font-semibold text-xs border border-white/10"
+                        className="px-3 py-2 rounded-lg bg-black/80 hover:bg-black text-white font-semibold text-xs border border-white/10 cursor-pointer"
                       >
                         Cancelar
                       </button>

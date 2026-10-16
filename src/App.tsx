@@ -32,6 +32,9 @@ import { IoTTelemetryHub } from './components/IoTTelemetryHub';
 import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
 import { AppSplashAnimation } from './components/AppSplashAnimation';
+import { WelcomeModal } from './components/WelcomeModal';
+import { INITIAL_TEAMS } from './data/initialData';
+import { TeamInvitation } from './types';
 
 export default function App() {
   // Persistence state
@@ -44,6 +47,9 @@ export default function App() {
   const [posts, setPosts] = useState<Post[]>(initial.posts || INITIAL_POSTS);
   const [standings, setStandings] = useState<StandingsRow[]>(initial.standings || INITIAL_STANDINGS);
   const [users, setUsers] = useState<AppUser[]>(initial.users || INITIAL_USERS);
+  const [allTeams, setAllTeams] = useState<TeamInfo[]>(initial.allTeams || INITIAL_TEAMS);
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
+  const [welcomeInvitation, setWelcomeInvitation] = useState<TeamInvitation | null>(null);
 
   // App Navigation & Language state
   const [activeTab, setActiveTab] = useState<string>('calendar');
@@ -169,6 +175,8 @@ export default function App() {
         <LoginScreen
           team={team}
           setTeam={setTeam}
+          allTeams={allTeams}
+          setAllTeams={setAllTeams}
           allUsers={users}
           setUsers={setUsers}
           players={players}
@@ -184,7 +192,21 @@ export default function App() {
           }}
           onTeamCreated={(newTeam) => {
             setTeam(newTeam);
+            setAllTeams((prev) => [newTeam, ...prev.filter((t) => t.id !== newTeam.id)]);
+            try {
+              localStorage.setItem('teamgol_team_data', JSON.stringify(newTeam));
+              const stored = localStorage.getItem('teamgol_all_teams_data');
+              const cur: TeamInfo[] = stored ? JSON.parse(stored) : allTeams;
+              const upd = [newTeam, ...cur.filter((t) => t.id !== newTeam.id)];
+              localStorage.setItem('teamgol_all_teams_data', JSON.stringify(upd));
+            } catch {
+              // ignore
+            }
             setActiveTab('owner_admin');
+          }}
+          onInvitationSent={(invitation) => {
+            setWelcomeInvitation(invitation);
+            setIsWelcomeModalOpen(true);
           }}
         />
       </>
@@ -423,6 +445,15 @@ export default function App() {
           setJoinSuccessAlert(`¡Bienvenido al equipo, ${playerName}! Ya formas parte de ${team.name} y puedes ver todas las convocatorias y alineaciones.`);
           setTimeout(() => setJoinSuccessAlert(null), 7000);
         }}
+      />
+
+      {/* Official Welcome Celebration Modal when invitation is accepted */}
+      <WelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onClose={() => setIsWelcomeModalOpen(false)}
+        team={team}
+        invitation={welcomeInvitation}
+        onNavigate={(tab) => setActiveTab(tab)}
       />
     </div>
   );

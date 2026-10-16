@@ -93,3 +93,33 @@ export async function downloadElementAsImage(
   }
 }
 
+/**
+ * Captures an HTML DOM element and returns a base64 Data URL or Blob URL
+ * without triggering an automatic file download. Perfect for stories.
+ */
+export async function captureElementAsDataUrl(
+  element: HTMLElement,
+  options: { backgroundColor?: string; scale?: number } = {}
+): Promise<string | null> {
+  const { backgroundColor = '#0A0A0B', scale = 2 } = options;
+  try {
+    const canvas = await html2canvas(element, {
+      backgroundColor,
+      scale,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight,
+      imageTimeout: 8000,
+    });
+    return canvas.toDataURL('image/jpeg', 0.92);
+  } catch (error) {
+    console.error('Error capturing element as data URL:', error);
+    return null;
+  }
+}
+
+
