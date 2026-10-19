@@ -19,7 +19,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
-import { Post, AppUser, Language } from '../types';
+import { Post, AppUser, Language, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
 
 interface SocialWallProps {
@@ -27,6 +27,7 @@ interface SocialWallProps {
   setPosts: React.Dispatch<React.SetStateAction<Post[]>>;
   currentUser: AppUser;
   language: Language;
+  team?: TeamInfo;
 }
 
 export const SocialWall: React.FC<SocialWallProps> = ({
@@ -34,6 +35,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   setPosts,
   currentUser,
   language,
+  team,
 }) => {
   const t = getT(language);
 
@@ -59,9 +61,34 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     post_01: true,
   });
 
-  const pendingPosts = posts.filter((p) => p.status === 'pending');
-  const approvedPosts = posts.filter((p) => p.status === 'approved' || !p.status);
-  const myPendingPosts = posts.filter(
+  // Filter posts so that:
+  // 1. Official league posts (isLeagueOfficial || category === 'Liga') from this league appear for all teams in the league.
+  // 2. Team-specific posts (teamId === team.id) appear for this team.
+  // 3. Posts belonging to other teams (e.g. Bayern Munich) do NOT appear on another team's wall.
+  const currentTeamId = team?.id || 'team_01';
+  const currentLeague = (team?.leagueName || 'Liga Premier Fútbol 7').trim().toLowerCase();
+
+  const relevantPosts = posts.filter((p) => {
+    const isOfficialLeaguePost = p.isLeagueOfficial || p.category === 'Liga';
+    if (isOfficialLeaguePost) {
+      if (!p.leagueName) return true;
+      return p.leagueName.trim().toLowerCase() === currentLeague;
+    }
+
+    if (p.teamId && p.teamId !== currentTeamId) {
+      return false;
+    }
+
+    if (p.teamId === currentTeamId) {
+      return true;
+    }
+
+    return currentTeamId === 'team_01';
+  });
+
+  const pendingPosts = relevantPosts.filter((p) => p.status === 'pending');
+  const approvedPosts = relevantPosts.filter((p) => p.status === 'approved' || !p.status);
+  const myPendingPosts = relevantPosts.filter(
     (p) => p.authorId === currentUser.id && p.status === 'pending'
   );
 
@@ -102,9 +129,13 @@ export const SocialWall: React.FC<SocialWallProps> = ({
 
     const isOwner = currentUser.role === 'owner';
     const postStatus: Post['status'] = isOwner ? 'approved' : 'pending';
+    const isLeagueOfficialPost = newCategory === 'Liga';
 
     const post: Post = {
       id: `post_${Date.now()}`,
+      teamId: isLeagueOfficialPost ? undefined : (team?.id || 'team_01'),
+      leagueName: team?.leagueName || 'Liga Premier Fútbol 7',
+      isLeagueOfficial: isLeagueOfficialPost,
       authorId: currentUser.id,
       authorName: currentUser.name,
       authorAvatar: currentUser.avatarUrl,

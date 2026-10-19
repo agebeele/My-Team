@@ -263,16 +263,6 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Share to Stories button */}
-          <button
-            onClick={handleShareToStories}
-            disabled={isSharingStory}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-            title={`Compartir ${activeTab === 'scorers' ? 'tabla de goleo' : 'tabla general'} directamente a tus historias`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>{isSharingStory ? 'Publicando...' : 'Compartir a mis Historias'}</span>
-          </button>
 
           {/* Download button for current active tab */}
           <button

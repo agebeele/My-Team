@@ -116,6 +116,8 @@ export interface Player {
   isCalledUp?: boolean;
   isStarter?: boolean;
   mvpHistory: MVPRecord[];
+  linkedUserId?: string;
+  invitationStatus?: 'pending' | 'confirmed' | 'declined';
 }
 
 export interface TeamInfo {
@@ -222,6 +224,9 @@ export interface PostComment {
 
 export interface Post {
   id: string;
+  teamId?: string; // ID of the team this post belongs to
+  leagueName?: string; // League this post is associated with
+  isLeagueOfficial?: boolean; // If true, official post from La Liga visible to all teams in league
   authorId: string;
   authorName: string;
   authorAvatar: string;
@@ -250,12 +255,56 @@ export interface AppUser {
   role: UserRole;
   avatarUrl: string;
   playerId?: string;
+  teamId?: string; // Affiliated team ID
   provider: 'google' | 'apple' | 'email' | 'guest';
   username?: string;
   password?: string;
   phone?: string;
   adminTitle?: string;
   bio?: string;
+  position?: PlayerPosition;
+  jerseyNumber?: number;
+}
+
+export type StoryType = 'custom' | 'match' | 'mvp' | 'standings' | 'scorers' | 'convocatoria' | 'lineup' | 'player_card';
+export type StoryTheme = 'neon' | 'dark' | 'gold' | 'minimal' | 'fire' | 'facebook';
+
+export interface ClubStory {
+  id: string;
+  type: StoryType;
+  title: string;
+  caption?: string;
+  imageUrl?: string;
+  mediaUrl?: string;
+  authorId: string;
+  authorName: string;
+  authorRole?: UserRole;
+  authorAvatar?: string;
+  authorUsername?: string;
+  createdAt: string | number;
+  theme?: StoryTheme;
+  likesCount?: number;
+  likedByUserIds?: string[];
+  teamId?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  recipientUserId: string;
+  title: string;
+  message: string;
+  type: 'invitation' | 'match' | 'announcement' | 'alert' | 'mvp';
+  read: boolean;
+  createdAt: string;
+  status?: 'pending' | 'accepted' | 'declined';
+  invitationData?: {
+    dorsal?: number;
+    position?: PlayerPosition;
+    nickname?: string;
+    playerId?: string;
+    teamId?: string;
+    teamName?: string;
+  };
 }
 
 export interface TeamInvitation {

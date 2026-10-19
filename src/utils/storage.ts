@@ -17,27 +17,197 @@ import {
   INITIAL_USERS,
   DEFAULT_LINEUP,
 } from '../data/initialData';
+import { DEFAULT_GREY_SHIELD_SVG } from './ocrTableParser';
 
 const STORAGE_KEYS = {
   TEAM: 'teamgol_team_data',
   ALL_TEAMS: 'teamgol_all_teams_data',
   PLAYERS: 'teamgol_players_data',
+  PLAYERS_BY_TEAM: 'teamgol_players_by_team',
   MATCHES: 'teamgol_matches_data',
+  MATCHES_BY_TEAM: 'teamgol_matches_by_team',
   STANDINGS: 'teamgol_standings_data',
+  STANDINGS_BY_LEAGUE: 'teamgol_standings_by_league',
   POSTS: 'teamgol_posts_data',
   USERS: 'teamgol_users_data',
   CURRENT_USER: 'teamgol_current_user',
   LANGUAGE: 'teamgol_language',
   DEVICE_SESSION_SAVED: 'teamgol_device_session_saved',
+  SENT_INVITATIONS: 'teamgol_sent_invitations',
+};
+
+// Retrieve players for a specific team
+export const getPlayersForTeam = (teamId: string): Player[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PLAYERS_BY_TEAM);
+    if (raw) {
+      const map = JSON.parse(raw);
+      if (map && map[teamId] && Array.isArray(map[teamId])) {
+        return map[teamId];
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Only team_01 (Bayern Munich default) starts with INITIAL_PLAYERS
+  if (teamId === 'team_01') {
+    const starterIds = new Set(DEFAULT_LINEUP.map((p) => p.playerId));
+    return INITIAL_PLAYERS.map((p) => ({
+      ...p,
+      isStarter: starterIds.has(p.id),
+    }));
+  }
+
+  // Any newly created or separate team starts with an EMPTY squad (0 players)
+  return [];
+};
+
+// Save squad for a specific team
+export const savePlayersForTeam = (teamId: string, players: Player[]) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PLAYERS_BY_TEAM);
+    const map = raw ? JSON.parse(raw) : {};
+    map[teamId] = players;
+    localStorage.setItem(STORAGE_KEYS.PLAYERS_BY_TEAM, JSON.stringify(map));
+    localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
+  } catch (err) {
+    console.warn('Error saving players for team', err);
+  }
+};
+
+// Retrieve matches for a specific team
+export const getMatchesForTeam = (teamId: string): Match[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.MATCHES_BY_TEAM);
+    if (raw) {
+      const map = JSON.parse(raw);
+      if (map && map[teamId] && Array.isArray(map[teamId])) {
+        return map[teamId];
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Only team_01 starts with initial matches
+  if (teamId === 'team_01') {
+    return INITIAL_MATCHES;
+  }
+
+  // Brand new teams start with an empty match schedule
+  return [];
+};
+
+// Save matches for a specific team
+export const saveMatchesForTeam = (teamId: string, matches: Match[]) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.MATCHES_BY_TEAM);
+    const map = raw ? JSON.parse(raw) : {};
+    map[teamId] = matches;
+    localStorage.setItem(STORAGE_KEYS.MATCHES_BY_TEAM, JSON.stringify(map));
+    localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(matches));
+  } catch (err) {
+    console.warn('Error saving matches for team', err);
+  }
+};
+
+// Retrieve standings for a specific league name
+export const getStandingsForLeague = (leagueName: string, activeTeam?: TeamInfo): StandingsRow[] => {
+  const normKey = (leagueName || 'Liga Premier Fútbol 7').trim().toLowerCase();
+  let baseRows: StandingsRow[] | null = null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STANDINGS_BY_LEAGUE);
+    if (raw) {
+      const map = JSON.parse(raw);
+      if (map && map[normKey] && Array.isArray(map[normKey]) && map[normKey].length > 0) {
+        baseRows = map[normKey];
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // If no stored standings exist for this league yet:
+  if (!baseRows || baseRows.length === 0) {
+    if (normKey === 'liga premier fútbol 7') {
+      baseRows = INITIAL_STANDINGS;
+    } else {
+      // For a new or different league, start with a clean table for this league
+      const initialRow: StandingsRow = {
+        id: `st_${activeTeam?.id || Date.now()}_1`,
+        rank: 1,
+        name: activeTeam?.name || 'Mi Equipo',
+        logo: activeTeam?.logoUrl || DEFAULT_GREY_SHIELD_SVG,
+        pj: 0,
+        g: 0,
+        e: 0,
+        p: 0,
+        gf: 0,
+        gc: 0,
+        dg: 0,
+        pts: 0,
+        isOurTeam: true,
+      };
+      return [initialRow];
+    }
+  }
+
+  // Ensure activeTeam is represented in the table and marked as our team
+  let rows = baseRows.map((row: StandingsRow) => ({
+    ...row,
+    isOurTeam: activeTeam
+      ? row.name.trim().toLowerCase() === activeTeam.name.trim().toLowerCase() ||
+        row.name.trim().toLowerCase() === activeTeam.shortName.trim().toLowerCase()
+      : row.name.toUpperCase().includes('BAYERN'),
+  }));
+
+  if (activeTeam) {
+    const teamInTable = rows.some(
+      (r) =>
+        r.name.trim().toLowerCase() === activeTeam.name.trim().toLowerCase() ||
+        r.name.trim().toLowerCase() === activeTeam.shortName.trim().toLowerCase()
+    );
+    if (!teamInTable) {
+      rows.push({
+        id: `st_${activeTeam.id || Date.now()}`,
+        rank: rows.length + 1,
+        name: activeTeam.name,
+        logo: activeTeam.logoUrl || DEFAULT_GREY_SHIELD_SVG,
+        pj: 0,
+        g: 0,
+        e: 0,
+        p: 0,
+        gf: 0,
+        gc: 0,
+        dg: 0,
+        pts: 0,
+        isOurTeam: true,
+      });
+    }
+  }
+
+  return rows;
+};
+
+// Save standings for a specific league
+export const saveStandingsForLeague = (leagueName: string, standings: StandingsRow[]) => {
+  const normKey = (leagueName || 'Liga Premier Fútbol 7').trim().toLowerCase();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.STANDINGS_BY_LEAGUE);
+    const map = raw ? JSON.parse(raw) : {};
+    map[normKey] = standings;
+    localStorage.setItem(STORAGE_KEYS.STANDINGS_BY_LEAGUE, JSON.stringify(map));
+    localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(standings));
+  } catch (err) {
+    console.warn('Error saving standings for league', err);
+  }
 };
 
 export const loadInitialState = () => {
   try {
     const savedAllTeams = localStorage.getItem(STORAGE_KEYS.ALL_TEAMS);
     const savedTeam = localStorage.getItem(STORAGE_KEYS.TEAM);
-    const savedPlayers = localStorage.getItem(STORAGE_KEYS.PLAYERS);
-    const savedMatches = localStorage.getItem(STORAGE_KEYS.MATCHES);
-    const savedStandings = localStorage.getItem(STORAGE_KEYS.STANDINGS);
     const savedPosts = localStorage.getItem(STORAGE_KEYS.POSTS);
     const savedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
     const savedCurrentUser = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -74,7 +244,9 @@ export const loadInitialState = () => {
       }
     }
 
-    const loadedMatches = savedMatches ? (JSON.parse(savedMatches) as Match[]) : INITIAL_MATCHES;
+    // Load team-specific players and matches
+    const normalizedPlayers = getPlayersForTeam(loadedTeam.id);
+    const loadedMatches = getMatchesForTeam(loadedTeam.id);
     const normalizedMatches = loadedMatches.map((m) => {
       let lineup = m.lineup;
       if (!lineup || lineup.length !== 7) {
@@ -87,13 +259,8 @@ export const loadInitialState = () => {
       };
     });
 
-    const loadedPlayers = savedPlayers ? (JSON.parse(savedPlayers) as Player[]) : INITIAL_PLAYERS;
-    // Ensure only the 7 starting players in DEFAULT_LINEUP have isStarter = true
-    const starterIds = new Set(DEFAULT_LINEUP.map((p) => p.playerId));
-    const normalizedPlayers = loadedPlayers.map((p) => ({
-      ...p,
-      isStarter: starterIds.has(p.id),
-    }));
+    // Load league-specific standings
+    const loadedStandings = getStandingsForLeague(loadedTeam.leagueName, loadedTeam);
 
     const loadedUsersRaw = savedUsers ? (JSON.parse(savedUsers) as AppUser[]) : INITIAL_USERS;
     // Normalize users to guarantee requested admin account
@@ -111,6 +278,7 @@ export const loadInitialState = () => {
                 username: 'admin',
                 password: 'root',
                 role: 'owner' as const,
+                teamId: u.teamId || 'team_01',
               }
             : u
         )
@@ -138,23 +306,17 @@ export const loadInitialState = () => {
       }
     }
 
-    let loadedStandings = INITIAL_STANDINGS;
-    if (savedStandings) {
+    // Posts with backward compatibility
+    let loadedPosts: Post[] = INITIAL_POSTS;
+    if (savedPosts) {
       try {
-        const parsed = JSON.parse(savedStandings) as StandingsRow[];
-        const isOldData =
-          parsed.length < 25 ||
-          parsed.some((r) => r.name.toLowerCase().includes('frontera') || r.name.toLowerCase().includes('fenix'));
-        if (!isOldData && parsed.length >= 28) {
-          loadedStandings = parsed;
-        } else {
-          localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(INITIAL_STANDINGS));
+        const parsed = JSON.parse(savedPosts) as Post[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          loadedPosts = parsed;
         }
       } catch {
-        loadedStandings = INITIAL_STANDINGS;
+        loadedPosts = INITIAL_POSTS;
       }
-    } else {
-      localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(INITIAL_STANDINGS));
     }
 
     return {
@@ -163,7 +325,7 @@ export const loadInitialState = () => {
       players: normalizedPlayers,
       matches: normalizedMatches,
       standings: loadedStandings,
-      posts: savedPosts ? (JSON.parse(savedPosts) as Post[]) : INITIAL_POSTS,
+      posts: loadedPosts,
       users: normalizedUsers,
       currentUser: initialCurrentUser,
       isDeviceAuthenticated: !!initialCurrentUser,
@@ -220,30 +382,20 @@ export const saveToStorage = (state: {
   try {
     if (state.team) {
       localStorage.setItem(STORAGE_KEYS.TEAM, JSON.stringify(state.team));
+      if (state.players) {
+        savePlayersForTeam(state.team.id, state.players);
+      }
+      if (state.matches) {
+        saveMatchesForTeam(state.team.id, state.matches);
+      }
+      if (state.standings) {
+        saveStandingsForLeague(state.team.leagueName, state.standings);
+      }
     }
     if (state.allTeams) {
       localStorage.setItem(STORAGE_KEYS.ALL_TEAMS, JSON.stringify(state.allTeams));
-    } else if (state.team) {
-      // Sync into allTeams
-      try {
-        const stored = localStorage.getItem(STORAGE_KEYS.ALL_TEAMS);
-        let list: TeamInfo[] = stored ? JSON.parse(stored) : INITIAL_TEAMS;
-        if (!Array.isArray(list)) list = INITIAL_TEAMS;
-        const exists = list.some((t) => t.id === state.team!.id);
-        if (exists) {
-          list = list.map((t) => (t.id === state.team!.id ? state.team! : t));
-        } else {
-          list = [state.team!, ...list];
-        }
-        localStorage.setItem(STORAGE_KEYS.ALL_TEAMS, JSON.stringify(list));
-      } catch {
-        // ignore
-      }
     }
-    if (state.players) localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(state.players));
-    if (state.matches) localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(state.matches));
     if (state.posts) localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(state.posts));
-    if (state.standings) localStorage.setItem(STORAGE_KEYS.STANDINGS, JSON.stringify(state.standings));
     if (state.users) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
     if (state.currentUser !== undefined) {
       if (state.currentUser) {

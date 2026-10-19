@@ -779,15 +779,6 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
 
           {/* ACTION BUTTONS */}
           <div className="space-y-2 pt-3 border-t border-[#CED0D4] dark:border-white/10">
-            {/* Direct Native Share Button */}
-            <button
-              onClick={handleShareToStories}
-              disabled={isExporting}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white font-black text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>{isExporting ? 'Generando Foto...' : 'Compartir a Mis Historias'}</span>
-            </button>
 
             {/* Download HD Button */}
             <div className="grid grid-cols-2 gap-2">

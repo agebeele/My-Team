@@ -314,17 +314,6 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
           <div />
         )}
 
-        <div className="flex items-center gap-2">
-          {onOpenStoryShare && (
-            <button
-              onClick={() => onOpenStoryShare('player_card')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white text-xs font-black shadow-md transition-all cursor-pointer transform hover:scale-[1.02]"
-              title="Compartir tu ficha oficial de jugador en tus historias de Instagram, WhatsApp o TikTok"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>Subir a Historias (9:16)</span>
-            </button>
-          )}
 
           {/* Digital Credential Trigger Button */}
           <button

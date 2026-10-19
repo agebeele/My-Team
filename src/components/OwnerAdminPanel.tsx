@@ -47,7 +47,6 @@ import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { TableAiScannerModal } from './TableAiScannerModal';
 import { EmailInvitationModal } from './EmailInvitationModal';
-import { WelcomeModal } from './WelcomeModal';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface OwnerAdminPanelProps {
@@ -313,47 +312,6 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
       },
     ];
   });
-
-  const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
-  const [acceptedInvitationForWelcome, setAcceptedInvitationForWelcome] = useState<TeamInvitation | null>(null);
-
-  const handleAcceptInvitation = (invitation: TeamInvitation) => {
-    const updated = sentInvitations.map((inv) =>
-      inv.id === invitation.id ? { ...inv, status: 'accepted' as const } : inv
-    );
-    setSentInvitations(updated);
-    try {
-      localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
-
-    // Ensure player is in the squad
-    const exists = players.some((p) => p.name.toLowerCase() === invitation.playerName.toLowerCase());
-    if (!exists) {
-      const newPlayer: Player = {
-        id: `p_inv_${Date.now()}`,
-        name: invitation.playerName,
-        nickname: invitation.playerName.split(' ')[0],
-        number: Math.floor(Math.random() * 80) + 11,
-        position: 'MED',
-        avatarUrl: DEFAULT_FACEBOOK_AVATAR,
-        goals: 0,
-        assists: 0,
-        matches: 0,
-        yellowCards: 0,
-        redCards: 0,
-        isCalledUp: true,
-        isStarter: false,
-        mvpHistory: [],
-      };
-      setPlayers((prev) => [...prev, newPlayer]);
-    }
-
-    setIsEmailModalOpen(false);
-    setAcceptedInvitationForWelcome({ ...invitation, status: 'accepted' });
-    setWelcomeModalOpen(true);
-  };
 
   const getInviteUrlForEmail = (email?: string, name?: string) => {
     const params = new URLSearchParams();
@@ -804,7 +762,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         : 'bg-blue-50 text-[#1877F2] border-blue-200'
                     }`}>
-                      {inv.status === 'accepted' ? 'Aceptada en la App' : 'Enviada por Correo'}
+                      {inv.status === 'accepted' ? '✅ Aceptada por el Jugador' : '✉️ Invitación Enviada (Pendiente)'}
                     </span>
                     <button
                       onClick={() => {
@@ -816,12 +774,17 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                       Ver Correo
                     </button>
                     <button
-                      onClick={() => handleAcceptInvitation(inv)}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer flex items-center gap-1 shadow-xs"
-                      title="Simular aceptación del jugador y ver pantalla de bienvenida"
+                      onClick={() => {
+                        const directUrl = getInviteUrlForEmail(inv.email, inv.playerName);
+                        navigator.clipboard.writeText(directUrl);
+                        setNotificationStatus(`Enlace de invitación copiado para ${inv.email}`);
+                        setTimeout(() => setNotificationStatus(null), 3500);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 text-[#1877F2] border border-[#1877F2]/30 font-semibold text-[11px] cursor-pointer flex items-center gap-1 shadow-2xs"
+                      title="Copiar enlace directo de registro para este jugador"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-300" />
-                      <span>Aceptar y Ver Bienvenida</span>
+                      <Copy className="w-3 h-3" />
+                      <span>Copiar Enlace</span>
                     </button>
                   </div>
                 </div>
@@ -2059,15 +2022,6 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
         onClose={() => setIsEmailModalOpen(false)}
         invitation={activeEmailInvitation}
         team={team}
-        onAcceptInvitation={handleAcceptInvitation}
-      />
-
-      {/* Welcome Celebration Modal when invitation is accepted */}
-      <WelcomeModal
-        isOpen={welcomeModalOpen}
-        onClose={() => setWelcomeModalOpen(false)}
-        team={team}
-        invitation={acceptedInvitationForWelcome}
       />
     </div>
   );

@@ -15,8 +15,20 @@ import {
   INITIAL_POSTS,
   INITIAL_STANDINGS,
   INITIAL_USERS,
+  INITIAL_TEAMS,
 } from './data/initialData';
-import { loadInitialData, saveToStorage, saveDeviceSession, clearDeviceSession } from './utils/storage';
+import {
+  loadInitialData,
+  saveToStorage,
+  saveDeviceSession,
+  clearDeviceSession,
+  getPlayersForTeam,
+  getMatchesForTeam,
+  getStandingsForLeague,
+  savePlayersForTeam,
+  saveMatchesForTeam,
+  saveStandingsForLeague,
+} from './utils/storage';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { MatchCalendar } from './components/MatchCalendar';
@@ -28,12 +40,10 @@ import { SocialWall } from './components/SocialWall';
 import { PlayerProfileView } from './components/PlayerProfileView';
 import { OwnerAdminPanel } from './components/OwnerAdminPanel';
 import { LiveMatchMode } from './components/LiveMatchMode';
-import { IoTTelemetryHub } from './components/IoTTelemetryHub';
 import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
 import { AppSplashAnimation } from './components/AppSplashAnimation';
 import { WelcomeModal } from './components/WelcomeModal';
-import { INITIAL_TEAMS } from './data/initialData';
 import { TeamInvitation } from './types';
 
 export default function App() {
@@ -86,7 +96,7 @@ export default function App() {
   });
   const [joinSuccessAlert, setJoinSuccessAlert] = useState<string | null>(null);
 
-  // Ensure clean light theme by removing any stored dark mode class
+  // Clean light theme
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('app_theme');
@@ -126,17 +136,48 @@ export default function App() {
     }
   }, [team.name, team.id, team.logoUrl]);
 
+  // Handler to switch active team cleanly with distinct data segregation
+  const handleSwitchTeam = (newTeam: TeamInfo) => {
+    if (!newTeam) return;
+
+    // 1. Save data for current team before leaving
+    if (team?.id) {
+      savePlayersForTeam(team.id, players);
+      saveMatchesForTeam(team.id, matches);
+      saveStandingsForLeague(team.leagueName, standings);
+    }
+
+    // 2. Load target team's data
+    const targetPlayers = getPlayersForTeam(newTeam.id);
+    const targetMatches = getMatchesForTeam(newTeam.id);
+    const targetStandings = getStandingsForLeague(newTeam.leagueName, newTeam);
+
+    setTeam(newTeam);
+    setPlayers(targetPlayers);
+    setMatches(targetMatches);
+    setStandings(targetStandings);
+
+    try {
+      localStorage.setItem('teamgol_team_data', JSON.stringify(newTeam));
+    } catch {
+      // ignore
+    }
+  };
+
   // Auto-save changes to storage
   useEffect(() => {
     saveToStorage({
       team,
+      allTeams,
       players,
       matches,
       posts,
       standings,
       users,
+      currentUser,
+      language,
     });
-  }, [team, players, matches, posts, standings, users]);
+  }, [team, allTeams, players, matches, posts, standings, users, currentUser, language]);
 
   // Update selected player when switching user if user has linked playerId
   useEffect(() => {
@@ -181,6 +222,8 @@ export default function App() {
           setUsers={setUsers}
           players={players}
           setPlayers={setPlayers}
+          setMatches={setMatches}
+          setStandings={setStandings}
           language={language}
           invitedTeam={invitedTeam}
           invitedTeamName={invitedTeamName}
@@ -193,15 +236,6 @@ export default function App() {
           onTeamCreated={(newTeam) => {
             setTeam(newTeam);
             setAllTeams((prev) => [newTeam, ...prev.filter((t) => t.id !== newTeam.id)]);
-            try {
-              localStorage.setItem('teamgol_team_data', JSON.stringify(newTeam));
-              const stored = localStorage.getItem('teamgol_all_teams_data');
-              const cur: TeamInfo[] = stored ? JSON.parse(stored) : allTeams;
-              const upd = [newTeam, ...cur.filter((t) => t.id !== newTeam.id)];
-              localStorage.setItem('teamgol_all_teams_data', JSON.stringify(upd));
-            } catch {
-              // ignore
-            }
             setActiveTab('owner_admin');
           }}
           onInvitationSent={(invitation) => {
@@ -224,6 +258,8 @@ export default function App() {
       {/* Top Main Navigation Bar */}
       <Navbar
         team={team}
+        allTeams={allTeams}
+        onSwitchTeam={handleSwitchTeam}
         currentUser={currentUser}
         setCurrentUser={(u) => {
           setCurrentUser(u);
@@ -263,39 +299,29 @@ export default function App() {
             matches={matches}
             setMatches={setMatches}
             team={team}
-            players={players}
             currentUser={currentUser}
             language={language}
             onOpenMvp={handleOpenMvpForMatch}
             onStartLiveMatch={handleStartLiveMatch}
-            onNavigateToConvocatoria={(matchId) => {
-              setSelectedMatchId(matchId);
-              setActiveTab('convocatoria');
-            }}
-            onNavigateToLineup={(matchId) => {
-              setSelectedMatchId(matchId);
-              setActiveTab('lineup');
-            }}
           />
         )}
 
-        {/* TAB 1.5: Live Match Mode (Modo Partido) */}
-        {(activeTab === 'live_match' || activeTab === 'match_mode') && (
+        {/* TAB 1.5: Live Match Mode */}
+        {activeTab === 'live_match' && (
           <LiveMatchMode
-            team={team}
             matches={matches}
             setMatches={setMatches}
             players={players}
             setPlayers={setPlayers}
+            team={team}
             currentUser={currentUser}
             language={language}
             selectedMatchId={selectedMatchId}
-            onOpenMvp={handleOpenMvpForMatch}
-            onNavigateToLineup={(matchId) => {
+            onExitLiveMatch={() => setActiveTab('calendar')}
+            onOpenMvpVoting={(matchId) => {
               setSelectedMatchId(matchId);
-              setActiveTab('lineup');
+              setActiveTab('mvp');
             }}
-            onBackToCalendar={() => setActiveTab('calendar')}
           />
         )}
 
@@ -361,6 +387,7 @@ export default function App() {
           <SocialWall
             posts={posts}
             setPosts={setPosts}
+            team={team}
             currentUser={currentUser}
             language={language}
           />
@@ -397,19 +424,9 @@ export default function App() {
             language={language}
           />
         )}
-
-        {/* TAB 9: Brazalete Deportivo Inteligente (ESP32 IoT Hub) */}
-        {activeTab === 'iot' && (
-          <IoTTelemetryHub
-            team={team}
-            players={players}
-            currentUser={currentUser}
-            onViewPlayerProfile={handleViewPlayerProfile}
-          />
-        )}
       </main>
 
-      {/* Mobile Bottom Dock Bar (iOS & Android friendly) */}
+      {/* Mobile Bottom Dock Bar */}
       <BottomNav
         activeTab={activeTab}
         setActiveTab={setActiveTab}

@@ -28,6 +28,8 @@ import {
   AppUser,
   TeamInfo,
   Player,
+  Match,
+  StandingsRow,
   Language,
   PlayerPosition,
   DEFAULT_FACEBOOK_AVATAR,
@@ -37,6 +39,14 @@ import {
 import { INITIAL_TEAMS } from '../data/initialData';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
+import {
+  getPlayersForTeam,
+  savePlayersForTeam,
+  getMatchesForTeam,
+  saveMatchesForTeam,
+  getStandingsForLeague,
+  saveStandingsForLeague,
+} from '../utils/storage';
 
 interface LoginScreenProps {
   team: TeamInfo;
@@ -47,6 +57,8 @@ interface LoginScreenProps {
   setUsers?: React.Dispatch<React.SetStateAction<AppUser[]>>;
   players: Player[];
   setPlayers?: React.Dispatch<React.SetStateAction<Player[]>>;
+  setMatches?: React.Dispatch<React.SetStateAction<Match[]>>;
+  setStandings?: React.Dispatch<React.SetStateAction<StandingsRow[]>>;
   onLoginSuccess: (user: AppUser, rememberDevice: boolean) => void;
   onTeamCreated?: (newTeam: TeamInfo) => void;
   onInvitationSent?: (invitation: TeamInvitation) => void;
@@ -92,6 +104,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   setUsers,
   players,
   setPlayers,
+  setMatches,
+  setStandings,
   onLoginSuccess,
   onTeamCreated,
   onInvitationSent,
@@ -269,6 +283,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
+    if (matchedUser.teamId) {
+      const userTeam = teamList.find((t) => t.id === matchedUser.teamId);
+      if (userTeam) {
+        const teamPlayers = getPlayersForTeam(userTeam.id);
+        const teamMatches = getMatchesForTeam(userTeam.id);
+        const teamStandings = getStandingsForLeague(userTeam.leagueName, userTeam);
+        if (setTeam) setTeam(userTeam);
+        if (setPlayers) setPlayers(teamPlayers);
+        if (setMatches) setMatches(teamMatches);
+        if (setStandings) setStandings(teamStandings);
+        try {
+          localStorage.setItem('teamgol_team_data', JSON.stringify(userTeam));
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     setLoginSuccess(`¡Bienvenido, ${matchedUser.name.split(' ')[0]}!`);
     setTimeout(() => {
       onLoginSuccess(matchedUser, rememberDevice);
@@ -366,6 +398,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       mvpHistory: [],
     };
 
+    // Determine the chosen team
+    const chosenTeam = teamList.find((t) => t.id === selectedTeamId) || teamList[0] || team;
+
     const newUser: AppUser = {
       id: newUserId,
       name,
@@ -375,18 +410,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       role: 'player',
       avatarUrl: newPlayer.avatarUrl,
       playerId: newPlayerId,
+      teamId: chosenTeam.id,
       provider: 'email',
     };
 
+    // Save player specifically into chosenTeam's squad
+    const existingTeamPlayers = getPlayersForTeam(chosenTeam.id);
+    const updatedTeamPlayers = [
+      ...existingTeamPlayers.filter((p) => p.name.toLowerCase() !== newPlayer.name.toLowerCase()),
+      newPlayer,
+    ];
+    savePlayersForTeam(chosenTeam.id, updatedTeamPlayers);
+    const teamMatches = getMatchesForTeam(chosenTeam.id);
+    const teamStandings = getStandingsForLeague(chosenTeam.leagueName, chosenTeam);
+
     if (setPlayers) {
-      setPlayers((prev) => [...prev, newPlayer]);
+      setPlayers(updatedTeamPlayers);
+    }
+    if (setMatches) {
+      setMatches(teamMatches);
+    }
+    if (setStandings) {
+      setStandings(teamStandings);
     }
     if (setUsers) {
       setUsers((prev) => [...prev, newUser]);
     }
-
-    // Determine the chosen team
-    const chosenTeam = teamList.find((t) => t.id === selectedTeamId) || teamList[0] || team;
     if (setTeam) {
       setTeam(chosenTeam);
     }
@@ -396,27 +445,26 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       // ignore
     }
 
-    const invitation: TeamInvitation = {
-      id: `inv_${Date.now()}`,
-      email,
-      playerName: name,
-      teamId: chosenTeam.id,
-      teamName: chosenTeam.name,
-      teamLogo: chosenTeam.logoUrl,
-      stadium: chosenTeam.stadium,
-      sentAt: new Date().toLocaleDateString('es-MX', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      role: 'player',
-      status: 'accepted',
-    };
-
-    if (onInvitationSent) {
-      onInvitationSent(invitation);
+    // Check if this email was invited by an admin/DT for this team
+    try {
+      const storedInvs = localStorage.getItem('teamgol_sent_invitations');
+      if (storedInvs) {
+        const invList: TeamInvitation[] = JSON.parse(storedInvs);
+        const matchIndex = invList.findIndex(
+          (inv) =>
+            inv.email.toLowerCase() === email.toLowerCase() &&
+            (inv.teamId === chosenTeam.id || !inv.teamId)
+        );
+        if (matchIndex >= 0) {
+          invList[matchIndex] = { ...invList[matchIndex], status: 'accepted' };
+          localStorage.setItem('teamgol_sent_invitations', JSON.stringify(invList));
+          if (onInvitationSent) {
+            onInvitationSent(invList[matchIndex]);
+          }
+        }
+      }
+    } catch {
+      // ignore
     }
 
     setLoginSuccess(`¡Cuenta creada con éxito! Bienvenido a ${chosenTeam.name} (${chosenTeam.stadium}).`);
@@ -502,23 +550,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       provider: 'email',
     };
 
-    // 3. Create initial DT player record for squad
-    const dtPlayer: Player = {
-      id: ownerPlayerId,
-      name: dtName,
-      nickname: 'DT',
-      number: 1,
-      position: 'MED',
-      avatarUrl: DEFAULT_FACEBOOK_AVATAR,
-      goals: 0,
-      assists: 0,
-      matches: 0,
-      yellowCards: 0,
-      redCards: 0,
-      isCalledUp: true,
-      isStarter: true,
-      mvpHistory: [],
-    };
+    // 3. New team starts completely clean (0 players, 0 matches) to invite everyone from scratch
+    const emptySquad: Player[] = [];
+    const emptyMatches: Match[] = [];
+    savePlayersForTeam(newTeamId, emptySquad);
+    saveMatchesForTeam(newTeamId, emptyMatches);
+
+    // League standings: load/initialize table for the new team's league
+    const leagueStandings = getStandingsForLeague(createdTeam.leagueName, createdTeam);
+    saveStandingsForLeague(createdTeam.leagueName, leagueStandings);
 
     // Clear previous invite storage so the user is established in their new team
     try {
@@ -548,7 +588,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setUsers((prev) => [ownerUser, ...prev]);
     }
     if (setPlayers) {
-      setPlayers((prev) => [dtPlayer, ...prev]);
+      setPlayers(emptySquad);
+    }
+    if (setMatches) {
+      setMatches(emptyMatches);
+    }
+    if (setStandings) {
+      setStandings(leagueStandings);
     }
     if (onTeamCreated) {
       onTeamCreated(createdTeam);

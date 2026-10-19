@@ -2,24 +2,24 @@ import React, { useState } from 'react';
 import {
   Shield,
   Bell,
-  Globe,
   User,
   Crown,
-  Settings,
   ChevronDown,
   Check,
-  Smartphone,
   LogOut,
   Sparkles,
   Zap,
-  Activity,
   Moon,
   Sun,
-  Download,
+  X,
+  MapPin,
+  Plus,
+  ArrowRight,
 } from 'lucide-react';
 import { AppUser, Language, TeamInfo, UserRole } from '../types';
 import { getT } from '../utils/translations';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
+import { INITIAL_TEAMS } from '../data/initialData';
 
 interface NavbarProps {
   currentTab?: string;
@@ -33,16 +33,16 @@ interface NavbarProps {
   users?: AppUser[];
   allUsers?: AppUser[];
   team: TeamInfo;
+  allTeams?: TeamInfo[];
+  onSwitchTeam?: (team: TeamInfo) => void;
   language: Language;
-  setLanguage: (lang: Language) => void;
+  setLanguage?: (lang: Language) => void;
   unreadAlertsCount?: number;
   onOpenNotifications?: () => void;
   onOpenAuthModal?: () => void;
   onOpenAuth?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
-  onOpenAndroidUsb?: () => void;
-  onOpenInstallModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -52,23 +52,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   hasLiveMatch = false,
   currentUser,
-  setCurrentUser,
   onLogout,
-  users,
-  allUsers,
   team,
+  allTeams = INITIAL_TEAMS,
+  onSwitchTeam,
   language,
-  setLanguage,
   unreadAlertsCount = 0,
   onOpenNotifications = () => {},
-  onOpenAuthModal,
-  onOpenAuth,
   theme = 'light',
   onToggleTheme,
-  onOpenAndroidUsb,
-  onOpenInstallModal,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [showTeamSwitcherModal, setShowTeamSwitcherModal] = useState(false);
   const t = getT(language);
 
   const selectedTab = currentTab || activeTab || 'calendar';
@@ -76,69 +71,73 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (setCurrentTab) setCurrentTab(tabId);
     if (setActiveTab) setActiveTab(tabId);
   };
-  const userList = allUsers || users || [];
-  const handleOpenAuth = onOpenAuth || onOpenAuthModal || (() => {});
 
   const getRoleBadge = (role: UserRole) => {
-    if (role === 'owner') {
-      return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#E7F3FF] text-[#1877F2] border border-[#1877F2]/30">
-          <Crown className="w-3 h-3 text-[#1877F2]" />
-          {t.roles.owner}
-        </span>
-      );
+    switch (role) {
+      case 'owner':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+            <Crown className="w-3 h-3 text-amber-600" />
+            <span>DT / Dueño</span>
+          </span>
+        );
+      case 'player':
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-blue-700 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-full">
+            <User className="w-3 h-3 text-blue-600" />
+            <span>Jugador</span>
+          </span>
+        );
     }
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
-        <User className="w-3 h-3 text-gray-500" />
-        {t.roles.player}
-      </span>
-    );
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white dark:bg-[#242526] border-b border-[#CED0D4] dark:border-white/10 shadow-xs transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16">
-          {/* Brand & Team Info with Dream Team Identity */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="flex items-center -space-x-2">
+    <header className="sticky top-0 z-40 bg-white/95 dark:bg-[#242526]/95 backdrop-blur-md border-b border-[#CED0D4] dark:border-white/10 shadow-xs transition-colors">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
+          {/* Left Brand & Active Club */}
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Team Crest with quick team switcher trigger */}
+            <button
+              id="btn-navbar-team-logo"
+              onClick={() => setShowTeamSwitcherModal(true)}
+              className="relative group shrink-0 cursor-pointer"
+              title="Clic para cambiar de equipo"
+            >
               <img
-                src={APP_LOGO_URL}
-                alt={APP_NAME}
+                src={team.logoUrl}
+                alt={team.name}
                 referrerPolicy="no-referrer"
-                title="Dream Team - Plataforma Oficial"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl object-cover ring-2 ring-amber-400 shadow-md z-10 bg-white shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+                className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-[#1877F2]/40 shadow-xs transition-transform group-hover:scale-105"
               />
-              <div className="relative">
-                <img
-                  src={team.logoUrl}
-                  alt={team.name}
-                  referrerPolicy="no-referrer"
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-[#1877F2] shadow-sm bg-white"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-                <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#1877F2] text-[9px] text-white font-black shadow-xs">
-                  7
-                </span>
-              </div>
-            </div>
+              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px] font-black shadow-xs">
+                7
+              </span>
+            </button>
 
-            <div>
-              <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
                   <span>{team.shortName}</span>
                 </h1>
-                <span className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-[#1877F2] bg-[#E7F3FF] dark:bg-[#1877F2]/20 border border-[#1877F2]/20 px-1.5 py-0.5 rounded-full">
-                  <span>Dream Team</span>
-                </span>
+                <button
+                  id="btn-navbar-switch-team-tag"
+                  onClick={() => setShowTeamSwitcherModal(true)}
+                  className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-[#1877F2] bg-[#E7F3FF] dark:bg-[#1877F2]/20 hover:bg-[#D5E9FF] border border-[#1877F2]/20 px-1.5 py-0.5 rounded-full cursor-pointer transition-colors"
+                  title="Cambiar de equipo registrado"
+                >
+                  <span>Cambiar</span>
+                  <ChevronDown className="w-2.5 h-2.5" />
+                </button>
                 {hasLiveMatch && (
                   <button
                     onClick={() => handleTabChange('live_match')}
                     className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-wider animate-pulse cursor-pointer shadow-xs hover:bg-rose-100 transition-colors"
-                    title="Hay un partido de Fútbol 7 en juego. Clic para entrar al Modo Partido"
+                    title="Hay un partido de Fútbol 7 en juego"
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                     <span>EN VIVO</span>
@@ -151,7 +150,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Desktop Navigation Tabs - Facebook Modern Style */}
+          {/* Desktop Navigation Tabs */}
           <nav className="hidden lg:flex items-center gap-1 bg-[#F0F2F5] dark:bg-[#18191A] p-1 rounded-xl">
             <button
               id="nav-btn-calendar"
@@ -211,7 +210,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="nav-btn-tables"
               onClick={() => handleTabChange('tables')}
               className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === 'tables'
+                selectedTab === 'tables' || selectedTab === 'standings'
                   ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
                   : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
               }`}
@@ -221,10 +220,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="nav-btn-mvp"
               onClick={() => handleTabChange('mvp')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
                 selectedTab === 'mvp'
-                  ? 'bg-white dark:bg-[#242526] text-amber-600 dark:text-amber-400 shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-white/60 dark:hover:bg-white/10'
+                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
               }`}
             >
               <Sparkles className="w-3 h-3 text-amber-500" />
@@ -241,30 +240,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               {t.nav.wall}
             </button>
-            <button
-              id="nav-btn-iot"
-              onClick={() => handleTabChange('iot')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTab === 'iot'
-                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              <Activity className="w-3.5 h-3.5 text-[#1877F2]" />
-              <span>{t.nav.iot || 'Brazalete IoT'}</span>
-            </button>
-            <button
-              id="nav-btn-android-usb"
-              onClick={() => handleTabChange('android_usb')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTab === 'android_usb'
-                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 shadow-xs'
-                  : 'text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Android USB</span>
-            </button>
             {currentUser.role === 'owner' && (
               <button
                 id="nav-btn-admin"
@@ -280,37 +255,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </nav>
 
-          {/* Right Action Bar - Facebook Circular Action Buttons */}
+          {/* Right Action Bar */}
           <div className="flex items-center gap-2">
-
-            {/* Quick Install on Android Button */}
-            {onOpenInstallModal && (
-              <button
-                id="btn-navbar-install-app"
-                onClick={onOpenInstallModal}
-                className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-full bg-[#1877F2] hover:bg-[#0866FF] text-white transition-all flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-black shadow-md hover:shadow-lg cursor-pointer"
-                title="Instalar en tu teléfono Android (1 Clic, QR o APK)"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline sm:inline">Instalar App</span>
-                <span className="inline xs:hidden sm:hidden">Instalar</span>
-              </button>
-            )}
-
-            {/* Android USB Debugging / Native App Hub Button */}
-            {onOpenAndroidUsb && (
-              <button
-                id="btn-android-usb-modal"
-                onClick={onOpenAndroidUsb}
-                className="h-8 sm:h-9 px-2 sm:px-3 rounded-full bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/70 text-emerald-800 dark:text-emerald-300 border border-emerald-400 dark:border-emerald-500/50 transition-colors flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-black shadow-xs cursor-pointer"
-                title="Depuración USB & App Móvil Nativa (Android Kotlin)"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 animate-pulse" />
-                <span className="hidden xs:inline sm:inline">Android USB</span>
-                <span className="inline xs:hidden sm:hidden">USB</span>
-              </button>
-            )}
-
             {/* Global Dark / Light Theme Toggle Switch */}
             {onToggleTheme && (
               <button
@@ -326,16 +272,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </button>
             )}
-
-            {/* Language Switcher */}
-            <button
-              id="btn-lang-toggle"
-              onClick={() => setLanguage(language === 'es' ? 'en' : 'es')}
-              className="w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-white transition-colors flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer"
-              title={language === 'es' ? 'Cambiar a English' : 'Switch to Spanish'}
-            >
-              <span className="uppercase text-[11px]">{language}</span>
-            </button>
 
             {/* Notification Bell */}
             <button
@@ -374,7 +310,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ChevronDown className="w-3.5 h-3.5 text-[#65676B] dark:text-gray-400 hidden sm:block mr-1" />
               </button>
 
-              {/* Profile Menu - ONLY CURRENT USER */}
+              {/* Profile Menu */}
               {showRoleMenu && (
                 <div
                   id="menu-role-dropdown"
@@ -405,9 +341,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/60 dark:border-white/10">
                       <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-semibold">
-                        Rol en el club:
+                        Club actual:
                       </span>
-                      {getRoleBadge(currentUser.role)}
+                      <span className="text-xs font-bold text-[#1877F2] truncate max-w-[120px]">
+                        {team.name}
+                      </span>
                     </div>
                   </div>
 
@@ -426,15 +364,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
 
                     <button
-                      id="btn-menu-iot-armband"
+                      id="btn-menu-switch-team"
                       onClick={() => {
-                        handleTabChange('iot');
                         setShowRoleMenu(false);
+                        setShowTeamSwitcherModal(true);
                       }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#1877F2] hover:bg-[#E7F3FF] dark:hover:bg-[#1877F2]/10 transition-colors cursor-pointer"
                     >
-                      <Activity className="w-4 h-4 text-emerald-600" />
-                      <span>Brazalete Deportivo (ESP32 IoT)</span>
+                      <Shield className="w-4 h-4 text-[#1877F2]" />
+                      <span>Cambiar de Equipo ({allTeams.length} registrados)</span>
                     </button>
 
                     {currentUser.role === 'owner' && (
@@ -474,6 +412,117 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Team Switcher Modal */}
+      {showTeamSwitcherModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col text-[#050505] dark:text-white animate-in zoom-in-95 duration-200 max-h-[85vh]">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-[#CED0D4] dark:border-white/10 flex items-center justify-between bg-[#F0F2F5] dark:bg-[#18191A]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[#1877F2]/10 text-[#1877F2]">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black tracking-tight">
+                    Equipos Registrados en el Sistema
+                  </h3>
+                  <p className="text-xs text-[#65676B] dark:text-gray-400">
+                    Selecciona un club para ver su plantilla, partidos y tabla de liga
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTeamSwitcherModal(false)}
+                className="p-1.5 rounded-lg bg-white dark:bg-[#3A3B3C] hover:bg-[#E4E6EB] text-[#65676B] dark:text-gray-300 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Teams List */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3">
+              {allTeams.map((t) => {
+                const isActive = t.id === team.id;
+                return (
+                  <div
+                    key={t.id}
+                    className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                      isActive
+                        ? 'bg-[#E7F3FF] dark:bg-[#1877F2]/20 border-[#1877F2] ring-2 ring-[#1877F2]/30 shadow-xs'
+                        : 'bg-white dark:bg-[#18191A] border-[#CED0D4] dark:border-white/10 hover:border-[#1877F2]/50 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={t.logoUrl}
+                        alt={t.name}
+                        referrerPolicy="no-referrer"
+                        className="w-12 h-12 rounded-xl object-cover border border-[#CED0D4] dark:border-white/10 shadow-xs shrink-0 bg-white"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-black text-[#050505] dark:text-white truncate">
+                            {t.name}
+                          </h4>
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-blue-50 text-[#1877F2] border border-[#1877F2]/20 shrink-0">
+                            {t.shortName}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#65676B] dark:text-gray-400 font-medium truncate">
+                          {t.leagueName}
+                        </p>
+                        <p className="text-[10px] text-[#65676B] dark:text-gray-400 flex items-center gap-1 mt-0.5 truncate">
+                          <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                          <span>{t.stadium}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      {isActive ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#1877F2] bg-white dark:bg-[#242526] px-3 py-1.5 rounded-xl border border-[#1877F2]/40 shadow-xs">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Activo</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onSwitchTeam) {
+                              onSwitchTeam(t);
+                            }
+                            setShowTeamSwitcherModal(false);
+                          }}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                        >
+                          <span>Seleccionar</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-[#F0F2F5] dark:bg-[#18191A] border-t border-[#CED0D4] dark:border-white/10 flex items-center justify-between text-xs text-[#65676B] dark:text-gray-400">
+              <span>Cada equipo tiene su propia plantilla y partidos independientes.</span>
+              <button
+                type="button"
+                onClick={() => setShowTeamSwitcherModal(false)}
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#242526] hover:bg-gray-100 dark:hover:bg-white/10 text-[#050505] dark:text-white font-bold border border-[#CED0D4] dark:border-white/10 cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

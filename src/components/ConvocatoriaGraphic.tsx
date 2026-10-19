@@ -713,17 +713,6 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
             {isGenerating ? 'Generando...' : t.convocatoria.downloadGraphic}
           </button>
 
-          {/* Share to Stories Button */}
-          <button
-            id="btn-share-convocatoria-stories"
-            onClick={handleShareConvocatoriaToStories}
-            disabled={isSharingStory}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer"
-            title="Compartir póster de convocatoria a mis historias de la app"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{isSharingStory ? 'Publicando...' : 'Compartir a mis Historias'}</span>
-          </button>
 
           {/* Team Identity Button (Owner) */}
           {isOwnerOrAdmin && (
