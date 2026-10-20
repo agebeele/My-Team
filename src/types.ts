@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'player';
+export type UserRole = 'owner' | 'player' | 'admin' | 'coach';
 
 // All standard football / soccer positions
 export type PlayerPosition =
@@ -266,8 +266,8 @@ export interface AppUser {
   jerseyNumber?: number;
 }
 
-export type StoryType = 'custom' | 'match' | 'mvp' | 'standings' | 'scorers' | 'convocatoria' | 'lineup' | 'player_card';
-export type StoryTheme = 'neon' | 'dark' | 'gold' | 'minimal' | 'fire' | 'facebook';
+export type StoryType = 'custom' | 'match' | 'match_result' | 'mvp' | 'standings' | 'scorers' | 'convocatoria' | 'lineup' | 'player_card';
+export type StoryTheme = 'neon' | 'dark' | 'gold' | 'minimal' | 'fire' | 'facebook' | 'champions_neon' | 'gold_mvp' | 'emerald_turf' | 'dark_minimal' | 'bayern_red';
 
 export interface ClubStory {
   id: string;
@@ -293,9 +293,13 @@ export interface AppNotification {
   recipientUserId: string;
   title: string;
   message: string;
-  type: 'invitation' | 'match' | 'announcement' | 'alert' | 'mvp';
+  type: 'invitation' | 'match' | 'announcement' | 'alert' | 'mvp' | 'squad_invitation';
   read: boolean;
   createdAt: string;
+  timestamp?: number | string;
+  senderAvatar?: string;
+  senderName?: string;
+  teamLogo?: string;
   status?: 'pending' | 'accepted' | 'declined';
   invitationData?: {
     dorsal?: number;

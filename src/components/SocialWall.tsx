@@ -210,20 +210,25 @@ export const SocialWall: React.FC<SocialWallProps> = ({
         const newReactions = { ...p.reactions };
         const updatedUserReactions = { ...p.reactions.userReactions };
 
+        type ReactionNumKey = 'likes' | 'fire' | 'clap' | 'goal';
         if (isSame) {
           // Remove reaction
-          newReactions[reactionType] = Math.max(0, newReactions[reactionType] - 1);
+          const key = reactionType as ReactionNumKey;
+          if (key in newReactions) {
+            newReactions[key] = Math.max(0, (newReactions[key] || 0) - 1);
+          }
           delete updatedUserReactions[currentUser.id];
         } else {
           // Decrement previous if existed
           if (currentReaction && currentReaction in newReactions) {
-            newReactions[currentReaction as keyof typeof newReactions] = Math.max(
-              0,
-              (newReactions[currentReaction as keyof typeof newReactions] as number) - 1
-            );
+            const prevKey = currentReaction as ReactionNumKey;
+            newReactions[prevKey] = Math.max(0, (newReactions[prevKey] || 0) - 1);
           }
           // Increment new
-          newReactions[reactionType] = ((newReactions[reactionType] as number) || 0) + 1;
+          const key = reactionType as ReactionNumKey;
+          if (key in newReactions) {
+            newReactions[key] = (newReactions[key] || 0) + 1;
+          }
           updatedUserReactions[currentUser.id] = reactionType;
         }
 

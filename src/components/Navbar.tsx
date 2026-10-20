@@ -303,7 +303,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 />
                 <div className="hidden sm:block text-left pr-1.5">
                   <div className="text-xs font-bold text-[#050505] dark:text-white truncate max-w-[110px]">
-                    {currentUser.name.split(' ')[0]}
+                    {(currentUser.name || 'Usuario').split(' ')[0]}
                   </div>
                   {getRoleBadge(currentUser.role)}
                 </div>

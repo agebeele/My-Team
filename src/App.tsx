@@ -299,6 +299,7 @@ export default function App() {
             matches={matches}
             setMatches={setMatches}
             team={team}
+            players={players}
             currentUser={currentUser}
             language={language}
             onOpenMvp={handleOpenMvpForMatch}
@@ -317,8 +318,8 @@ export default function App() {
             currentUser={currentUser}
             language={language}
             selectedMatchId={selectedMatchId}
-            onExitLiveMatch={() => setActiveTab('calendar')}
-            onOpenMvpVoting={(matchId) => {
+            onBackToCalendar={() => setActiveTab('calendar')}
+            onOpenMvp={(matchId) => {
               setSelectedMatchId(matchId);
               setActiveTab('mvp');
             }}

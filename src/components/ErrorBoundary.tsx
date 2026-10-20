@@ -10,8 +10,8 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+export class ErrorBoundary extends React.Component<Props, State> {
+  override state: State = {
     hasError: false,
     error: null,
   };
@@ -57,10 +57,18 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
 
             {this.state.error?.message && (
-              <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-left overflow-x-auto">
-                <p className="text-[11px] font-mono text-gray-700 break-all">
-                  {this.state.error.message}
-                </p>
+              <div className="space-y-2 text-left">
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800">
+                  <p className="text-xs font-bold">{this.state.error.message}</p>
+                </div>
+                {this.state.error.stack && (
+                  <details className="text-[10px] text-gray-500 font-mono">
+                    <summary className="cursor-pointer hover:underline text-gray-700">Ver detalle técnico</summary>
+                    <pre className="mt-1 p-2 bg-gray-100 rounded-lg overflow-x-auto whitespace-pre-wrap max-h-36">
+                      {this.state.error.stack}
+                    </pre>
+                  </details>
+                )}
               </div>
             )}
 

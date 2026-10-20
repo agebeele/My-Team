@@ -305,8 +305,8 @@ export async function generateMatchPosterCanvas(
     ctx.fillStyle = '#CBD5E1';
     ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
     let cardsText = 'Tarjetas: ';
-    if (yellowEvents.length > 0) cardsText += `🟨 ${yellowEvents.map((y) => `${y.playerName?.split(' ')[0]} (${y.minute}')`).join(', ')}  `;
-    if (redEvents.length > 0) cardsText += `🟥 ${redEvents.map((r) => `${r.playerName?.split(' ')[0]} (${r.minute}')`).join(', ')}`;
+    if (yellowEvents.length > 0) cardsText += `🟨 ${yellowEvents.map((y) => `${(y.playerName || 'Jugador').split(' ')[0]} (${y.minute}')`).join(', ')}  `;
+    if (redEvents.length > 0) cardsText += `🟥 ${redEvents.map((r) => `${(r.playerName || 'Jugador').split(' ')[0]} (${r.minute}')`).join(', ')}`;
     ctx.fillText(cardsText.slice(0, 48), 75, midY + midH - 20);
   }
 

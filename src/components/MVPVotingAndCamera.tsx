@@ -892,7 +892,7 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
             <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
               <button
                 id="btn-open-camera-mvp"
-                onClick={startCamera}
+                onClick={() => startCamera()}
                 disabled={isCameraActive}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/10 dark:hover:bg-white/20 text-[#050505] dark:text-white font-bold text-xs border border-[#CED0D4] dark:border-white/10 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
               >

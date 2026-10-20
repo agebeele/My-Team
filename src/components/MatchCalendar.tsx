@@ -46,10 +46,10 @@ interface MatchCalendarProps {
 }
 
 export const MatchCalendar: React.FC<MatchCalendarProps> = ({
-  matches,
+  matches = [],
   setMatches,
   team,
-  players,
+  players = [],
   currentUser,
   language,
   onNavigateToMvp,
@@ -61,7 +61,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   toggleMatchReminder = (_match: Match) => {},
 }) => {
   const t = getT(language);
-  const isOwner = currentUser.role === 'owner' || currentUser.role === 'admin';
+  const isOwner = currentUser?.role === 'owner';
   const handleGoToMvp = onOpenMvp || onNavigateToMvp || (() => {});
 
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'finished'>('all');
@@ -85,7 +85,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   const [resultScoreUs, setResultScoreUs] = useState<number | string>(0);
   const [resultScoreThem, setResultScoreThem] = useState<number | string>(0);
   const [scorersList, setScorersList] = useState<Array<{ playerId: string; playerName: string; minute: number }>>([]);
-  const [selectedScorerPlayerId, setSelectedScorerPlayerId] = useState<string>(players[0]?.id || '');
+  const [selectedScorerPlayerId, setSelectedScorerPlayerId] = useState<string>(players?.[0]?.id || '');
   const [scorerMinute, setScorerMinute] = useState<number | string>('');
 
   // Gallery image download states
@@ -255,7 +255,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
     setResultScoreUs(match.scoreUs ?? 0);
     setResultScoreThem(match.scoreThem ?? 0);
     setScorersList(match.scorersUs || []);
-    setSelectedScorerPlayerId(players[0]?.id || '');
+    setSelectedScorerPlayerId(players?.[0]?.id || '');
     setScorerMinute(''); // Start completely blank so the user can easily type without an unwanted 1!
   };
 
@@ -567,9 +567,9 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                   <span className="truncate font-medium">{match.stadium}</span>
                 </div>
 
-                {match.scorersUs.length > 0 && (
+                {Boolean(match.scorersUs && match.scorersUs.length > 0) && (
                   <div className="text-[11px] text-[#050505] dark:text-gray-300 font-semibold truncate ml-2">
-                    ⚽ {match.scorersUs.map((s) => `${s.playerName.split(' ')[0]} (${s.minute}')`).join(', ')}
+                    ⚽ {match.scorersUs?.map((s) => `${(s.playerName || 'Goleador').split(' ')[0]} (${s.minute}')`).join(', ')}
                   </div>
                 )}
               </div>
