@@ -315,6 +315,7 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
         )}
 
 
+        <div className="flex items-center gap-2">
           {/* Digital Credential Trigger Button */}
           <button
             id="btn-open-credential"

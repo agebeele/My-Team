@@ -706,7 +706,11 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                   ))
                 ) : (
                   standings.map((row) => {
-                    const isCurrent = row.isOurTeam;
+                    const isCurrent = Boolean(
+                      (team?.name && row.name.trim().toLowerCase() === team.name.trim().toLowerCase()) ||
+                      (team?.shortName && row.name.trim().toLowerCase() === team.shortName.trim().toLowerCase()) ||
+                      (row.isOurTeam && (!team?.name || row.name.trim().toLowerCase() === team.name.trim().toLowerCase()))
+                    );
 
                     return (
                       <tr

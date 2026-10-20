@@ -585,7 +585,7 @@ export const INITIAL_MATCHES: Match[] = [
 
 export const INITIAL_STANDINGS: StandingsRow[] = [
   { id: 'st_1', rank: 1, name: 'REAL MADRID', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png', pj: 28, g: 24, e: 3, p: 1, gf: 104, gc: 35, dg: 69, pts: 75 },
-  { id: 'st_2', rank: 2, name: 'BAYERN MUNICH', logo: '/fc_bayern_logo.png', pj: 28, g: 20, e: 7, p: 1, gf: 131, gc: 41, dg: 90, pts: 67, isOurTeam: true },
+  { id: 'st_2', rank: 2, name: 'BAYERN MUNICH', logo: '/fc_bayern_logo.png', pj: 28, g: 20, e: 7, p: 1, gf: 131, gc: 41, dg: 90, pts: 67 },
   { id: 'st_3', rank: 3, name: 'TOTTENHAM', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png', pj: 28, g: 21, e: 3, p: 4, gf: 129, gc: 46, dg: 83, pts: 66 },
   { id: 'st_4', rank: 4, name: 'MILAN', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/103.png', pj: 28, g: 21, e: 1, p: 6, gf: 149, gc: 58, dg: 91, pts: 64 },
   { id: 'st_5', rank: 5, name: 'INT. DE MILAN', logo: 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png', pj: 28, g: 20, e: 3, p: 5, gf: 138, gc: 58, dg: 80, pts: 63 },

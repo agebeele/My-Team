@@ -238,7 +238,7 @@ export const StoriesReel: React.FC<StoriesReelProps> = ({
               <div className="flex items-center gap-2">
                 <Camera className="w-5 h-5 text-[#1877F2]" />
                 <h4 className="font-black text-sm text-[#050505] dark:text-white">
-                  Publicar en mis Historias
+                  Publicar Historia del Club
                 </h4>
               </div>
               <button

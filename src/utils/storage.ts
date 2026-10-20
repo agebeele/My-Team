@@ -159,7 +159,7 @@ export const getStandingsForLeague = (leagueName: string, activeTeam?: TeamInfo)
     isOurTeam: activeTeam
       ? row.name.trim().toLowerCase() === activeTeam.name.trim().toLowerCase() ||
         row.name.trim().toLowerCase() === activeTeam.shortName.trim().toLowerCase()
-      : row.name.toUpperCase().includes('BAYERN'),
+      : false,
   }));
 
   if (activeTeam) {

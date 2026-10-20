@@ -269,17 +269,8 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
               <span>{currentStory.likesCount || 0}</span>
             </button>
 
-            {/* Actions: Native Share and Download */}
+            {/* Actions: Download */}
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleShareNative}
-                className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors cursor-pointer"
-                title="Compartir historia"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-
               <a
                 href={currentStory.imageUrl}
                 download={`historia_${currentStory.type}.jpg`}

@@ -199,20 +199,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <span>{team.name}</span>
               </div>
             </div>
-
-            {/* Quick Share to Stories Button inside profile */}
-            {onOpenStoryShare && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenStoryShare('player_card');
-                }}
-                className="self-center px-3 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 text-white font-black text-xs shadow-md hover:scale-105 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Crear Historia</span>
-              </button>
-            )}
           </div>
 
           {/* Form Fields */}
