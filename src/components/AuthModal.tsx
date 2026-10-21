@@ -130,8 +130,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             username: 'admin',
             password: 'root',
             role: 'owner',
-            avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-            playerId: 'p1',
+            avatarUrl: DEFAULT_FACEBOOK_AVATAR,
+            playerId: 'p_1',
+            teamId: 'team_01',
             provider: 'email',
           };
           if (setUsers) setUsers((prev) => [fallbackAdmin, ...prev]);

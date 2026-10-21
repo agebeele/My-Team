@@ -301,7 +301,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
     }
 
-    setLoginSuccess(`¡Bienvenido, ${matchedUser.name.split(' ')[0]}!`);
+    setLoginSuccess(`¡Bienvenido, ${(matchedUser.name || 'Usuario').split(' ')[0]}!`);
     setTimeout(() => {
       onLoginSuccess(matchedUser, rememberDevice);
     }, 500);
@@ -547,6 +547,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       role: 'owner', // DT / Owner role with full management permissions!
       avatarUrl: DEFAULT_FACEBOOK_AVATAR,
       playerId: ownerPlayerId,
+      teamId: newTeamId,
       provider: 'email',
     };
 

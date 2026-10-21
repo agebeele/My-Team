@@ -401,7 +401,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
         spotlightPlayer =
           effectiveSquad.find((p) => p.mvpHistory && p.mvpHistory.length > 0) ||
           effectiveSquad.find((p) => p.isStarter) ||
-          effectiveSquad[0];
+          effectiveSquad?.[0];
       }
 
       const spotlightPhotoCandidate =

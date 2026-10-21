@@ -98,13 +98,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
           {/* Left Brand & Active Club */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            {/* Team Crest with quick team switcher trigger */}
-            <button
-              id="btn-navbar-team-logo"
-              onClick={() => setShowTeamSwitcherModal(true)}
-              className="relative group shrink-0 cursor-pointer"
-              title="Clic para cambiar de equipo"
-            >
+            {/* Team Crest */}
+            <div className="relative shrink-0">
               <img
                 src={team.logoUrl}
                 alt={team.name}
@@ -112,27 +107,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onError={(e) => {
                   (e.target as HTMLElement).style.display = 'none';
                 }}
-                className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-[#1877F2]/40 shadow-xs transition-transform group-hover:scale-105"
+                className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-[#1877F2]/40 shadow-xs"
               />
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px] font-black shadow-xs">
                 7
               </span>
-            </button>
+            </div>
 
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
                   <span>{team.shortName}</span>
                 </h1>
-                <button
-                  id="btn-navbar-switch-team-tag"
-                  onClick={() => setShowTeamSwitcherModal(true)}
-                  className="inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-[#1877F2] bg-[#E7F3FF] dark:bg-[#1877F2]/20 hover:bg-[#D5E9FF] border border-[#1877F2]/20 px-1.5 py-0.5 rounded-full cursor-pointer transition-colors"
-                  title="Cambiar de equipo registrado"
-                >
-                  <span>Cambiar</span>
-                  <ChevronDown className="w-2.5 h-2.5" />
-                </button>
                 {hasLiveMatch && (
                   <button
                     onClick={() => handleTabChange('live_match')}

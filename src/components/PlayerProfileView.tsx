@@ -267,7 +267,7 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
     setIsDownloadingCredential(true);
 
     const cleanPlayer = player.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    const fileName = `credencial_digital_${cleanPlayer}_dorsal_${player.number}.png`;
+    const fileName = `credencial_digital_${cleanPlayer}_dorsal_${player.number || 'sin_dorsal'}.png`;
 
     const res = await downloadElementAsImage(credentialCardRef.current, {
       fileName,

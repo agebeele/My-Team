@@ -47,9 +47,9 @@ interface LiveMatchModeProps {
 
 export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
   team,
-  matches,
+  matches = [],
   setMatches,
-  players,
+  players = [],
   setPlayers,
   currentUser,
   language,
@@ -217,7 +217,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
     const min = Math.max(1, Math.floor(timerSeconds / 60) + 1);
     if (type === 'goal') {
       setGoalTeam('us');
-      setGoalScorerId(onPitchPlayers[0]?.id || players[0]?.id || '');
+      setGoalScorerId(onPitchPlayers[0]?.id || players?.[0]?.id || '');
       setGoalRivalScorer(`Jugador de ${currentMatch.rival}`);
       setGoalAssistId('none');
       setGoalMinute(min);
@@ -226,11 +226,11 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
       setSubInId(benchPlayers[0]?.id || '');
       setSubMinute(min);
     } else if (type === 'yellow_card') {
-      setCardPlayerId(onPitchPlayers[0]?.id || players[0]?.id || '');
+      setCardPlayerId(onPitchPlayers[0]?.id || players?.[0]?.id || '');
       setCardMinute(min);
       setCardReason('Falta táctica');
     } else if (type === 'red_card') {
-      setCardPlayerId(onPitchPlayers[0]?.id || players[0]?.id || '');
+      setCardPlayerId(onPitchPlayers[0]?.id || players?.[0]?.id || '');
       setCardMinute(min);
       setCardReason('Doble amonestación (2da Amarilla)');
     }

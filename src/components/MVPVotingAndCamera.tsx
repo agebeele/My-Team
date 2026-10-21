@@ -172,11 +172,11 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
   // Find current top candidate
   const getLeaderCandidate = (): { player: Player | undefined; votes: number } => {
     if (!activeMatch?.mvpVotes) {
-      const p = players.find((pl) => pl.id === selectedCandidateId) || players[0];
+      const p = players.find((pl) => pl.id === selectedCandidateId) || players?.[0];
       return { player: p, votes: 1 };
     }
     let maxVotes = -1;
-    let leaderId = selectedCandidateId || players[0]?.id;
+    let leaderId = selectedCandidateId || players?.[0]?.id;
     Object.entries(activeMatch.mvpVotes).forEach(([pId, vCount]) => {
       const count = Number(vCount) || 0;
       if (count > maxVotes) {
