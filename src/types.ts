@@ -104,7 +104,7 @@ export interface Player {
   id: string;
   name: string;
   nickname?: string;
-  number: number;
+  number?: number | string;
   position: PlayerPosition;
   avatarUrl: string;
   goals: number;

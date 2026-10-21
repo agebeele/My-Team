@@ -1252,7 +1252,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs font-black text-[#1877F2] dark:text-emerald-400">
-                          #{player.number}
+                          {player.number ? `#${player.number}` : '-'}
                         </span>
                         <span className="text-xs font-bold text-[#050505] dark:text-white truncate">
                           {player.name}

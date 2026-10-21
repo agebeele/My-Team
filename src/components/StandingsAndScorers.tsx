@@ -423,7 +423,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                               {player.name}
                             </span>
                             <span className="text-[10px] text-[#65676B] dark:text-gray-400">
-                              #{player.number} {player.nickname ? `"${player.nickname}"` : ''}
+                              {player.number ? `#${player.number} ` : ''}{player.nickname ? `"${player.nickname}"` : ''}
                             </span>
                           </div>
                         </div>

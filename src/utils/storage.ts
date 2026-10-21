@@ -43,6 +43,21 @@ export const getPlayersForTeam = (teamId: string): Player[] => {
     if (raw) {
       const map = JSON.parse(raw);
       if (map && map[teamId] && Array.isArray(map[teamId])) {
+        // If team_01 has old mock squad, migrate to official 17 players
+        if (teamId === 'team_01') {
+          const hasOldSquad = map[teamId].some((p: Player) => p.name === 'Carlos Mendoza' || p.id === 'p1');
+          if (hasOldSquad) {
+            const starterIds = new Set(DEFAULT_LINEUP.map((p) => p.playerId));
+            const newSquad = INITIAL_PLAYERS.map((p) => ({
+              ...p,
+              isStarter: starterIds.has(p.id),
+            }));
+            map[teamId] = newSquad;
+            localStorage.setItem(STORAGE_KEYS.PLAYERS_BY_TEAM, JSON.stringify(map));
+            localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(newSquad));
+            return newSquad;
+          }
+        }
         return map[teamId];
       }
     }
@@ -278,7 +293,7 @@ export const loadInitialState = () => {
                 username: 'admin',
                 password: 'root',
                 role: 'owner' as const,
-                teamId: u.teamId || 'team_01',
+                teamId: 'team_01',
               }
             : u
         )

@@ -348,7 +348,7 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
 
             {/* Number Badge */}
             <span className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-[#1877F2] text-white font-mono font-bold text-sm flex items-center justify-center shadow-md border-2 border-white">
-              #{player.number}
+              {player.number ? `#${player.number}` : '-'}
             </span>
 
             {/* Camera Direct Action Button on Avatar */}

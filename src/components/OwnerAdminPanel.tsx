@@ -474,7 +474,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     setEditForm({
       name: player.name,
       nickname: player.nickname || '',
-      number: player.number.toString(),
+      number: player.number !== undefined && player.number !== null ? player.number.toString() : '',
       position: player.position,
       phone: player.phone || '',
       avatarUrl: player.avatarUrl || DEFAULT_FACEBOOK_AVATAR,
@@ -1073,7 +1073,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                         className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] bg-[#E4E6EB]"
                       />
                       <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#050505] text-white text-[10px] font-mono font-bold flex items-center justify-center border border-white">
-                        {player.number}
+                        {player.number || '-'}
                       </span>
                     </div>
 

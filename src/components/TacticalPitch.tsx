@@ -882,13 +882,13 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                       />
                     ) : (
                       <span className="font-mono font-bold text-sm">
-                        {player ? player.number : '?'}
+                        {player ? (player.number || slot.roleName) : '?'}
                       </span>
                     )}
 
                     {/* Number Overlay Badge */}
                     <span className="absolute -bottom-1 -right-1 bg-black text-emerald-400 border border-emerald-500/50 rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-mono font-bold">
-                      {player ? player.number : slot.roleName}
+                      {player ? (player.number || slot.roleName) : slot.roleName}
                     </span>
 
                     {/* Quick drag indicator dot */}
@@ -997,7 +997,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="font-mono text-xs font-black text-[#1877F2] dark:text-emerald-400 w-6">
-                        #{player.number}
+                        {player.number ? `#${player.number}` : '-'}
                       </span>
                       <img
                         src={player.avatarUrl}
