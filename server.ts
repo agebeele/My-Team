@@ -5,21 +5,74 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import sqlite3 from 'sqlite3';
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+// Middleware de CORS manual (sin depender del paquete cors)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 const PORT = Number(process.env.PORT) || 3000;
 
+// Permite peticiones desde tu frontend
 app.use(express.json({ limit: '50mb' }));
 
+// --- BASE DE DATOS SQLITE ---
+const db = new sqlite3.Database('./equipo.db', (err) => {
+  if (err) {
+    console.error('Error al conectar con SQLite:', err.message);
+  } else {
+    console.log('Conectado exitosamente a SQLite.');
+    inicializarBD();
+  }
+});
+
+function inicializarBD() {
+  db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS jugadores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      posicion TEXT NOT NULL,
+      numero INTEGER,
+      edad INTEGER,
+      telefono TEXT,
+      estado TEXT DEFAULT 'Activo',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+  });
+}
+
+// --- ENDPOINTS DE LA API ---
+
+app.get('/api/ping', (_req, res) => {
+  res.json({ mensaje: '¡Servidor funcionando!' });
+});
+
+// Endpoint de Jugadores que le faltaba a tu servidor
+app.get('/api/jugadores', (_req, res) => {
+  db.all('SELECT * FROM jugadores ORDER BY id DESC', [], (err, rows) => {
+    if (err) return res.status(400).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// Endpoint de IA / Escaneo de Tablas
 app.post('/api/ai/scan-table', async (req, res) => {
   try {
     const { images, imageBase64, mimeType = 'image/jpeg', teamName = '' } = req.body;
 
-    // Normalize images list
     const imageList: { base64: string; mimeType: string }[] = [];
     if (Array.isArray(images) && images.length > 0) {
       for (const item of images) {
@@ -38,7 +91,6 @@ app.post('/api/ai/scan-table', async (req, res) => {
       return res.status(400).json({ error: 'No se recibió ninguna foto de la tabla para analizar.' });
     }
 
-    // Persist uploaded photos to public/uploads for debugging and archival
     try {
       const uploadDir = path.join(process.cwd(), 'public', 'uploads');
       if (!fs.existsSync(uploadDir)) {
@@ -56,7 +108,6 @@ app.post('/api/ai/scan-table', async (req, res) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // If Gemini API Key is available, try Gemini 3.8 Flash Vision
     if (apiKey) {
       try {
         const ai = new GoogleGenAI({
@@ -69,23 +120,23 @@ app.post('/api/ai/scan-table', async (req, res) => {
         });
 
         const promptText = `Eres un asistente de inteligencia artificial experto en digitalización de tablas y estadísticas de ligas de fútbol (fútbol 7, fútbol rápido, fútbol soccer).
-Analiza detalladamente las ${imageList.length} imágenes adjuntas, que corresponden a la tabla de clasificación o posiciones de la liga (pueden ser partes consecutivas de la tabla o capturas de varias secciones, por ejemplo posiciones 1 a 16 en una foto y 17 a 31 en otra).
-Extrae absolutamente TODAS las filas de la tabla combinadas en orden estricto de posición (desde la posición 1 hasta la última, por ejemplo 31 equipos).
+Analiza detalladamente las ${imageList.length} imágenes adjuntas, que corresponden a la tabla de clasificación o posiciones de la liga.
+Extrae absolutamente TODAS las filas de la tabla combinadas en orden estricto de posición (desde la posición 1 hasta la última).
 Para cada equipo extrae:
-- rank: Posición numérica consecutiva (1, 2, 3... hasta 31+)
-- name: Nombre oficial del equipo tal como aparece
-- pj: Partidos jugados (o JJ)
-- g: Partidos ganados (o JG, PG)
-- e: Partidos empatados (o JE, PE)
-- p: Partidos perdidos (o JP, PP)
+- rank: Posición numérica consecutiva
+- name: Nombre oficial del equipo
+- pj: Partidos jugados
+- g: Partidos ganados
+- e: Partidos empatados
+- p: Partidos perdidos
 - gf: Goles a favor
 - gc: Goles en contra
-- dg: Diferencia de goles (gf - gc)
+- dg: Diferencia de goles
 - pts: Puntos totales
 
 El equipo del usuario es o contiene: "${teamName}".
 NO inventes datos: respeta fielmente los números de cada equipo que aparecen en las imágenes.
-Asegúrate de calcular los valores faltantes si alguna columna estuviera borrosa o cortada (dg = gf - gc, pts = g*3 + e).
+Asegúrate de calcular los valores faltantes si alguna columna estuviera borrosa o cortada.
 Devuelve el nombre de la liga o torneo si es visible, y la lista completa de todos los equipos en orden de posición.`;
 
         const parts: any[] = imageList.map((img) => ({
@@ -104,25 +155,22 @@ Devuelve el nombre de la liga o torneo si es visible, y la lista completa de tod
             responseSchema: {
               type: Type.OBJECT,
               properties: {
-                leagueName: {
-                  type: Type.STRING,
-                  description: 'Nombre de la liga o torneo',
-                },
+                leagueName: { type: Type.STRING },
                 teams: {
                   type: Type.ARRAY,
                   items: {
                     type: Type.OBJECT,
                     properties: {
-                      rank: { type: Type.INTEGER, description: 'Posición en la tabla' },
-                      name: { type: Type.STRING, description: 'Nombre del equipo' },
-                      pj: { type: Type.INTEGER, description: 'Partidos jugados' },
-                      g: { type: Type.INTEGER, description: 'Partidos ganados' },
-                      e: { type: Type.INTEGER, description: 'Partidos empatados' },
-                      p: { type: Type.INTEGER, description: 'Partidos perdidos' },
-                      gf: { type: Type.INTEGER, description: 'Goles a favor' },
-                      gc: { type: Type.INTEGER, description: 'Goles en contra' },
-                      dg: { type: Type.INTEGER, description: 'Diferencia de goles' },
-                      pts: { type: Type.INTEGER, description: 'Puntos' },
+                      rank: { type: Type.INTEGER },
+                      name: { type: Type.STRING },
+                      pj: { type: Type.INTEGER },
+                      g: { type: Type.INTEGER },
+                      e: { type: Type.INTEGER },
+                      p: { type: Type.INTEGER },
+                      gf: { type: Type.INTEGER },
+                      gc: { type: Type.INTEGER },
+                      dg: { type: Type.INTEGER },
+                      pts: { type: Type.INTEGER },
                     },
                     required: ['rank', 'name', 'pj', 'g', 'e', 'p', 'gf', 'gc', 'dg', 'pts'],
                   },
@@ -145,7 +193,6 @@ Devuelve el nombre de la liga o torneo si es visible, y la lista completa de tod
       }
     }
 
-    // Tell the client to run client-side OCR directly on device
     return res.json({
       requiresClientScan: true,
       message: 'Escaneo visual directo activado en cliente.',
@@ -156,11 +203,17 @@ Devuelve el nombre de la liga o torneo si es visible, y la lista completa de tod
   }
 });
 
+// --- INICIALIZACIÓN DEL SERVIDOR ---
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+      const distIndex = path.resolve(__dirname, 'dist', 'index.html');
+      if (fs.existsSync(distIndex)) {
+        res.sendFile(distIndex);
+      } else {
+        res.json({ status: 'API Online', message: 'Backend listo en Render' });
+      }
     });
   } else {
     const vite = await createViteServer({

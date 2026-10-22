@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import {
   Match,
   TeamInfo,
@@ -101,6 +102,31 @@ export default function App() {
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('app_theme');
   }, []);
+
+
+	// Cargar jugadores desde el backend SQLite
+  useEffect(() => {
+    fetch('https://equipo-backend-ts31.onrender.com/api/jugadores')
+  .then((res) => res.json())
+  .then((result) => {
+    // Si viene como { data: [...] } usa result.data, si es arreglo directo usa result
+    const listaJugadores = Array.isArray(result) ? result : (result.data || []);
+    
+    if (listaJugadores.length > 0) {
+      const jugadoresFormateados = listaJugadores.map((j: any) => ({
+        id: String(j.id),
+        name: j.nombre,
+        number: j.numero || 0,
+        position: j.posicion,
+        phone: j.telefono || '',
+        status: j.estado || 'Activo'
+      }));
+      setPlayers(jugadoresFormateados);
+    }
+  })
+  .catch((err) => console.error('Error cargando desde SQLite:', err));
+  }, []);
+
 
   // Detect invite link in URL: ?joinTeam=...&teamName=...&teamLogo=...
   useEffect(() => {
