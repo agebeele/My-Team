@@ -28,6 +28,7 @@ import {
   Image as ImageIcon,
   Mail,
   Send,
+  Database,
 } from 'lucide-react';
 import {
   TeamInfo,
@@ -48,8 +49,10 @@ import { CameraCaptureModal } from './CameraCaptureModal';
 import { TableAiScannerModal } from './TableAiScannerModal';
 import { EmailInvitationModal } from './EmailInvitationModal';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
+import { isSupabaseConfigured } from '../utils/supabaseClient';
 
 interface OwnerAdminPanelProps {
+  onOpenSupabaseModal?: () => void;
   team: TeamInfo;
   setTeam: React.Dispatch<React.SetStateAction<TeamInfo>>;
   users: AppUser[];
@@ -65,6 +68,7 @@ interface OwnerAdminPanelProps {
 }
 
 export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
+  onOpenSupabaseModal,
   team,
   setTeam,
   users,
@@ -658,6 +662,47 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
           <span>{notificationStatus}</span>
         </div>
       )}
+
+      {/* SUPABASE CLOUD SYNC CARD */}
+      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-[#0F1E36] text-white p-5 sm:p-6 rounded-2xl border border-emerald-500/30 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+            <Database className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-base font-black tracking-tight text-white">
+                Base de Datos en la Nube (Supabase)
+              </h3>
+              {isSupabaseConfigured() ? (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Sincronización en Vivo Activa
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  Modo Local (Sin Conectar)
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5 max-w-xl leading-relaxed">
+              {isSupabaseConfigured()
+                ? 'Tus jugadores, partidos y muro social se actualizan en tiempo real entre todos los celulares conectados.'
+                : 'Conecta Supabase para que tus amigos y jugadores vean altas de plantilla, partidos y muro en vivo desde cualquier celular.'}
+            </p>
+          </div>
+        </div>
+
+        {onOpenSupabaseModal && (
+          <button
+            onClick={onOpenSupabaseModal}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs transition-all shadow-md shrink-0 cursor-pointer"
+          >
+            <Database className="w-4 h-4 text-black" />
+            <span>{isSupabaseConfigured() ? 'Ver Estado / Script' : 'Conectar Supabase'}</span>
+          </button>
+        )}
+      </div>
 
       {/* SECTION 1: INVITATION BY EMAIL FOR NEW PLAYERS (NO WHATSAPP) */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">

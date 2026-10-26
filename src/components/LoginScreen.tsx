@@ -47,6 +47,8 @@ import {
   getStandingsForLeague,
   saveStandingsForLeague,
 } from '../utils/storage';
+import { isSupabaseConfigured } from '../utils/supabaseClient';
+import { supabaseUpsertUser, supabaseUpsertPlayer } from '../utils/supabaseService';
 
 interface LoginScreenProps {
   team: TeamInfo;
@@ -435,6 +437,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
     if (setUsers) {
       setUsers((prev) => [...prev, newUser]);
+    }
+    if (isSupabaseConfigured()) {
+      supabaseUpsertUser(newUser);
+      supabaseUpsertPlayer(chosenTeam.id, newPlayer);
     }
     if (setTeam) {
       setTeam(chosenTeam);

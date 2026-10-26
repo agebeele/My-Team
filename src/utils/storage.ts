@@ -315,6 +315,8 @@ export const loadInitialState = () => {
         );
         if (found) {
           initialCurrentUser = found;
+        } else if (parsed && parsed.id && parsed.name) {
+          initialCurrentUser = parsed;
         }
       } catch {
         initialCurrentUser = null;
@@ -412,14 +414,9 @@ export const saveToStorage = (state: {
     }
     if (state.posts) localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(state.posts));
     if (state.users) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
-    if (state.currentUser !== undefined) {
-      if (state.currentUser) {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
-        localStorage.setItem(STORAGE_KEYS.DEVICE_SESSION_SAVED, 'true');
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-        localStorage.removeItem(STORAGE_KEYS.DEVICE_SESSION_SAVED);
-      }
+    if (state.currentUser) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
+      localStorage.setItem(STORAGE_KEYS.DEVICE_SESSION_SAVED, 'true');
     }
     if (state.language) localStorage.setItem(STORAGE_KEYS.LANGUAGE, state.language);
   } catch (err) {

@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { Post, AppUser, Language, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
+import { isSupabaseConfigured } from '../utils/supabaseClient';
+import { supabaseUpsertPost, supabaseDeletePost } from '../utils/supabaseService';
 
 interface SocialWallProps {
   posts: Post[];
@@ -158,6 +160,9 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     };
 
     setPosts([post, ...posts]);
+    if (isSupabaseConfigured()) {
+      supabaseUpsertPost(post);
+    }
     setShowNewPostModal(false);
     setNewTitle('');
     setNewContent('');
@@ -177,12 +182,19 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     setPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, status: 'approved' as const } : p))
     );
+    const postToApprove = posts.find((p) => p.id === postId);
+    if (postToApprove && isSupabaseConfigured()) {
+      supabaseUpsertPost({ ...postToApprove, status: 'approved' });
+    }
     setAuthSuccessToast('¡Publicación autorizada y visible en el muro!');
     setTimeout(() => setAuthSuccessToast(null), 4000);
   };
 
   const handleRejectPost = (postId: string) => {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
+    if (isSupabaseConfigured()) {
+      supabaseDeletePost(postId);
+    }
     setAuthSuccessToast('Publicación rechazada y eliminada.');
     setTimeout(() => setAuthSuccessToast(null), 4000);
   };
@@ -191,6 +203,11 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     setPosts((prev) =>
       prev.map((p) => (p.status === 'pending' ? { ...p, status: 'approved' as const } : p))
     );
+    if (isSupabaseConfigured()) {
+      pendingPosts.forEach((p) => {
+        supabaseUpsertPost({ ...p, status: 'approved' });
+      });
+    }
     setAuthSuccessToast(`¡${pendingPosts.length} publicaciones autorizadas con éxito!`);
     setTimeout(() => setAuthSuccessToast(null), 4000);
     setShowAuthModal(false);

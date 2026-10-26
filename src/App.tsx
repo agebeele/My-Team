@@ -45,6 +45,19 @@ import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
 import { AppSplashAnimation } from './components/AppSplashAnimation';
 import { WelcomeModal } from './components/WelcomeModal';
+import { SupabaseConnectModal } from './components/SupabaseConnectModal';
+import { isSupabaseConfigured } from './utils/supabaseClient';
+import {
+  supabaseFetchPlayers,
+  supabaseFetchMatches,
+  supabaseFetchPosts,
+  supabaseFetchUsers,
+  supabaseUpsertPlayer,
+  supabaseUpsertMatch,
+  supabaseUpsertPost,
+  supabaseUpsertUser,
+  subscribeToSupabaseTable,
+} from './utils/supabaseService';
 import { TeamInvitation } from './types';
 
 export default function App() {
@@ -96,6 +109,127 @@ export default function App() {
     return null;
   });
   const [joinSuccessAlert, setJoinSuccessAlert] = useState<string | null>(null);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [supabaseVersion, setSupabaseVersion] = useState(0);
+
+  // Real-time synchronization with Supabase when configured
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    let isMounted = true;
+
+    const syncFromSupabase = async () => {
+      try {
+        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers] = await Promise.all([
+          supabaseFetchPlayers(team.id),
+          supabaseFetchMatches(team.id),
+          supabaseFetchPosts(team.id),
+          supabaseFetchUsers(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (cloudPlayers && cloudPlayers.length > 0) {
+          setPlayers(cloudPlayers);
+        }
+        if (cloudMatches && cloudMatches.length > 0) {
+          setMatches(cloudMatches);
+        }
+        if (cloudPosts && cloudPosts.length > 0) {
+          setPosts(cloudPosts);
+        }
+        if (cloudUsers && cloudUsers.length > 0) {
+          setUsers(cloudUsers);
+        }
+      } catch (err) {
+        console.warn('Error syncing from Supabase:', err);
+      }
+    };
+
+    syncFromSupabase();
+
+    // Subscribe to real-time events across tables
+    const unsubPosts = subscribeToSupabaseTable('posts', () => {
+      supabaseFetchPosts(team.id).then((fresh) => {
+        if (isMounted && fresh) setPosts(fresh);
+      });
+    });
+
+    const unsubPlayers = subscribeToSupabaseTable('players', () => {
+      supabaseFetchPlayers(team.id).then((fresh) => {
+        if (isMounted && fresh && fresh.length > 0) setPlayers(fresh);
+      });
+    });
+
+    const unsubMatches = subscribeToSupabaseTable('matches', () => {
+      supabaseFetchMatches(team.id).then((fresh) => {
+        if (isMounted && fresh) setMatches(fresh);
+      });
+    });
+
+    const unsubUsers = subscribeToSupabaseTable('app_users', () => {
+      supabaseFetchUsers().then((fresh) => {
+        if (isMounted && fresh && fresh.length > 0) setUsers(fresh);
+      });
+    });
+
+    return () => {
+      isMounted = false;
+      unsubPosts();
+      unsubPlayers();
+      unsubMatches();
+      unsubUsers();
+    };
+  }, [team.id, supabaseVersion]);
+
+  // Wrapper mutators that sync changes to Supabase in real-time
+  const handleSetPosts: React.Dispatch<React.SetStateAction<Post[]>> = (action) => {
+    setPosts((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      if (isSupabaseConfigured()) {
+        next.forEach((p) => {
+          supabaseUpsertPost(p);
+        });
+      }
+      return next;
+    });
+  };
+
+  const handleSetPlayers: React.Dispatch<React.SetStateAction<Player[]>> = (action) => {
+    setPlayers((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      if (isSupabaseConfigured()) {
+        next.forEach((pl) => {
+          supabaseUpsertPlayer(team.id, pl);
+        });
+      }
+      return next;
+    });
+  };
+
+  const handleSetMatches: React.Dispatch<React.SetStateAction<Match[]>> = (action) => {
+    setMatches((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      if (isSupabaseConfigured()) {
+        next.forEach((m) => {
+          supabaseUpsertMatch(team.id, m);
+        });
+      }
+      return next;
+    });
+  };
+
+  const handleSetUsers: React.Dispatch<React.SetStateAction<AppUser[]>> = (action) => {
+    setUsers((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      if (isSupabaseConfigured()) {
+        next.forEach((u) => {
+          supabaseUpsertUser(u);
+        });
+      }
+      return next;
+    });
+  };
 
   // Clean light theme
   useEffect(() => {
@@ -245,10 +379,10 @@ export default function App() {
           allTeams={allTeams}
           setAllTeams={setAllTeams}
           allUsers={users}
-          setUsers={setUsers}
+          setUsers={handleSetUsers}
           players={players}
-          setPlayers={setPlayers}
-          setMatches={setMatches}
+          setPlayers={handleSetPlayers}
+          setMatches={handleSetMatches}
           setStandings={setStandings}
           language={language}
           invitedTeam={invitedTeam}
@@ -302,6 +436,7 @@ export default function App() {
         language={language}
         setLanguage={setLanguage}
         onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
       />
 
       {/* Welcome Join Alert Banner if joined via invite */}
@@ -323,7 +458,7 @@ export default function App() {
         {activeTab === 'calendar' && (
           <MatchCalendar
             matches={matches}
-            setMatches={setMatches}
+            setMatches={handleSetMatches}
             team={team}
             players={players}
             currentUser={currentUser}
@@ -337,9 +472,9 @@ export default function App() {
         {activeTab === 'live_match' && (
           <LiveMatchMode
             matches={matches}
-            setMatches={setMatches}
+            setMatches={handleSetMatches}
             players={players}
-            setPlayers={setPlayers}
+            setPlayers={handleSetPlayers}
             team={team}
             currentUser={currentUser}
             language={language}
@@ -358,7 +493,7 @@ export default function App() {
             team={team}
             setTeam={setTeam}
             players={players}
-            setPlayers={setPlayers}
+            setPlayers={handleSetPlayers}
             matches={matches}
             currentUser={currentUser}
             language={language}
@@ -373,7 +508,7 @@ export default function App() {
             setTeam={setTeam}
             players={players}
             matches={matches}
-            setMatches={setMatches}
+            setMatches={handleSetMatches}
             currentUser={currentUser}
             language={language}
             selectedMatchId={selectedMatchId}
@@ -385,9 +520,9 @@ export default function App() {
           <MVPVotingAndCamera
             team={team}
             matches={matches}
-            setMatches={setMatches}
+            setMatches={handleSetMatches}
             players={players}
-            setPlayers={setPlayers}
+            setPlayers={handleSetPlayers}
             currentUser={currentUser}
             language={language}
             selectedMatchId={selectedMatchId}
@@ -413,7 +548,7 @@ export default function App() {
         {activeTab === 'wall' && (
           <SocialWall
             posts={posts}
-            setPosts={setPosts}
+            setPosts={handleSetPosts}
             team={team}
             currentUser={currentUser}
             language={language}
@@ -424,7 +559,7 @@ export default function App() {
         {activeTab === 'profile' && currentPlayer && (
           <PlayerProfileView
             player={currentPlayer}
-            setPlayers={setPlayers}
+            setPlayers={handleSetPlayers}
             team={team}
             currentUser={currentUser}
             language={language}
@@ -437,9 +572,9 @@ export default function App() {
             team={team}
             setTeam={setTeam}
             users={users}
-            setUsers={setUsers}
+            setUsers={handleSetUsers}
             players={players}
-            setPlayers={setPlayers}
+            setPlayers={handleSetPlayers}
             matches={matches}
             standings={standings}
             setStandings={setStandings}
@@ -449,6 +584,7 @@ export default function App() {
               saveDeviceSession(u);
             }}
             language={language}
+            onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
           />
         )}
       </main>
@@ -479,9 +615,9 @@ export default function App() {
           }
         }}
         allUsers={users}
-        setUsers={setUsers}
+        setUsers={handleSetUsers}
         players={players}
-        setPlayers={setPlayers}
+        setPlayers={handleSetPlayers}
         team={team}
         language={language}
         invitedTeamName={invitedTeamName}
@@ -498,6 +634,13 @@ export default function App() {
         team={team}
         invitation={welcomeInvitation}
         onNavigate={(tab) => setActiveTab(tab)}
+      />
+
+      {/* Supabase Cloud Connection & Sync Modal */}
+      <SupabaseConnectModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
+        onConnected={() => setSupabaseVersion((v) => v + 1)}
       />
     </div>
   );

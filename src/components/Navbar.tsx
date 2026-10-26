@@ -15,6 +15,7 @@ import {
   MapPin,
   Plus,
   ArrowRight,
+  Database,
 } from 'lucide-react';
 import { AppUser, Language, TeamInfo, UserRole } from '../types';
 import { getT } from '../utils/translations';
@@ -22,6 +23,7 @@ import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
 import { INITIAL_TEAMS } from '../data/initialData';
 
 interface NavbarProps {
+  onOpenSupabaseModal?: () => void;
   currentTab?: string;
   activeTab?: string;
   setCurrentTab?: (tab: string) => void;
@@ -59,6 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   language,
   unreadAlertsCount = 0,
   onOpenNotifications = () => {},
+  onOpenSupabaseModal,
   theme = 'light',
   onToggleTheme,
 }) => {
@@ -372,6 +375,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                       >
                         <Crown className="w-4 h-4 text-amber-500" />
                         <span>Panel de Administración & Perfil DT</span>
+                      </button>
+                    )}
+
+                    {onOpenSupabaseModal && (
+                      <button
+                        id="btn-menu-supabase-modal"
+                        onClick={() => {
+                          setShowRoleMenu(false);
+                          onOpenSupabaseModal();
+                        }}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors cursor-pointer"
+                      >
+                        <Database className="w-4 h-4 text-emerald-600" />
+                        <div className="flex items-center justify-between flex-1">
+                          <span>Base de Datos Supabase</span>
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        </div>
                       </button>
                     )}
                   </div>
