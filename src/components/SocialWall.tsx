@@ -23,6 +23,7 @@ import { Post, AppUser, Language, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
 import { supabaseUpsertPost, supabaseDeletePost } from '../utils/supabaseService';
+import { formatDisplayTime, getCurrentTimestampIso } from '../utils/dateUtils';
 
 interface SocialWallProps {
   posts: Post[];
@@ -148,7 +149,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
       imageUrl: attachedMediaUrl || undefined,
       mediaType: attachedMediaType || undefined,
       status: postStatus,
-      createdAt: 'Justo ahora',
+      createdAt: getCurrentTimestampIso(),
       reactions: {
         likes: 0,
         fire: 0,
@@ -264,26 +265,30 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     const text = commentInputs[postId]?.trim();
     if (!text) return;
 
-    setPosts((prev) =>
-      prev.map((p) => {
+    const newComment = {
+      id: `c_${Date.now()}`,
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      authorAvatar: currentUser.avatarUrl,
+      authorRole: currentUser.role,
+      text,
+      createdAt: getCurrentTimestampIso(),
+    };
+
+    setPosts((prev) => {
+      const updated = prev.map((p) => {
         if (p.id !== postId) return p;
-        return {
+        const postWithComment = {
           ...p,
-          comments: [
-            ...p.comments,
-            {
-              id: `c_${Date.now()}`,
-              authorId: currentUser.id,
-              authorName: currentUser.name,
-              authorAvatar: currentUser.avatarUrl,
-              authorRole: currentUser.role,
-              text,
-              createdAt: 'Hace un momento',
-            },
-          ],
+          comments: [...p.comments, newComment],
         };
-      })
-    );
+        if (isSupabaseConfigured()) {
+          supabaseUpsertPost(postWithComment);
+        }
+        return postWithComment;
+      });
+      return updated;
+    });
 
     setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
     setExpandedComments((prev) => ({ ...prev, [postId]: true }));
@@ -439,7 +444,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                         {getRoleBadge(post.authorRole)}
                       </div>
                       <span className="text-[11px] text-[#65676B] font-medium">
-                        {post.createdAt}
+                        {formatDisplayTime(post.createdAt)}
                       </span>
                     </div>
                   </div>
@@ -574,7 +579,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                               {comment.authorName}
                             </span>
                             <span className="text-[10px] text-[#65676B]">
-                              {comment.createdAt}
+                              {formatDisplayTime(comment.createdAt)}
                             </span>
                           </div>
                           <p className="text-[#050505] leading-relaxed">{comment.text}</p>
