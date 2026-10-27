@@ -236,6 +236,26 @@ export default function App() {
     });
   };
 
+  const handleSetTeam: React.Dispatch<React.SetStateAction<TeamInfo>> = (action) => {
+    setTeam((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      setAllTeams((prevAll) => {
+        const updated = prevAll.map((t) => (t.id === next.id ? next : t));
+        if (!updated.some((t) => t.id === next.id)) {
+          updated.push(next);
+        }
+        pushBackendSync({ team: next, allTeams: updated });
+        return updated;
+      });
+      try {
+        localStorage.setItem('teamgol_team_data', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
   // Continuous real-time SQLite sync across all connected phones and laptops
   useEffect(() => {
     let isMounted = true;
@@ -616,7 +636,7 @@ export default function App() {
         {(activeTab === 'admin' || activeTab === 'owner_admin') && (
           <OwnerAdminPanel
             team={team}
-            setTeam={setTeam}
+            setTeam={handleSetTeam}
             users={users}
             setUsers={handleSetUsers}
             players={players}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Crown,
   User,
@@ -48,6 +48,8 @@ import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { TableAiScannerModal } from './TableAiScannerModal';
 import { EmailInvitationModal } from './EmailInvitationModal';
+import { LocationAutocompleteInput } from './LocationAutocompleteInput';
+import { pushBackendSync } from '../utils/backendSync';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
 
@@ -92,9 +94,23 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     shortName: team.shortName,
     leagueName: team.leagueName,
     stadium: team.stadium,
+    location: team.location || '',
     logoUrl: team.logoUrl,
     bannerUrl: team.bannerUrl,
   });
+
+  useEffect(() => {
+    setTeamForm({
+      name: team.name,
+      shortName: team.shortName,
+      leagueName: team.leagueName,
+      stadium: team.stadium,
+      location: team.location || '',
+      logoUrl: team.logoUrl,
+      bannerUrl: team.bannerUrl,
+    });
+  }, [team.id, team.name, team.stadium, team.location, team.leagueName, team.logoUrl, team.bannerUrl]);
+
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
   const [showBannerUrlInput, setShowBannerUrlInput] = useState(false);
@@ -383,10 +399,20 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
   const handleUpdateTeam = (e: React.FormEvent) => {
     e.preventDefault();
-    setTeam((prev) => ({
-      ...prev,
+    const updatedTeam: TeamInfo = {
+      ...team,
       ...teamForm,
-    }));
+    };
+    setTeam(updatedTeam);
+    pushBackendSync({
+      team: updatedTeam,
+      allTeams: [updatedTeam],
+    });
+    try {
+      localStorage.setItem('teamgol_team_data', JSON.stringify(updatedTeam));
+    } catch {
+      // ignore
+    }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
@@ -1378,31 +1404,49 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
-                    Liga / Torneo
+                    Liga / Torneo *
                   </label>
                   <input
                     type="text"
                     required
                     value={teamForm.leagueName}
                     onChange={(e) => setTeamForm({ ...teamForm, leagueName: e.target.value })}
+                    placeholder="Ej. Liga Premier Fútbol 7"
                     className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
-                    Cancha / Estadio
-                  </label>
-                  <input
-                    type="text"
+                  <LocationAutocompleteInput
+                    label="Cancha / Estadio Local"
                     required
                     value={teamForm.stadium}
-                    onChange={(e) => setTeamForm({ ...teamForm, stadium: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
+                    placeholder="Ej. Cancha Sintética San Pedro"
+                    helperText="Escribe el nombre de la cancha para autocompletar"
+                    onChange={(val, details) => {
+                      setTeamForm((prev) => ({
+                        ...prev,
+                        stadium: val,
+                        location: details?.fullAddress || prev.location || val,
+                      }));
+                    }}
                   />
                 </div>
+              </div>
+
+              {/* Dirección y Ubicación GPS con Autocompletado tipo Uber */}
+              <div className="p-3.5 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] space-y-2">
+                <LocationAutocompleteInput
+                  label="Dirección y Ubicación de la Cancha"
+                  value={teamForm.location}
+                  placeholder="Ej. Av. Vasconcelos #300, Col. Del Valle, San Pedro Garza García..."
+                  helperText="Autocompletado en tiempo real sin necesidad de API Key. Incluye enlace directo a Google Maps."
+                  onChange={(val) => {
+                    setTeamForm((prev) => ({ ...prev, location: val }));
+                  }}
+                />
               </div>
 
               {/* Escudo / Logo con opción de subir imagen */}
