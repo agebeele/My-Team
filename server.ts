@@ -57,23 +57,23 @@ const INITIAL_SERVER_TEAM = {
 };
 
 const INITIAL_SERVER_PLAYERS = [
-  { id: 'p_1', name: 'Brandon García', nickname: 'Lucho', number: '6', position: 'MCD', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_2', name: 'Daniel Usuga', nickname: 'Parce', number: '88', position: 'DFC', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_3', name: 'Ivan Hernandez', nickname: 'Nito', number: '99', position: 'ED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_4', name: 'Oskar Batalla', nickname: 'Batalla', number: '9', position: 'DEL', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_5', name: 'Angel Tamayo', nickname: 'Cucu', number: '1', position: 'POR', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_6', name: 'Raul Aguayo', nickname: 'Rulo', number: '11', position: 'DFC', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_7', name: 'Hugo Aguayo', nickname: 'Hugo', number: '22', position: 'DEL', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_8', name: 'Angel Ivan', nickname: 'Arturito', number: '', position: 'MCD', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_9', name: 'Axiel', nickname: 'Tortas', number: '15', position: 'MED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_10', name: 'Eliu', nickname: 'Eliu', number: '', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_11', name: 'Angel Terron', nickname: 'Terron', number: '21', position: 'MCO', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_12', name: 'Emilio Garcia', nickname: 'Champi', number: '7', position: 'EI', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_13', name: 'Carlos', nickname: 'Cafe', number: '', position: 'ED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_14', name: 'Oskar Hernandez', nickname: 'Oskarin', number: '', position: 'MED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_15', name: 'Moises Treviño', nickname: 'Pitbull', number: '33', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_16', name: 'Fernando', nickname: '', number: '', position: 'DEL', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_17', name: 'Luis', nickname: 'Pepino', number: '', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_1', teamId: 'team_01', name: 'Brandon García', nickname: 'Lucho', number: '6', position: 'MCD', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_2', teamId: 'team_01', name: 'Daniel Usuga', nickname: 'Parce', number: '88', position: 'DFC', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_3', teamId: 'team_01', name: 'Ivan Hernandez', nickname: 'Nito', number: '99', position: 'ED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_4', teamId: 'team_01', name: 'Oskar Batalla', nickname: 'Batalla', number: '9', position: 'DEL', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_5', teamId: 'team_01', name: 'Angel Tamayo', nickname: 'Cucu', number: '1', position: 'POR', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_6', teamId: 'team_01', name: 'Raul Aguayo', nickname: 'Rulo', number: '11', position: 'DFC', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_7', teamId: 'team_01', name: 'Hugo Aguayo', nickname: 'Hugo', number: '22', position: 'DEL', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_8', teamId: 'team_01', name: 'Angel Ivan', nickname: 'Arturito', number: '', position: 'MCD', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_9', teamId: 'team_01', name: 'Axiel', nickname: 'Tortas', number: '15', position: 'MED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_10', teamId: 'team_01', name: 'Eliu', nickname: 'Eliu', number: '', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_11', teamId: 'team_01', name: 'Angel Terron', nickname: 'Terron', number: '21', position: 'MCO', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_12', teamId: 'team_01', name: 'Emilio Garcia', nickname: 'Champi', number: '7', position: 'EI', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_13', teamId: 'team_01', name: 'Carlos', nickname: 'Cafe', number: '', position: 'ED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_14', teamId: 'team_01', name: 'Oskar Hernandez', nickname: 'Oskarin', number: '', position: 'MED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_15', teamId: 'team_01', name: 'Moises Treviño', nickname: 'Pitbull', number: '33', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_16', teamId: 'team_01', name: 'Fernando', nickname: '', number: '', position: 'DEL', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
+  { id: 'p_17', teamId: 'team_01', name: 'Luis', nickname: 'Pepino', number: '', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
 ];
 
 const INITIAL_SERVER_USERS = [
@@ -190,19 +190,115 @@ app.post('/api/sync', (req, res) => {
   }
 
   currentVersion = Date.now();
-  db.serialize(() => {
-    const stmt = db.prepare(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES (?, ?, ?)`);
-    const allowedKeys = ['team', 'allTeams', 'players', 'matches', 'posts', 'standings', 'users'];
-    for (const key of allowedKeys) {
-      if (updates[key] !== undefined) {
-        stmt.run(key, JSON.stringify(updates[key]), currentVersion);
-      }
+
+  // Read current store first to merge safely without overwriting other teams' players or users!
+  db.all(`SELECT key, value FROM app_store`, (err, rows: any[]) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
     }
-    stmt.finalize((err) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
+
+    const currentData: any = {};
+    if (rows) {
+      rows.forEach((r) => {
+        try {
+          currentData[r.key] = JSON.parse(r.value);
+        } catch {
+          currentData[r.key] = r.value;
+        }
+      });
+    }
+
+    // 1. Teams: Merge allTeams so new teams are appended and Bayern is NEVER lost
+    let mergedAllTeams: any[] = currentData.allTeams || [INITIAL_SERVER_TEAM];
+    if (updates.allTeams && Array.isArray(updates.allTeams)) {
+      updates.allTeams.forEach((newT: any) => {
+        mergedAllTeams = [...mergedAllTeams.filter((t: any) => t.id !== newT.id), newT];
+      });
+    }
+    if (updates.team && updates.team.id) {
+      mergedAllTeams = [...mergedAllTeams.filter((t: any) => t.id !== updates.team.id), updates.team];
+    }
+    // Always ensure Bayern Munich is present in allTeams
+    if (!mergedAllTeams.some((t: any) => t.id === 'team_01')) {
+      mergedAllTeams = [INITIAL_SERVER_TEAM, ...mergedAllTeams];
+    }
+
+    // 2. Users: Merge users by email so admin is NEVER lost
+    let mergedUsers: any[] = currentData.users || INITIAL_SERVER_USERS;
+    if (updates.users && Array.isArray(updates.users)) {
+      updates.users.forEach((newU: any) => {
+        mergedUsers = [...mergedUsers.filter((u: any) => u.email.toLowerCase() !== newU.email.toLowerCase()), newU];
+      });
+    }
+    // Always ensure admin is present
+    if (!mergedUsers.some((u: any) => u.email.toLowerCase() === 'agbl141201@gmail.com')) {
+      mergedUsers = [...mergedUsers, INITIAL_SERVER_USERS[0]];
+    }
+
+    // 3. Players: Merge players by teamId so one team's updates NEVER erase another team's squad!
+    let mergedPlayers: any[] = currentData.players || INITIAL_SERVER_PLAYERS;
+    mergedPlayers = mergedPlayers.map((p: any) => ({
+      ...p,
+      teamId: p.teamId || 'team_01',
+    }));
+
+    if (updates.players && Array.isArray(updates.players)) {
+      const targetTeamId = updates.team?.id || updates.players[0]?.teamId || 'team_01';
+      const taggedPlayers = updates.players.map((p: any) => ({
+        ...p,
+        teamId: p.teamId || targetTeamId,
+      }));
+
+      // Keep players from other teams + updated players from target team
+      mergedPlayers = [
+        ...mergedPlayers.filter((p: any) => p.teamId !== targetTeamId),
+        ...taggedPlayers,
+      ];
+    }
+
+    // If Bayern squad is somehow missing, restore the 17 players
+    const bayernPlayersCount = mergedPlayers.filter((p: any) => p.teamId === 'team_01').length;
+    if (bayernPlayersCount === 0) {
+      mergedPlayers = [...mergedPlayers, ...INITIAL_SERVER_PLAYERS];
+    }
+
+    // 4. Matches: Merge by teamId
+    let mergedMatches: any[] = currentData.matches || [];
+    if (updates.matches && Array.isArray(updates.matches)) {
+      const targetTeamId = updates.team?.id || updates.matches[0]?.teamId || 'team_01';
+      const taggedMatches = updates.matches.map((m: any) => ({
+        ...m,
+        teamId: m.teamId || targetTeamId,
+      }));
+      mergedMatches = [
+        ...mergedMatches.filter((m: any) => m.teamId !== targetTeamId),
+        ...taggedMatches,
+      ];
+    }
+
+    // 5. Posts: Merge posts by id
+    let mergedPosts: any[] = currentData.posts || [];
+    if (updates.posts && Array.isArray(updates.posts)) {
+      updates.posts.forEach((newP: any) => {
+        mergedPosts = [newP, ...mergedPosts.filter((p: any) => p.id !== newP.id)];
+      });
+    }
+
+    // Write merged state to SQLite
+    db.serialize(() => {
+      const stmt = db.prepare(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES (?, ?, ?)`);
+      stmt.run('allTeams', JSON.stringify(mergedAllTeams), currentVersion);
+      stmt.run('users', JSON.stringify(mergedUsers), currentVersion);
+      stmt.run('players', JSON.stringify(mergedPlayers), currentVersion);
+      stmt.run('matches', JSON.stringify(mergedMatches), currentVersion);
+      stmt.run('posts', JSON.stringify(mergedPosts), currentVersion);
+      if (updates.standings) {
+        stmt.run('standings', JSON.stringify(updates.standings), currentVersion);
       }
-      res.json({ success: true, version: currentVersion });
+      stmt.finalize((finalErr) => {
+        if (finalErr) return res.status(500).json({ error: finalErr.message });
+        res.json({ success: true, version: currentVersion });
+      });
     });
   });
 });

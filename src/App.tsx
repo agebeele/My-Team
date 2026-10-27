@@ -244,18 +244,28 @@ export default function App() {
       const data = await fetchBackendSync();
       if (!isMounted || !data) return;
 
-      if (data.team) {
-        setTeam((prev) => (prev.id === data.team?.id ? { ...prev, ...data.team } : data.team || prev));
-      }
       if (data.allTeams && data.allTeams.length > 0) {
         setAllTeams(data.allTeams);
+        // Only update current team metadata (colors, name, stadium) if it still exists
+        setTeam((prev) => {
+          const match = data.allTeams?.find((t) => t.id === prev.id);
+          return match ? { ...prev, ...match } : prev;
+        });
       }
+
       if (data.players && data.players.length > 0) {
-        setPlayers(data.players);
+        // Filter players specifically for the currently active team
+        const currentSquad = data.players.filter((p: any) => !p.teamId || p.teamId === team.id);
+        if (currentSquad.length > 0) {
+          setPlayers(currentSquad);
+        }
       }
+
       if (data.matches) {
-        setMatches(data.matches);
+        const currentMatches = data.matches.filter((m: any) => !m.teamId || m.teamId === team.id);
+        setMatches(currentMatches);
       }
+
       if (data.posts && data.posts.length > 0) {
         setPosts(data.posts);
       }
@@ -275,7 +285,7 @@ export default function App() {
       isMounted = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [team.id]);
 
   // Clean light theme
   useEffect(() => {
@@ -411,12 +421,26 @@ export default function App() {
           invitedTeamName={invitedTeamName}
           onLoginSuccess={(user, rememberDevice) => {
             setCurrentUser(user);
+            const userTeamId =
+              user.teamId ||
+              (user.email.toLowerCase() === 'agbl141201@gmail.com' || user.username?.toLowerCase() === 'admin'
+                ? 'team_01'
+                : null);
+
+            if (userTeamId) {
+              const targetTeam =
+                allTeams.find((t) => t.id === userTeamId) ||
+                (userTeamId === 'team_01' ? INITIAL_TEAM : undefined);
+              if (targetTeam) {
+                handleSwitchTeam(targetTeam);
+              }
+            }
             if (rememberDevice) {
               saveDeviceSession(user);
             }
           }}
           onTeamCreated={(newTeam) => {
-            setTeam(newTeam);
+            handleSwitchTeam(newTeam);
             setAllTeams((prev) => [newTeam, ...prev.filter((t) => t.id !== newTeam.id)]);
             setActiveTab('owner_admin');
           }}

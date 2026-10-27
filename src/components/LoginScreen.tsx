@@ -240,24 +240,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           (u.username && u.username.toLowerCase() === 'admin')
       );
 
-      const targetAdmin: AppUser = adminInList || {
-        id: 'u_admin',
-        name: 'Administrador (Admin)',
+      const targetAdmin: AppUser = {
+        id: adminInList?.id || 'u_admin',
+        name: adminInList?.name || 'Administrador (Admin)',
         email: 'agbl141201@gmail.com',
         username: 'admin',
         password: 'root',
         role: 'owner',
         avatarUrl:
+          adminInList?.avatarUrl ||
           'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-        playerId: 'p1',
+        playerId: adminInList?.playerId || 'p_1',
+        teamId: 'team_01', // Bayern Munich
         provider: 'email',
       };
+
+      // Explicitly load and switch to FC Bayern Munich
+      const bayernTeam =
+        teamList.find((t) => t.id === 'team_01' || t.name.toLowerCase().includes('bayern')) ||
+        INITIAL_TEAMS[0] ||
+        team;
+
+      if (setTeam) setTeam(bayernTeam);
+      const teamPlayers = getPlayersForTeam(bayernTeam.id);
+      const teamMatches = getMatchesForTeam(bayernTeam.id);
+      const teamStandings = getStandingsForLeague(bayernTeam.leagueName, bayernTeam);
+
+      if (setPlayers) setPlayers(teamPlayers.length > 0 ? teamPlayers : players);
+      if (setMatches) setMatches(teamMatches);
+      if (setStandings) setStandings(teamStandings);
+
+      try {
+        localStorage.setItem('teamgol_team_data', JSON.stringify(bayernTeam));
+      } catch {
+        // ignore
+      }
 
       if (!adminInList && setUsers) {
         setUsers((prev) => [targetAdmin, ...prev]);
       }
 
-      setLoginSuccess('¡Bienvenido Administrador!');
+      setLoginSuccess('¡Bienvenido Administrador del FC Bayern Munich!');
       setTimeout(() => {
         onLoginSuccess(targetAdmin, rememberDevice);
       }, 500);
