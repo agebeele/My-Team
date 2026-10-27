@@ -58,6 +58,7 @@ import {
   supabaseUpsertUser,
   subscribeToSupabaseTable,
 } from './utils/supabaseService';
+import { fetchBackendSync, pushBackendSync } from './utils/backendSync';
 import { TeamInvitation } from './types';
 
 export default function App() {
@@ -182,10 +183,11 @@ export default function App() {
     };
   }, [team.id, supabaseVersion]);
 
-  // Wrapper mutators that sync changes to Supabase in real-time
+  // Wrapper mutators that sync changes to SQLite backend and Supabase in real-time
   const handleSetPosts: React.Dispatch<React.SetStateAction<Post[]>> = (action) => {
     setPosts((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      pushBackendSync({ posts: next });
       if (isSupabaseConfigured()) {
         next.forEach((p) => {
           supabaseUpsertPost(p);
@@ -198,6 +200,7 @@ export default function App() {
   const handleSetPlayers: React.Dispatch<React.SetStateAction<Player[]>> = (action) => {
     setPlayers((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      pushBackendSync({ players: next });
       if (isSupabaseConfigured()) {
         next.forEach((pl) => {
           supabaseUpsertPlayer(team.id, pl);
@@ -210,6 +213,7 @@ export default function App() {
   const handleSetMatches: React.Dispatch<React.SetStateAction<Match[]>> = (action) => {
     setMatches((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      pushBackendSync({ matches: next });
       if (isSupabaseConfigured()) {
         next.forEach((m) => {
           supabaseUpsertMatch(team.id, m);
@@ -222,6 +226,7 @@ export default function App() {
   const handleSetUsers: React.Dispatch<React.SetStateAction<AppUser[]>> = (action) => {
     setUsers((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      pushBackendSync({ users: next });
       if (isSupabaseConfigured()) {
         next.forEach((u) => {
           supabaseUpsertUser(u);
@@ -231,34 +236,51 @@ export default function App() {
     });
   };
 
+  // Continuous real-time SQLite sync across all connected phones and laptops
+  useEffect(() => {
+    let isMounted = true;
+
+    const doSync = async () => {
+      const data = await fetchBackendSync();
+      if (!isMounted || !data) return;
+
+      if (data.team) {
+        setTeam((prev) => (prev.id === data.team?.id ? { ...prev, ...data.team } : data.team || prev));
+      }
+      if (data.allTeams && data.allTeams.length > 0) {
+        setAllTeams(data.allTeams);
+      }
+      if (data.players && data.players.length > 0) {
+        setPlayers(data.players);
+      }
+      if (data.matches) {
+        setMatches(data.matches);
+      }
+      if (data.posts && data.posts.length > 0) {
+        setPosts(data.posts);
+      }
+      if (data.users && data.users.length > 0) {
+        setUsers(data.users);
+      }
+      if (data.standings && data.standings.length > 0) {
+        setStandings(data.standings);
+      }
+    };
+
+    doSync();
+    // Poll every 3 seconds to keep all devices in sync without page reloads
+    const timer = setInterval(doSync, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   // Clean light theme
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('app_theme');
-  }, []);
-
-
-	// Cargar jugadores desde el backend SQLite
-  useEffect(() => {
-    fetch('https://equipo-backend-ts31.onrender.com/api/jugadores')
-  .then((res) => res.json())
-  .then((result) => {
-    // Si viene como { data: [...] } usa result.data, si es arreglo directo usa result
-    const listaJugadores = Array.isArray(result) ? result : (result.data || []);
-    
-    if (listaJugadores.length > 0) {
-      const jugadoresFormateados = listaJugadores.map((j: any) => ({
-        id: String(j.id),
-        name: j.nombre,
-        number: j.numero || 0,
-        position: j.posicion,
-        phone: j.telefono || '',
-        status: j.estado || 'Activo'
-      }));
-      setPlayers(jugadoresFormateados);
-    }
-  })
-  .catch((err) => console.error('Error cargando desde SQLite:', err));
   }, []);
 
 

@@ -49,6 +49,7 @@ import {
 } from '../utils/storage';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
 import { supabaseUpsertUser, supabaseUpsertPlayer } from '../utils/supabaseService';
+import { pushBackendSync } from '../utils/backendSync';
 
 interface LoginScreenProps {
   team: TeamInfo;
@@ -442,6 +443,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       supabaseUpsertUser(newUser);
       supabaseUpsertPlayer(chosenTeam.id, newPlayer);
     }
+    pushBackendSync({
+      team: chosenTeam,
+      players: updatedTeamPlayers,
+      users: [...allUsers, newUser],
+    });
     if (setTeam) {
       setTeam(chosenTeam);
     }
@@ -606,6 +612,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     if (onTeamCreated) {
       onTeamCreated(createdTeam);
     }
+
+    pushBackendSync({
+      team: createdTeam,
+      allTeams: [...allTeams.filter((t) => t.id !== createdTeam.id), createdTeam],
+      users: [ownerUser, ...allUsers],
+      players: emptySquad,
+      matches: emptyMatches,
+      standings: leagueStandings,
+    });
 
     setLoginSuccess(`¡Equipo "${teamName}" creado con éxito! Bienvenido, Director Técnico.`);
     setTimeout(() => {
