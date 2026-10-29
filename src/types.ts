@@ -359,3 +359,12 @@ export interface TelemetrySessionRecord {
   caloriesBurned: number;
   highIntensityMinutes: number;
 }
+
+export const STANDARD_LEAGUES = [
+  'Champions League',
+  'Liga Francesa',
+  'Liga Española',
+  'Liga Mexicana',
+  'Copa del Mundo',
+] as const;
+

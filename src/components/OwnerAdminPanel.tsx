@@ -29,6 +29,7 @@ import {
   Mail,
   Send,
   Database,
+  ChevronDown,
 } from 'lucide-react';
 import {
   TeamInfo,
@@ -354,14 +355,27 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
   const handleSendEmailInvite = (e: React.FormEvent) => {
     e.preventDefault();
-    const email = inviteEmailInput.trim();
+    const email = inviteEmailInput.trim().toLowerCase();
     if (!email || !email.includes('@')) {
       setNotificationStatus('Ingresa un correo electrónico válido para enviar la invitación.');
       setTimeout(() => setNotificationStatus(null), 4000);
       return;
     }
 
-    const playerName = invitePlayerNameInput.trim() || email.split('@')[0];
+    // Validar si el correo está dado de alta en el padrón de usuarios / jugadores
+    const registeredUser = users.find(
+      (u) => u.email.toLowerCase() === email
+    );
+
+    if (!registeredUser) {
+      setNotificationStatus(
+        `❌ No se puede enviar la invitación: El correo "${email}" no está registrado en la base de datos de usuarios/jugadores. Pide al jugador que primero se registre o cree su cuenta en la app.`
+      );
+      setTimeout(() => setNotificationStatus(null), 7000);
+      return;
+    }
+
+    const playerName = invitePlayerNameInput.trim() || registeredUser.name || email.split('@')[0];
     const newInvitation: TeamInvitation = {
       id: `inv_${Date.now()}`,
       email,
@@ -702,37 +716,37 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
         </div>
       )}
 
-      {/* SUPABASE CLOUD SYNC CARD */}
-      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-[#0F1E36] text-white p-5 sm:p-6 rounded-2xl border border-emerald-500/30 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-start sm:items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
-            <Database className="w-6 h-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-black tracking-tight text-white">
-                Base de Datos en la Nube (Supabase)
-              </h3>
-              {isSupabaseConfigured() ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Sincronización en Vivo Activa
-                </span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  Modo Local (Sin Conectar)
-                </span>
-              )}
+      {/* SUPABASE CLOUD SYNC CARD (Solo visible para el Administrador de la Liga) */}
+      {currentUser.role === 'league_admin' && onOpenSupabaseModal && (
+        <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-[#0F1E36] text-white p-5 sm:p-6 rounded-2xl border border-emerald-500/30 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="p-3 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shrink-0">
+              <Database className="w-6 h-6" />
             </div>
-            <p className="text-xs text-slate-300 mt-0.5 max-w-xl leading-relaxed">
-              {isSupabaseConfigured()
-                ? 'Tus jugadores, partidos y muro social se actualizan en tiempo real entre todos los celulares conectados.'
-                : 'Conecta Supabase para que tus amigos y jugadores vean altas de plantilla, partidos y muro en vivo desde cualquier celular.'}
-            </p>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-black tracking-tight text-white">
+                  Base de Datos en la Nube (Supabase)
+                </h3>
+                {isSupabaseConfigured() ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Sincronización en Vivo Activa
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Modo Local (Sin Conectar)
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5 max-w-xl leading-relaxed">
+                {isSupabaseConfigured()
+                  ? 'Tus jugadores, partidos y muro social se actualizan en tiempo real entre todos los celulares conectados.'
+                  : 'Conecta Supabase para que tus amigos y jugadores vean altas de plantilla, partidos y muro en vivo desde cualquier celular.'}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {onOpenSupabaseModal && (
           <button
             onClick={onOpenSupabaseModal}
             className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs transition-all shadow-md shrink-0 cursor-pointer"
@@ -740,8 +754,8 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
             <Database className="w-4 h-4 text-black" />
             <span>{isSupabaseConfigured() ? 'Ver Estado / Script' : 'Conectar Supabase'}</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* SECTION 1: INVITATION BY EMAIL FOR NEW PLAYERS (NO WHATSAPP) */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">
@@ -1427,17 +1441,27 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1">
-                    Liga / Torneo *
+                  <label className="block text-[11px] font-bold uppercase text-[#65676B] mb-1 flex items-center justify-between">
+                    <span>Liga / Torneo *</span>
+                    <span className="text-[10px] text-[#1877F2] font-semibold">Seleccionar</span>
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={teamForm.leagueName}
-                    onChange={(e) => setTeamForm({ ...teamForm, leagueName: e.target.value })}
-                    placeholder="Ej. Liga Premier Fútbol 7"
-                    className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-medium focus:outline-none focus:border-[#1877F2]"
-                  />
+                  <div className="relative">
+                    <select
+                      value={teamForm.leagueName}
+                      onChange={(e) => setTeamForm({ ...teamForm, leagueName: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-xs font-bold focus:outline-none focus:border-[#1877F2] appearance-none pr-8 cursor-pointer"
+                    >
+                      <option value="Champions League">🏆 Champions League</option>
+                      <option value="Liga Francesa">🇫🇷 Liga Francesa</option>
+                      <option value="Liga Española">🇪🇸 Liga Española</option>
+                      <option value="Liga Mexicana">🇲🇽 Liga Mexicana</option>
+                      <option value="Copa del Mundo">🌍 Copa del Mundo</option>
+                      {teamForm.leagueName && !['Champions League', 'Liga Francesa', 'Liga Española', 'Liga Mexicana', 'Copa del Mundo'].includes(teamForm.leagueName) && (
+                        <option value={teamForm.leagueName}>{teamForm.leagueName}</option>
+                      )}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-[#65676B] absolute right-2.5 top-2.5 pointer-events-none" />
+                  </div>
                 </div>
                 <div>
                   <LocationAutocompleteInput

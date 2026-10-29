@@ -355,11 +355,27 @@ app.post('/api/sync', (req, res) => {
 
       // Upsert individual matches into relational table 'partidos'
       if (updates.matches && Array.isArray(updates.matches)) {
+        const targetTeamId = updates.team?.id || updates.matches[0]?.teamId || 'team_01';
+        const taggedMatches = updates.matches.map((m: any) => ({
+          ...m,
+          teamId: m.teamId || targetTeamId,
+        }));
+
+        if (taggedMatches.length > 0) {
+          const placeholders = taggedMatches.map(() => '?').join(',');
+          db.run(
+            `DELETE FROM partidos WHERE team_id = ? AND id NOT IN (${placeholders})`,
+            [targetTeamId, ...taggedMatches.map((m: any) => m.id)]
+          );
+        } else {
+          db.run(`DELETE FROM partidos WHERE team_id = ?`, [targetTeamId]);
+        }
+
         const matchStmt = db.prepare(`INSERT OR REPLACE INTO partidos (id, team_id, rival, fecha, hora, cancha, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-        mergedMatches.forEach((m: any) => {
+        taggedMatches.forEach((m: any) => {
           matchStmt.run(
             m.id,
-            m.teamId || 'team_01',
+            m.teamId || targetTeamId,
             m.rival || '',
             m.date || '',
             m.time || '',
@@ -423,6 +439,27 @@ app.get('/api/partidos', (req, res) => {
       res.json([]);
     });
   });
+});
+
+// Eliminar un partido directamente por ID
+app.delete('/api/partidos/:id', (req, res) => {
+  const matchId = req.params.id;
+  currentVersion = Date.now();
+  db.serialize(() => {
+    db.run(`DELETE FROM partidos WHERE id = ?`, [matchId]);
+    db.get(`SELECT value FROM app_store WHERE key = 'matches'`, (err, row: any) => {
+      if (!err && row && row.value) {
+        try {
+          const list = JSON.parse(row.value).filter((m: any) => m.id !== matchId);
+          db.run(
+            `INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('matches', ?, ?)`,
+            [JSON.stringify(list), currentVersion]
+          );
+        } catch {}
+      }
+    });
+  });
+  res.json({ success: true, deletedId: matchId, version: currentVersion });
 });
 
 // Endpoint de Publicaciones / Muro (relacional)

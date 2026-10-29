@@ -48,6 +48,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState<Post['category']>('Anuncio');
+  const [targetLeague, setTargetLeague] = useState<string>('Todas las Ligas');
   const [attachedMediaUrl, setAttachedMediaUrl] = useState<string | null>(null);
   const [attachedMediaType, setAttachedMediaType] = useState<'image' | 'video' | null>(null);
   const [attachedMediaName, setAttachedMediaName] = useState<string | null>(null);
@@ -72,27 +73,35 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   const currentTeamId = team?.id || 'team_01';
   const currentLeague = (team?.leagueName || 'Liga Premier Fútbol 7').trim().toLowerCase();
 
+  const isLeagueAdmin = currentUser.role === 'league_admin';
+
   const relevantPosts = posts.filter((p) => {
-    // 1. ALL league admin and official league posts appear across ALL teams!
-    const isOfficialLeaguePost =
-      p.isLeagueOfficial ||
-      p.category === 'Liga' ||
-      p.authorRole === 'league_admin' ||
-      !p.teamId;
-
-    if (isOfficialLeaguePost) {
-      return true;
+    // If current user is League Admin, they ONLY see their own publications!
+    if (isLeagueAdmin) {
+      return p.authorId === currentUser.id || p.authorRole === 'league_admin';
     }
 
-    if (p.teamId && p.teamId !== currentTeamId) {
-      return false;
-    }
-
+    // For team players and owners:
+    // 1. Posts from their own team:
     if (p.teamId === currentTeamId) {
       return true;
     }
 
-    return currentTeamId === 'team_01';
+    // 2. Official league posts: only if targeted to "Todas las Ligas" or this team's league!
+    const isOfficialLeaguePost =
+      p.isLeagueOfficial ||
+      p.category === 'Liga' ||
+      p.authorRole === 'league_admin';
+
+    if (isOfficialLeaguePost) {
+      const postLeague = (p.leagueName || '').trim().toLowerCase();
+      if (!postLeague || postLeague === 'todas las ligas' || postLeague === 'todas') {
+        return true;
+      }
+      return postLeague === currentLeague;
+    }
+
+    return false;
   });
 
   const pendingPosts = relevantPosts.filter((p) => p.status === 'pending');
@@ -140,10 +149,12 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     const isLeagueOfficialPost = newCategory === 'Liga' || currentUser.role === 'league_admin';
     const postStatus: Post['status'] = isOwner ? 'approved' : 'pending';
 
+    const selectedLeague = currentUser.role === 'league_admin' ? targetLeague : (team?.leagueName || 'Champions League');
+
     const post: Post = {
       id: `post_${Date.now()}`,
       teamId: isLeagueOfficialPost ? undefined : (team?.id || 'team_01'),
-      leagueName: team?.leagueName || 'Liga Premier Fútbol 7',
+      leagueName: selectedLeague,
       isLeagueOfficial: isLeagueOfficialPost,
       authorId: currentUser.id,
       authorName: currentUser.name,
@@ -680,6 +691,27 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                   className="w-full px-3 py-2 bg-[#F0F2F5] border border-[#CED0D4] rounded-xl text-[#050505] text-sm font-medium focus:outline-none focus:border-[#1877F2]"
                 />
               </div>
+
+              {currentUser.role === 'league_admin' && (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#65676B] mb-1 flex items-center justify-between">
+                    <span>Liga de Destino *</span>
+                    <span className="text-[10px] text-purple-600 font-bold">Oficial</span>
+                  </label>
+                  <select
+                    value={targetLeague}
+                    onChange={(e) => setTargetLeague(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#F0F2F5] border border-purple-300 rounded-xl text-[#050505] text-sm font-bold focus:outline-none focus:border-purple-600 cursor-pointer"
+                  >
+                    <option value="Todas las Ligas">🌍 Todas las Ligas (Difusión Global a Todos los Equipos)</option>
+                    <option value="Champions League">🏆 Champions League</option>
+                    <option value="Liga Francesa">🇫🇷 Liga Francesa</option>
+                    <option value="Liga Española">🇪🇸 Liga Española</option>
+                    <option value="Liga Mexicana">🇲🇽 Liga Mexicana</option>
+                    <option value="Copa del Mundo">🌍 Copa del Mundo</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-[#65676B] mb-1">

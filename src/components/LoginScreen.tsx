@@ -23,6 +23,7 @@ import {
   Building2,
   Search,
   ExternalLink,
+  ChevronDown,
 } from 'lucide-react';
 import {
   AppUser,
@@ -163,7 +164,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   // "Quiero armar mi propio equipo" form state
   const [newTeamForm, setNewTeamForm] = useState({
     name: '',
-    leagueName: 'Liga Premier Fútbol 7',
+    leagueName: 'Champions League',
     stadium: 'Cancha Sintética San Pedro',
     location: 'Av. Vasconcelos #300, Col. Del Valle, San Pedro Garza García, N.L.',
     primaryColor: '#1877F2',
@@ -1221,15 +1222,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#050505] mb-1">
-                    Liga o Categoría
+                  <label className="block text-xs font-bold text-[#050505] mb-1 flex items-center justify-between">
+                    <span>Liga o Torneo Oficial *</span>
+                    <span className="text-[10px] text-amber-600 font-semibold">Selecciona la liga</span>
                   </label>
-                  <input
-                    type="text"
-                    value={newTeamForm.leagueName}
-                    onChange={(e) => setNewTeamForm({ ...newTeamForm, leagueName: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-medium text-[#050505] focus:ring-2 focus:ring-amber-500 focus:bg-white outline-hidden"
-                  />
+                  <div className="relative">
+                    <select
+                      id="select-create-team-league"
+                      value={newTeamForm.leagueName}
+                      onChange={(e) => setNewTeamForm({ ...newTeamForm, leagueName: e.target.value })}
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-bold text-[#050505] focus:ring-2 focus:ring-amber-500 focus:bg-white outline-hidden appearance-none pr-8 cursor-pointer"
+                    >
+                      <option value="Champions League">🏆 Champions League</option>
+                      <option value="Liga Francesa">🇫🇷 Liga Francesa</option>
+                      <option value="Liga Española">🇪🇸 Liga Española</option>
+                      <option value="Liga Mexicana">🇲🇽 Liga Mexicana</option>
+                      <option value="Copa del Mundo">🌍 Copa del Mundo</option>
+                      {newTeamForm.leagueName && !['Champions League', 'Liga Francesa', 'Liga Española', 'Liga Mexicana', 'Copa del Mundo'].includes(newTeamForm.leagueName) && (
+                        <option value={newTeamForm.leagueName}>{newTeamForm.leagueName}</option>
+                      )}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-[#65676B] absolute right-3 top-3 pointer-events-none" />
+                  </div>
                 </div>
 
                 {/* Crest Selection */}

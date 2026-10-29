@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Shield,
   Bell,
@@ -6,6 +6,7 @@ import {
   Crown,
   ChevronDown,
   Check,
+  CheckCircle2,
   LogOut,
   Sparkles,
   Zap,
@@ -17,7 +18,7 @@ import {
   ArrowRight,
   Database,
 } from 'lucide-react';
-import { AppUser, Language, TeamInfo, UserRole } from '../types';
+import { AppUser, Language, TeamInfo, UserRole, TeamInvitation } from '../types';
 import { getT } from '../utils/translations';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
 import { INITIAL_TEAMS } from '../data/initialData';
@@ -66,7 +67,58 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
   const [showTeamSwitcherModal, setShowTeamSwitcherModal] = useState(false);
+  const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
+    try {
+      const stored = localStorage.getItem('teamgol_sent_invitations');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const stored = localStorage.getItem('teamgol_sent_invitations');
+        if (stored) setSentInvitations(JSON.parse(stored));
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const myPendingInvitations = sentInvitations.filter(
+    (inv) => inv.email.toLowerCase() === currentUser?.email.toLowerCase() && inv.status === 'sent'
+  );
+
+  const totalUnreadCount = unreadAlertsCount + myPendingInvitations.length;
+
+  const handleAcceptInvite = (inv: TeamInvitation) => {
+    const updated = sentInvitations.map((i) =>
+      i.id === inv.id ? { ...i, status: 'accepted' as const } : i
+    );
+    setSentInvitations(updated);
+    try {
+      localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
+    } catch {}
+
+    const targetTeam = allTeams.find((t) => t.id === inv.teamId || t.name === inv.teamName);
+    if (targetTeam && onSwitchTeam) {
+      onSwitchTeam(targetTeam);
+    }
+    setShowNotificationsMenu(false);
+  };
+
+  const handleDeclineInvite = (invId: string) => {
+    const updated = sentInvitations.filter((i) => i.id !== invId);
+    setSentInvitations(updated);
+    try {
+      localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
+    } catch {}
+  };
+
   const t = getT(language);
 
   const selectedTab = currentTab || activeTab || 'calendar';
@@ -298,20 +350,107 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Notification Bell */}
-            <button
-              id="btn-notifications-bell"
-              onClick={onOpenNotifications}
-              className="relative w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-white transition-colors flex items-center justify-center shadow-xs cursor-pointer"
-              title="Notificaciones de partidos"
-            >
-              <Bell className="w-4 h-4" />
-              {unreadAlertsCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-[#E41E3F] text-[10px] font-bold text-white shadow-xs">
-                  {unreadAlertsCount}
-                </span>
+            {/* Notification Bell with In-App Invitations Popover */}
+            <div className="relative">
+              <button
+                id="btn-notifications-bell"
+                onClick={() => {
+                  setShowNotificationsMenu(!showNotificationsMenu);
+                  setShowRoleMenu(false);
+                }}
+                className="relative w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-white transition-colors flex items-center justify-center shadow-xs cursor-pointer"
+                title="Notificaciones e invitaciones oficiales"
+              >
+                <Bell className="w-4 h-4" />
+                {totalUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-[#E41E3F] text-[10px] font-bold text-white shadow-xs animate-pulse">
+                    {totalUnreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* In-App Notifications Dropdown */}
+              {showNotificationsMenu && (
+                <div
+                  id="menu-notifications-dropdown"
+                  className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 shadow-2xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150 text-[#050505] dark:text-white"
+                >
+                  <div className="flex items-center justify-between pb-3 border-b border-[#CED0D4] dark:border-white/10">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-[#1877F2]" />
+                      <h4 className="text-sm font-black">Centro de Notificaciones</h4>
+                    </div>
+                    {totalUnreadCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 text-[10px] font-black">
+                        {totalUnreadCount} nuevas
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="py-2 space-y-3 max-h-80 overflow-y-auto">
+                    {myPendingInvitations.length > 0 ? (
+                      myPendingInvitations.map((inv) => (
+                        <div
+                          key={inv.id}
+                          className="p-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 space-y-2.5"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            {inv.teamLogo ? (
+                              <img
+                                src={inv.teamLogo}
+                                alt={inv.teamName}
+                                className="w-9 h-9 rounded-xl object-cover ring-1 ring-blue-300 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-xl bg-blue-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                                ⚽
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-xs text-[#050505] dark:text-white block">
+                                Convocatoria Oficial de Equipo
+                              </span>
+                              <p className="text-[11px] text-[#65676B] dark:text-gray-300 mt-0.5 leading-snug">
+                                Has sido convocado para unirte al club <span className="font-bold text-blue-600 dark:text-blue-400">{inv.teamName}</span> en la cancha {inv.stadium || 'local'}.
+                              </p>
+                              <span className="text-[10px] text-gray-400 mt-1 block">
+                                {inv.sentAt}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleAcceptInvite(inv)}
+                              className="flex-1 py-1.5 px-3 rounded-lg bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Aceptar y Unirme</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeclineInvite(inv.id)}
+                              className="py-1.5 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-[#65676B] dark:text-gray-300 font-bold text-xs transition-colors cursor-pointer"
+                            >
+                              Rechazar
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center space-y-1">
+                        <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto opacity-70" />
+                        <p className="text-xs font-bold text-[#050505] dark:text-white">Al día</p>
+                        <p className="text-[11px] text-[#65676B] dark:text-gray-400">
+                          No tienes invitaciones de equipos pendientes.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
 
             {/* Role & Profile Switcher Dropdown */}
             <div className="relative">
@@ -414,7 +553,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
 
-                    {onOpenSupabaseModal && (
+                    {currentUser.role === 'league_admin' && onOpenSupabaseModal && (
                       <button
                         id="btn-menu-supabase-modal"
                         onClick={() => {

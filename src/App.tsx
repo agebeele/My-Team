@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 import {
   Match,
@@ -75,6 +75,7 @@ export default function App() {
   const [allTeams, setAllTeams] = useState<TeamInfo[]>(initial.allTeams || INITIAL_TEAMS);
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [welcomeInvitation, setWelcomeInvitation] = useState<TeamInvitation | null>(null);
+  const deletedMatchIdsRef = useRef<Set<string>>(new Set());
 
   // App Navigation & Language state
   const [activeTab, setActiveTab] = useState<string>('calendar');
@@ -216,6 +217,15 @@ export default function App() {
   const handleSetMatches: React.Dispatch<React.SetStateAction<Match[]>> = (action) => {
     setMatches((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      // Detect deleted matches and send DELETE request to backend
+      const nextIds = new Set(next.map((m) => m.id));
+      prev.forEach((oldM) => {
+        if (!nextIds.has(oldM.id)) {
+          deletedMatchIdsRef.current.add(oldM.id);
+          fetch(`/api/partidos/${oldM.id}`, { method: 'DELETE' }).catch(() => {});
+        }
+      });
+
       const tagged = next.map((m) => ({ ...m, teamId: m.teamId || team.id }));
       saveMatchesForTeam(team.id, tagged);
       try {
@@ -290,13 +300,19 @@ export default function App() {
       }
 
       if (data.matches) {
-        const currentMatches = data.matches.filter((m: any) => !m.teamId || m.teamId === team.id);
+        const currentMatches = data.matches.filter(
+          (m: any) => (!m.teamId || m.teamId === team.id) && !deletedMatchIdsRef.current.has(m.id)
+        );
         setMatches((prev) => {
           const map = new Map<string, Match>();
-          currentMatches.forEach((m: any) => map.set(m.id, m));
+          currentMatches.forEach((m: any) => {
+            if (!deletedMatchIdsRef.current.has(m.id)) {
+              map.set(m.id, m);
+            }
+          });
           // Preserve newly added local matches that might still be in-flight
           prev.forEach((m) => {
-            if (!map.has(m.id)) {
+            if (!map.has(m.id) && !deletedMatchIdsRef.current.has(m.id)) {
               map.set(m.id, m);
             }
           });
