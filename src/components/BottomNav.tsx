@@ -49,19 +49,25 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
   const role = userRole || currentUser?.role || 'player';
   const isOwner = role === 'owner';
+  const isLeagueAdmin = role === 'league_admin';
 
   // Primary tabs visible in mobile bottom dock
-  const primaryTabs = [
-    { id: 'calendar', label: t.nav.calendar, icon: CalendarDays, isLive: false },
-    { id: 'lineup', label: t.nav.lineup, icon: Shield, isLive: false },
-    { id: 'tables', label: t.nav.tables, icon: Trophy, isLive: false },
-    {
-      id: 'live_match',
-      label: hasLiveMatch ? 'En Vivo' : t.nav.liveMatch || 'Modo Partido',
-      icon: Zap,
-      isLive: hasLiveMatch,
-    },
-  ];
+  const primaryTabs = isLeagueAdmin
+    ? [
+        { id: 'wall', label: t.nav.wall || 'Muro', icon: MessageSquare, isLive: false },
+        { id: 'tables', label: t.nav.tables || 'Tablas', icon: Trophy, isLive: false },
+      ]
+    : [
+        { id: 'calendar', label: t.nav.calendar, icon: CalendarDays, isLive: false },
+        { id: 'lineup', label: t.nav.lineup, icon: Shield, isLive: false },
+        { id: 'tables', label: t.nav.tables, icon: Trophy, isLive: false },
+        {
+          id: 'live_match',
+          label: hasLiveMatch ? 'En Vivo' : t.nav.liveMatch || 'Modo Partido',
+          icon: Zap,
+          isLive: hasLiveMatch,
+        },
+      ];
 
   // Secondary items shown inside the "Más" sheet
   const secondaryMenuItems = [
@@ -242,30 +248,32 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             );
           })}
 
-          {/* Tab: Más / Menú */}
-          <button
-            id="mobile-tab-more"
-            onClick={() => setIsMoreMenuOpen(true)}
-            className={`flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all relative cursor-pointer ${
-              isSecondaryActive || isMoreMenuOpen
-                ? 'text-[#1877F2] dark:text-[#60A5FA] font-bold bg-[#E7F3FF] dark:bg-[#1877F2]/20'
-                : 'text-[#65676B] dark:text-gray-400 hover:text-[#050505] dark:hover:text-white'
-            }`}
-          >
-            <div className="relative">
-              {activeSecondaryItem ? (
-                <activeSecondaryItem.icon className="w-5 h-5 scale-110 stroke-[2.5]" />
-              ) : (
-                <MoreHorizontal className="w-5 h-5 stroke-2" />
-              )}
-              {isSecondaryActive && (
-                <span className="absolute -top-1 -right-1.5 flex h-2 w-2 rounded-full bg-[#1877F2]" />
-              )}
-            </div>
-            <span className="text-[10px] sm:text-[11px] tracking-tight mt-1 font-bold truncate max-w-[80px]">
-              {activeSecondaryItem ? activeSecondaryItem.label : language === 'en' ? 'More' : 'Más'}
-            </span>
-          </button>
+          {/* Tab: Más / Menú (solo para jugadores y DT) */}
+          {!isLeagueAdmin && (
+            <button
+              id="mobile-tab-more"
+              onClick={() => setIsMoreMenuOpen(true)}
+              className={`flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl transition-all relative cursor-pointer ${
+                isSecondaryActive || isMoreMenuOpen
+                  ? 'text-[#1877F2] dark:text-[#60A5FA] font-bold bg-[#E7F3FF] dark:bg-[#1877F2]/20'
+                  : 'text-[#65676B] dark:text-gray-400 hover:text-[#050505] dark:hover:text-white'
+              }`}
+            >
+              <div className="relative">
+                {activeSecondaryItem ? (
+                  <activeSecondaryItem.icon className="w-5 h-5 scale-110 stroke-[2.5]" />
+                ) : (
+                  <MoreHorizontal className="w-5 h-5 stroke-2" />
+                )}
+                {isSecondaryActive && (
+                  <span className="absolute -top-1 -right-1.5 flex h-2 w-2 rounded-full bg-[#1877F2]" />
+                )}
+              </div>
+              <span className="text-[10px] sm:text-[11px] tracking-tight mt-1 font-bold truncate max-w-[80px]">
+                {activeSecondaryItem ? activeSecondaryItem.label : language === 'en' ? 'More' : 'Más'}
+              </span>
+            </button>
+          )}
         </nav>
       </div>
     </>

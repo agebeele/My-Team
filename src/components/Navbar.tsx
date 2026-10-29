@@ -77,6 +77,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
+      case 'league_admin':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-purple-700 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-full">
+            <Shield className="w-3 h-3 text-purple-600" />
+            <span>Oficial de Liga</span>
+          </span>
+        );
       case 'owner':
         return (
           <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
@@ -120,9 +127,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
-                  <span>{team.shortName}</span>
+                  <span>{currentUser.role === 'league_admin' ? 'Panel de Liga' : team.shortName}</span>
                 </h1>
-                {hasLiveMatch && (
+                {hasLiveMatch && currentUser.role !== 'league_admin' && (
                   <button
                     onClick={() => handleTabChange('live_match')}
                     className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-wider animate-pulse cursor-pointer shadow-xs hover:bg-rose-100 transition-colors"
@@ -134,113 +141,142 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
               <p className="text-[11px] sm:text-xs text-[#65676B] dark:text-gray-400 truncate max-w-[150px] sm:max-w-xs font-medium">
-                {team.leagueName}
+                {team.leagueName || 'Liga Premier Fútbol 7'}
               </p>
             </div>
           </div>
 
           {/* Desktop Navigation Tabs */}
           <nav className="hidden lg:flex items-center gap-1 bg-[#F0F2F5] dark:bg-[#18191A] p-1 rounded-xl">
-            <button
-              id="nav-btn-calendar"
-              onClick={() => handleTabChange('calendar')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === 'calendar'
-                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              {t.nav.calendar}
-            </button>
-            <button
-              id="nav-btn-live-match"
-              onClick={() => handleTabChange('live_match')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTab === 'live_match'
-                  ? 'bg-white dark:bg-[#242526] text-rose-600 shadow-xs'
-                  : hasLiveMatch
-                  ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 animate-pulse'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              <Zap
-                className={`w-3.5 h-3.5 ${
-                  hasLiveMatch ? 'text-rose-600 fill-rose-600' : 'text-[#65676B] dark:text-gray-400'
-                }`}
-              />
-              <span>{t.nav.liveMatch || 'Modo Partido'}</span>
-              {hasLiveMatch && (
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
-              )}
-            </button>
-            <button
-              id="nav-btn-convocatoria"
-              onClick={() => handleTabChange('convocatoria')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === 'convocatoria'
-                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              {t.nav.convocatoria}
-            </button>
-            <button
-              id="nav-btn-lineup"
-              onClick={() => handleTabChange('lineup')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === 'lineup'
-                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              {t.nav.lineup}
-            </button>
-            <button
-              id="nav-btn-tables"
-              onClick={() => handleTabChange('tables')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === 'tables' || selectedTab === 'standings'
-                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              {t.nav.tables}
-            </button>
-            <button
-              id="nav-btn-mvp"
-              onClick={() => handleTabChange('mvp')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedTab === 'mvp'
-                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              <Sparkles className="w-3 h-3 text-amber-500" />
-              {t.nav.mvp}
-            </button>
-            <button
-              id="nav-btn-wall"
-              onClick={() => handleTabChange('wall')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                selectedTab === 'wall'
-                  ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
-                  : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-              }`}
-            >
-              {t.nav.wall}
-            </button>
-            {currentUser.role === 'owner' && (
-              <button
-                id="nav-btn-admin"
-                onClick={() => handleTabChange('admin')}
-                className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  selectedTab === 'admin'
-                    ? 'bg-white text-[#1877F2] shadow-xs'
-                    : 'text-[#1877F2] hover:bg-white/60'
-                }`}
-              >
-                Configuración
-              </button>
+            {currentUser.role === 'league_admin' ? (
+              <>
+                <button
+                  id="nav-btn-wall"
+                  onClick={() => handleTabChange('wall')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'wall'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  📰 {t.nav.wall}
+                </button>
+                <button
+                  id="nav-btn-tables"
+                  onClick={() => handleTabChange('tables')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'tables' || selectedTab === 'standings'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  🏆 {t.nav.tables}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  id="nav-btn-calendar"
+                  onClick={() => handleTabChange('calendar')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'calendar'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {t.nav.calendar}
+                </button>
+                <button
+                  id="nav-btn-live-match"
+                  onClick={() => handleTabChange('live_match')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    selectedTab === 'live_match'
+                      ? 'bg-white dark:bg-[#242526] text-rose-600 shadow-xs'
+                      : hasLiveMatch
+                      ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 animate-pulse'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  <Zap
+                    className={`w-3.5 h-3.5 ${
+                      hasLiveMatch ? 'text-rose-600 fill-rose-600' : 'text-[#65676B] dark:text-gray-400'
+                    }`}
+                  />
+                  <span>{t.nav.liveMatch || 'Modo Partido'}</span>
+                  {hasLiveMatch && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                  )}
+                </button>
+                <button
+                  id="nav-btn-convocatoria"
+                  onClick={() => handleTabChange('convocatoria')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'convocatoria'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {t.nav.convocatoria}
+                </button>
+                <button
+                  id="nav-btn-lineup"
+                  onClick={() => handleTabChange('lineup')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'lineup'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {t.nav.lineup}
+                </button>
+                <button
+                  id="nav-btn-tables"
+                  onClick={() => handleTabChange('tables')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'tables' || selectedTab === 'standings'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {t.nav.tables}
+                </button>
+                <button
+                  id="nav-btn-mvp"
+                  onClick={() => handleTabChange('mvp')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    selectedTab === 'mvp'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  {t.nav.mvp}
+                </button>
+                <button
+                  id="nav-btn-wall"
+                  onClick={() => handleTabChange('wall')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'wall'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {t.nav.wall}
+                </button>
+                {currentUser.role === 'owner' && (
+                  <button
+                    id="nav-btn-admin"
+                    onClick={() => handleTabChange('admin')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      selectedTab === 'admin'
+                        ? 'bg-white text-[#1877F2] shadow-xs'
+                        : 'text-[#1877F2] hover:bg-white/60'
+                    }`}
+                  >
+                    Configuración
+                  </button>
+                )}
+              </>
             )}
           </nav>
 

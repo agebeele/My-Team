@@ -58,7 +58,7 @@ import {
   supabaseUpsertUser,
   subscribeToSupabaseTable,
 } from './utils/supabaseService';
-import { fetchBackendSync, pushBackendSync } from './utils/backendSync';
+import { fetchBackendSync, pushBackendSync, pushBackendSyncImmediate } from './utils/backendSync';
 import { TeamInvitation } from './types';
 
 export default function App() {
@@ -187,7 +187,10 @@ export default function App() {
   const handleSetPosts: React.Dispatch<React.SetStateAction<Post[]>> = (action) => {
     setPosts((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      pushBackendSync({ posts: next });
+      try {
+        localStorage.setItem('teamgol_posts_data', JSON.stringify(next));
+      } catch {}
+      pushBackendSyncImmediate({ posts: next });
       if (isSupabaseConfigured()) {
         next.forEach((p) => {
           supabaseUpsertPost(p);
@@ -213,13 +216,18 @@ export default function App() {
   const handleSetMatches: React.Dispatch<React.SetStateAction<Match[]>> = (action) => {
     setMatches((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      pushBackendSync({ matches: next });
+      const tagged = next.map((m) => ({ ...m, teamId: m.teamId || team.id }));
+      saveMatchesForTeam(team.id, tagged);
+      try {
+        localStorage.setItem('teamgol_matches_data', JSON.stringify(tagged));
+      } catch {}
+      pushBackendSyncImmediate({ matches: tagged, team });
       if (isSupabaseConfigured()) {
-        next.forEach((m) => {
+        tagged.forEach((m) => {
           supabaseUpsertMatch(team.id, m);
         });
       }
-      return next;
+      return tagged;
     });
   };
 
@@ -283,11 +291,31 @@ export default function App() {
 
       if (data.matches) {
         const currentMatches = data.matches.filter((m: any) => !m.teamId || m.teamId === team.id);
-        setMatches(currentMatches);
+        setMatches((prev) => {
+          const map = new Map<string, Match>();
+          currentMatches.forEach((m: any) => map.set(m.id, m));
+          // Preserve newly added local matches that might still be in-flight
+          prev.forEach((m) => {
+            if (!map.has(m.id)) {
+              map.set(m.id, m);
+            }
+          });
+          return Array.from(map.values());
+        });
       }
 
       if (data.posts && data.posts.length > 0) {
-        setPosts(data.posts);
+        setPosts((prev) => {
+          const map = new Map<string, Post>();
+          data.posts.forEach((p: any) => map.set(p.id, p));
+          // Preserve newly created local posts so they never flash or disappear
+          prev.forEach((p) => {
+            if (!map.has(p.id)) {
+              map.set(p.id, p);
+            }
+          });
+          return Array.from(map.values());
+        });
       }
       if (data.users && data.users.length > 0) {
         setUsers(data.users);
@@ -398,6 +426,16 @@ export default function App() {
     }
   }, [currentUser]);
 
+  // Restrict navigation for league_admin to wall and tables
+  useEffect(() => {
+    if (currentUser?.role === 'league_admin') {
+      const allowed = ['wall', 'tables', 'standings', 'profile'];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab('wall');
+      }
+    }
+  }, [currentUser?.role, activeTab]);
+
   const currentPlayer = players.find((p) => p.id === selectedPlayerId) || players[0];
 
   const handleOpenMvpForMatch = (matchId: string) => {
@@ -441,18 +479,22 @@ export default function App() {
           invitedTeamName={invitedTeamName}
           onLoginSuccess={(user, rememberDevice) => {
             setCurrentUser(user);
-            const userTeamId =
-              user.teamId ||
-              (user.email.toLowerCase() === 'agbl141201@gmail.com' || user.username?.toLowerCase() === 'admin'
-                ? 'team_01'
-                : null);
+            if (user.role === 'league_admin') {
+              setActiveTab('wall');
+            } else {
+              const userTeamId =
+                user.teamId ||
+                (user.email.toLowerCase() === 'agbl141201@gmail.com' || user.username?.toLowerCase() === 'admin'
+                  ? 'team_01'
+                  : null);
 
-            if (userTeamId) {
-              const targetTeam =
-                allTeams.find((t) => t.id === userTeamId) ||
-                (userTeamId === 'team_01' ? INITIAL_TEAM : undefined);
-              if (targetTeam) {
-                handleSwitchTeam(targetTeam);
+              if (userTeamId) {
+                const targetTeam =
+                  allTeams.find((t) => t.id === userTeamId) ||
+                  (userTeamId === 'team_01' ? INITIAL_TEAM : undefined);
+                if (targetTeam) {
+                  handleSwitchTeam(targetTeam);
+                }
               }
             }
             if (rememberDevice) {

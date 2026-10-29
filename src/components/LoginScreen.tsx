@@ -287,6 +287,41 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
+    // Direct check for League Admin: usuario admin@dreamteam.com, pass admin
+    if (
+      (identifier === 'admin@dreamteam.com' || identifier === 'liga') &&
+      pass === 'admin'
+    ) {
+      const leagueUserInList = allUsers.find(
+        (u) =>
+          u.email.toLowerCase() === 'admin@dreamteam.com' ||
+          (u.username && u.username.toLowerCase() === 'admin@dreamteam.com')
+      );
+
+      const targetLeagueAdmin: AppUser = {
+        id: leagueUserInList?.id || 'u_league_admin',
+        name: leagueUserInList?.name || 'Administrador de Liga',
+        email: 'admin@dreamteam.com',
+        username: 'admin@dreamteam.com',
+        password: 'admin',
+        role: 'league_admin',
+        avatarUrl:
+          leagueUserInList?.avatarUrl ||
+          'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=200&q=80',
+        provider: 'email',
+      };
+
+      if (!leagueUserInList && setUsers) {
+        setUsers((prev) => [targetLeagueAdmin, ...prev]);
+      }
+
+      setLoginSuccess('¡Bienvenido Administrador de Liga!');
+      setTimeout(() => {
+        onLoginSuccess(targetLeagueAdmin, rememberDevice);
+      }, 500);
+      return;
+    }
+
     // Match in user directory
     const matchedUser = allUsers.find(
       (u) =>

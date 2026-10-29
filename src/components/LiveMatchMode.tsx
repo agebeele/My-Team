@@ -561,6 +561,31 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
 
   const sortedEvents = [...(currentMatch?.events || [])].sort((a, b) => b.minute - a.minute);
 
+  if (!currentMatch) {
+    return (
+      <div className="max-w-2xl mx-auto my-8 p-8 sm:p-12 bg-white rounded-3xl border border-[#CED0D4] shadow-xs text-center space-y-5 animate-in fade-in">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-xs">
+          <Calendar className="w-8 h-8" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl sm:text-2xl font-black text-[#050505]">No hay partidos programados</h3>
+          <p className="text-xs sm:text-sm text-[#65676B] max-w-md mx-auto leading-relaxed">
+            No tienes partidos agendados para transmitir en vivo actualmente. Agrega un partido en el calendario para llevar el marcador, cronómetro, alineación y goles en tiempo real.
+          </p>
+        </div>
+        {onBackToCalendar && (
+          <button
+            onClick={onBackToCalendar}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Ir al Calendario de Partidos</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Toast notification */}

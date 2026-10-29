@@ -206,6 +206,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
     } else {
       const newMatch: Match = {
         id: `m_${Date.now()}`,
+        teamId: team.id,
         rival: formData.rival,
         rivalLogo: formData.rivalLogo,
         date: formData.date,

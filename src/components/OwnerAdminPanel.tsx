@@ -397,6 +397,19 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     setTimeout(() => setNotificationStatus(null), 5000);
   };
 
+  const handleCancelInvitation = (invId: string) => {
+    const invToCancel = sentInvitations.find((i) => i.id === invId);
+    const updated = sentInvitations.filter((i) => i.id !== invId);
+    setSentInvitations(updated);
+    try {
+      localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+    setNotificationStatus(`Invitación para ${invToCancel?.email || 'el jugador'} cancelada y eliminada.`);
+    setTimeout(() => setNotificationStatus(null), 4000);
+  };
+
   const handleUpdateTeam = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedTeam: TeamInfo = {
@@ -856,6 +869,14 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                     >
                       <Copy className="w-3 h-3" />
                       <span>Copiar Enlace</span>
+                    </button>
+                    <button
+                      onClick={() => handleCancelInvitation(inv.id)}
+                      className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[11px] cursor-pointer flex items-center gap-1 transition-colors"
+                      title="Cancelar y eliminar esta invitación"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Cancelar</span>
                     </button>
                   </div>
                 </div>

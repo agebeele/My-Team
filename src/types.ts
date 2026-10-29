@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'player' | 'admin' | 'coach';
+export type UserRole = 'owner' | 'player' | 'admin' | 'coach' | 'league_admin';
 
 // All standard football / soccer positions
 export type PlayerPosition =
@@ -173,6 +173,7 @@ export interface LineupPosition {
 
 export interface Match {
   id: string;
+  teamId?: string;
   rival: string;
   rivalLogo: string;
   date: string; // YYYY-MM-DD

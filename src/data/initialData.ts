@@ -679,6 +679,16 @@ export const INITIAL_USERS: AppUser[] = [
     provider: 'email',
   },
   {
+    id: 'u_league_admin',
+    name: 'Administrador de Liga',
+    email: 'admin@dreamteam.com',
+    username: 'admin@dreamteam.com',
+    password: 'admin',
+    role: 'league_admin',
+    avatarUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=200&q=80',
+    provider: 'email',
+  },
+  {
     id: 'u_p1',
     name: 'Brandon García (Lucho)',
     email: 'brandon.garcia@bayern.com',

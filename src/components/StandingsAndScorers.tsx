@@ -497,7 +497,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                 </>
               ) : (
                 <>
-                  {(currentUser.role === 'owner' || currentUser.role === 'coach') && setStandings && (
+                  {(currentUser.role === 'owner' || currentUser.role === 'coach' || currentUser.role === 'league_admin') && setStandings && (
                     <>
                       <button
                         type="button"

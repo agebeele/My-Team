@@ -88,18 +88,71 @@ const INITIAL_SERVER_USERS = [
     teamId: 'team_01',
     provider: 'email',
   },
+  {
+    id: 'u_league_admin',
+    name: 'Administrador de Liga',
+    email: 'admin@dreamteam.com',
+    username: 'admin@dreamteam.com',
+    password: 'admin',
+    role: 'league_admin',
+    avatarUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=200&q=80',
+    provider: 'email',
+  },
 ];
 
 function inicializarBD() {
   db.serialize(() => {
-    // 1. Tabla de estado centralizado
+    // 1. Tabla de estado centralizado (cache rápido de sincronización)
     db.run(`CREATE TABLE IF NOT EXISTS app_store (
       key TEXT PRIMARY KEY,
       value TEXT,
       updated_at INTEGER
     )`);
 
-    // 2. Tabla clásica de jugadores
+    // 2. Tabla relacional de partidos
+    db.run(`CREATE TABLE IF NOT EXISTS partidos (
+      id TEXT PRIMARY KEY,
+      team_id TEXT,
+      rival TEXT,
+      fecha TEXT,
+      hora TEXT,
+      cancha TEXT,
+      payload TEXT,
+      updated_at INTEGER
+    )`);
+
+    // 3. Tabla relacional de publicaciones y anuncios
+    db.run(`CREATE TABLE IF NOT EXISTS publicaciones (
+      id TEXT PRIMARY KEY,
+      team_id TEXT,
+      autor_id TEXT,
+      autor_nombre TEXT,
+      autor_rol TEXT,
+      es_oficial_liga INTEGER,
+      categoria TEXT,
+      titulo TEXT,
+      contenido TEXT,
+      payload TEXT,
+      updated_at INTEGER
+    )`);
+
+    // 4. Tabla relacional de equipos
+    db.run(`CREATE TABLE IF NOT EXISTS equipos (
+      id TEXT PRIMARY KEY,
+      nombre TEXT,
+      payload TEXT,
+      updated_at INTEGER
+    )`);
+
+    // 5. Tabla relacional de usuarios
+    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE,
+      payload TEXT,
+      updated_at INTEGER
+    )`);
+
+    // 6. Tabla clásica de jugadores
     db.run(`CREATE TABLE IF NOT EXISTS jugadores (
       id TEXT PRIMARY KEY,
       nombre TEXT NOT NULL,
@@ -230,9 +283,12 @@ app.post('/api/sync', (req, res) => {
         mergedUsers = [...mergedUsers.filter((u: any) => u.email.toLowerCase() !== newU.email.toLowerCase()), newU];
       });
     }
-    // Always ensure admin is present
+    // Always ensure admin and league_admin are present
     if (!mergedUsers.some((u: any) => u.email.toLowerCase() === 'agbl141201@gmail.com')) {
       mergedUsers = [...mergedUsers, INITIAL_SERVER_USERS[0]];
+    }
+    if (!mergedUsers.some((u: any) => u.email.toLowerCase() === 'admin@dreamteam.com')) {
+      mergedUsers = [...mergedUsers, INITIAL_SERVER_USERS[1]];
     }
 
     // 3. Players: Merge players by teamId so one team's updates NEVER erase another team's squad!
@@ -284,7 +340,7 @@ app.post('/api/sync', (req, res) => {
       });
     }
 
-    // Write merged state to SQLite
+    // Write merged state to SQLite app_store and relational tables
     db.serialize(() => {
       const stmt = db.prepare(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES (?, ?, ?)`);
       stmt.run('allTeams', JSON.stringify(mergedAllTeams), currentVersion);
@@ -295,10 +351,96 @@ app.post('/api/sync', (req, res) => {
       if (updates.standings) {
         stmt.run('standings', JSON.stringify(updates.standings), currentVersion);
       }
-      stmt.finalize((finalErr) => {
-        if (finalErr) return res.status(500).json({ error: finalErr.message });
-        res.json({ success: true, version: currentVersion });
-      });
+      stmt.finalize();
+
+      // Upsert individual matches into relational table 'partidos'
+      if (updates.matches && Array.isArray(updates.matches)) {
+        const matchStmt = db.prepare(`INSERT OR REPLACE INTO partidos (id, team_id, rival, fecha, hora, cancha, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+        mergedMatches.forEach((m: any) => {
+          matchStmt.run(
+            m.id,
+            m.teamId || 'team_01',
+            m.rival || '',
+            m.date || '',
+            m.time || '',
+            m.stadium || '',
+            JSON.stringify(m),
+            currentVersion
+          );
+        });
+        matchStmt.finalize();
+      }
+
+      // Upsert individual posts into relational table 'publicaciones'
+      if (updates.posts && Array.isArray(updates.posts)) {
+        const postStmt = db.prepare(`INSERT OR REPLACE INTO publicaciones (id, team_id, autor_id, autor_nombre, autor_rol, es_oficial_liga, categoria, titulo, contenido, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        mergedPosts.forEach((p: any) => {
+          postStmt.run(
+            p.id,
+            p.teamId || null,
+            p.authorId || null,
+            p.authorName || '',
+            p.authorRole || 'player',
+            p.isLeagueOfficial || p.authorRole === 'league_admin' ? 1 : 0,
+            p.category || 'Anuncio',
+            p.title || '',
+            p.content || '',
+            JSON.stringify(p),
+            currentVersion
+          );
+        });
+        postStmt.finalize();
+      }
+
+      res.json({ success: true, version: currentVersion });
+    });
+  });
+});
+
+// Endpoint de Partidos (relacional)
+app.get('/api/partidos', (req, res) => {
+  const { teamId } = req.query;
+  const sql = teamId
+    ? `SELECT payload FROM partidos WHERE team_id = ? ORDER BY fecha DESC, hora DESC`
+    : `SELECT payload FROM partidos ORDER BY fecha DESC, hora DESC`;
+  const params = teamId ? [teamId] : [];
+
+  db.all(sql, params, (err, rows: any[]) => {
+    if (!err && rows && rows.length > 0) {
+      try {
+        return res.json(rows.map((r) => JSON.parse(r.payload)));
+      } catch {}
+    }
+    // fallback a app_store
+    db.get(`SELECT value FROM app_store WHERE key = 'matches'`, (err2, row: any) => {
+      if (!err2 && row && row.value) {
+        try {
+          const list = JSON.parse(row.value);
+          const filtered = teamId ? list.filter((m: any) => m.teamId === teamId) : list;
+          return res.json(filtered);
+        } catch {}
+      }
+      res.json([]);
+    });
+  });
+});
+
+// Endpoint de Publicaciones / Muro (relacional)
+app.get('/api/publicaciones', (_req, res) => {
+  db.all(`SELECT payload FROM publicaciones ORDER BY updated_at DESC`, [], (err, rows: any[]) => {
+    if (!err && rows && rows.length > 0) {
+      try {
+        return res.json(rows.map((r) => JSON.parse(r.payload)));
+      } catch {}
+    }
+    // fallback a app_store
+    db.get(`SELECT value FROM app_store WHERE key = 'posts'`, (err2, row: any) => {
+      if (!err2 && row && row.value) {
+        try {
+          return res.json(JSON.parse(row.value));
+        } catch {}
+      }
+      res.json([]);
     });
   });
 });

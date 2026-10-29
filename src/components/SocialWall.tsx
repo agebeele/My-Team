@@ -8,6 +8,7 @@ import {
   Crown,
   User,
   ShieldCheck,
+  Shield,
   CheckCircle2,
   XCircle,
   Clock,
@@ -72,10 +73,15 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   const currentLeague = (team?.leagueName || 'Liga Premier Fútbol 7').trim().toLowerCase();
 
   const relevantPosts = posts.filter((p) => {
-    const isOfficialLeaguePost = p.isLeagueOfficial || p.category === 'Liga';
+    // 1. ALL league admin and official league posts appear across ALL teams!
+    const isOfficialLeaguePost =
+      p.isLeagueOfficial ||
+      p.category === 'Liga' ||
+      p.authorRole === 'league_admin' ||
+      !p.teamId;
+
     if (isOfficialLeaguePost) {
-      if (!p.leagueName) return true;
-      return p.leagueName.trim().toLowerCase() === currentLeague;
+      return true;
     }
 
     if (p.teamId && p.teamId !== currentTeamId) {
@@ -130,9 +136,9 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) return;
 
-    const isOwner = currentUser.role === 'owner';
+    const isOwner = currentUser.role === 'owner' || currentUser.role === 'league_admin';
+    const isLeagueOfficialPost = newCategory === 'Liga' || currentUser.role === 'league_admin';
     const postStatus: Post['status'] = isOwner ? 'approved' : 'pending';
-    const isLeagueOfficialPost = newCategory === 'Liga';
 
     const post: Post = {
       id: `post_${Date.now()}`,
@@ -295,6 +301,13 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   };
 
   const getRoleBadge = (role: string) => {
+    if (role === 'league_admin') {
+      return (
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 font-bold border border-purple-300 inline-flex items-center gap-1">
+          <Shield className="w-2.5 h-2.5 text-purple-600" /> Oficial de Liga
+        </span>
+      );
+    }
     if (role === 'owner') {
       return (
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 font-bold border border-amber-300 inline-flex items-center gap-1">

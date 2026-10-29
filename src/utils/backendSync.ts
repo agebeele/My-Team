@@ -34,7 +34,28 @@ export const fetchBackendSync = async (): Promise<AppSyncData | null> => {
   }
 };
 
-// Send changes to backend SQLite with debouncing
+// Immediate push without delay (for critical saves: new posts, new matches, team edits)
+export const pushBackendSyncImmediate = async (data: AppSyncData): Promise<boolean> => {
+  try {
+    const res = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.version) {
+        lastServerVersion = json.version;
+      }
+      return true;
+    }
+  } catch (err) {
+    console.warn('Error pushing immediate sync to SQLite backend:', err);
+  }
+  return false;
+};
+
+// Send changes to backend SQLite with minimal debouncing
 export const pushBackendSync = (data: AppSyncData) => {
   pendingPush = { ...(pendingPush || {}), ...data };
 
@@ -68,7 +89,7 @@ export const pushBackendSync = (data: AppSyncData) => {
         pushBackendSync({});
       }
     }
-  }, 300);
+  }, 50);
 };
 
 export const getServerVersion = () => lastServerVersion;
