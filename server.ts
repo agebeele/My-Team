@@ -164,6 +164,20 @@ function inicializarBD() {
       creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // 7. Tabla relacional de solicitudes para unirse a equipos
+    db.run(`CREATE TABLE IF NOT EXISTS solicitudes_equipo (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      user_name TEXT,
+      user_email TEXT,
+      team_id TEXT,
+      team_name TEXT,
+      status TEXT DEFAULT 'pending',
+      payload TEXT,
+      created_at INTEGER,
+      updated_at INTEGER
+    )`);
+
     // Comprobar si app_store ya tiene datos; si no, poblarlo
     db.get(`SELECT COUNT(*) as count FROM app_store`, (err, row: any) => {
       if (!err && row && row.count === 0) {
@@ -229,6 +243,11 @@ app.get('/api/sync', (_req, res) => {
       result.matches = [];
       result.posts = [];
       result.standings = [];
+      result.joinRequests = [];
+    }
+
+    if (!result.joinRequests) {
+      result.joinRequests = [];
     }
 
     res.json(result);
@@ -340,6 +359,14 @@ app.post('/api/sync', (req, res) => {
       });
     }
 
+    // 6. Join Requests: Merge by id
+    let mergedJoinRequests: any[] = currentData.joinRequests || [];
+    if (updates.joinRequests && Array.isArray(updates.joinRequests)) {
+      updates.joinRequests.forEach((newR: any) => {
+        mergedJoinRequests = [newR, ...mergedJoinRequests.filter((r: any) => r.id !== newR.id)];
+      });
+    }
+
     // Write merged state to SQLite app_store and relational tables
     db.serialize(() => {
       const stmt = db.prepare(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES (?, ?, ?)`);
@@ -348,6 +375,7 @@ app.post('/api/sync', (req, res) => {
       stmt.run('players', JSON.stringify(mergedPlayers), currentVersion);
       stmt.run('matches', JSON.stringify(mergedMatches), currentVersion);
       stmt.run('posts', JSON.stringify(mergedPosts), currentVersion);
+      stmt.run('joinRequests', JSON.stringify(mergedJoinRequests), currentVersion);
       if (updates.standings) {
         stmt.run('standings', JSON.stringify(updates.standings), currentVersion);
       }
@@ -408,7 +436,36 @@ app.post('/api/sync', (req, res) => {
         postStmt.finalize();
       }
 
-      res.json({ success: true, version: currentVersion });
+      // Upsert individual join requests into 'solicitudes_equipo'
+      if (updates.joinRequests && Array.isArray(updates.joinRequests)) {
+        const reqStmt = db.prepare(`INSERT OR REPLACE INTO solicitudes_equipo (id, user_id, user_name, user_email, team_id, team_name, status, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        mergedJoinRequests.forEach((r: any) => {
+          reqStmt.run(
+            r.id,
+            r.userId,
+            r.userName || '',
+            r.userEmail || '',
+            r.teamId,
+            r.teamName || '',
+            r.status || 'pending',
+            JSON.stringify(r),
+            Date.now(),
+            currentVersion
+          );
+        });
+        reqStmt.finalize();
+      }
+
+      res.json({
+        success: true,
+        version: currentVersion,
+        posts: mergedPosts,
+        matches: mergedMatches,
+        joinRequests: mergedJoinRequests,
+        users: mergedUsers,
+        players: mergedPlayers,
+        allTeams: mergedAllTeams,
+      });
     });
   });
 });
@@ -480,6 +537,145 @@ app.get('/api/publicaciones', (_req, res) => {
       res.json([]);
     });
   });
+});
+
+// Eliminar una publicación directamente por ID
+app.delete('/api/publicaciones/:id', (req, res) => {
+  const postId = req.params.id;
+  currentVersion = Date.now();
+  db.serialize(() => {
+    db.run(`DELETE FROM publicaciones WHERE id = ?`, [postId]);
+    db.get(`SELECT value FROM app_store WHERE key = 'posts'`, (err, row: any) => {
+      if (!err && row && row.value) {
+        try {
+          const list = JSON.parse(row.value).filter((p: any) => p.id !== postId);
+          db.run(
+            `INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('posts', ?, ?)`,
+            [JSON.stringify(list), currentVersion]
+          );
+        } catch {}
+      }
+    });
+  });
+  res.json({ success: true, deletedId: postId, version: currentVersion });
+});
+
+// Endpoint de Solicitudes de Ingreso a Equipos
+app.get('/api/solicitudes', (_req, res) => {
+  db.all(`SELECT payload FROM solicitudes_equipo ORDER BY updated_at DESC`, [], (err, rows: any[]) => {
+    if (!err && rows && rows.length > 0) {
+      try {
+        return res.json(rows.map((r) => JSON.parse(r.payload)));
+      } catch {}
+    }
+    db.get(`SELECT value FROM app_store WHERE key = 'joinRequests'`, (err2, row: any) => {
+      if (!err2 && row && row.value) {
+        try {
+          return res.json(JSON.parse(row.value));
+        } catch {}
+      }
+      res.json([]);
+    });
+  });
+});
+
+// Crear o actualizar solicitud de ingreso
+app.post('/api/solicitudes', (req, res) => {
+  const request = req.body;
+  if (!request || !request.userId || !request.teamId) {
+    return res.status(400).json({ error: 'Datos de solicitud incompletos' });
+  }
+
+  const reqId = request.id || `req_${Date.now()}`;
+  const reqObj = {
+    ...request,
+    id: reqId,
+    status: request.status || 'pending',
+    createdAt: request.createdAt || new Date().toISOString(),
+  };
+
+  currentVersion = Date.now();
+  db.serialize(() => {
+    db.run(
+      `INSERT OR REPLACE INTO solicitudes_equipo (id, user_id, user_name, user_email, team_id, team_name, status, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        reqObj.id,
+        reqObj.userId,
+        reqObj.userName || '',
+        reqObj.userEmail || '',
+        reqObj.teamId,
+        reqObj.teamName || '',
+        reqObj.status,
+        JSON.stringify(reqObj),
+        Date.now(),
+        currentVersion,
+      ]
+    );
+
+    db.get(`SELECT value FROM app_store WHERE key = 'joinRequests'`, (err, row: any) => {
+      let list: any[] = [];
+      if (!err && row && row.value) {
+        try {
+          list = JSON.parse(row.value);
+        } catch {}
+      }
+      list = [reqObj, ...list.filter((r) => r.id !== reqObj.id)];
+      db.run(
+        `INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('joinRequests', ?, ?)`,
+        [JSON.stringify(list), currentVersion]
+      );
+    });
+  });
+
+  res.json({ success: true, request: reqObj, version: currentVersion });
+});
+
+// Resolver solicitud (Aceptar o Rechazar)
+app.put('/api/solicitudes/:id', (req, res) => {
+  const reqId = req.params.id;
+  const { status } = req.body; // 'accepted' | 'rejected'
+
+  if (!status || !['accepted', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'Estado no válido' });
+  }
+
+  currentVersion = Date.now();
+  db.serialize(() => {
+    db.get(`SELECT payload FROM solicitudes_equipo WHERE id = ?`, [reqId], (err, row: any) => {
+      let targetReq: any = null;
+      if (!err && row && row.payload) {
+        try {
+          targetReq = JSON.parse(row.payload);
+        } catch {}
+      }
+
+      if (targetReq) {
+        targetReq.status = status;
+        targetReq.resolvedAt = new Date().toISOString();
+
+        db.run(
+          `UPDATE solicitudes_equipo SET status = ?, payload = ?, updated_at = ? WHERE id = ?`,
+          [status, JSON.stringify(targetReq), currentVersion, reqId]
+        );
+      }
+
+      db.get(`SELECT value FROM app_store WHERE key = 'joinRequests'`, (_err2, row2: any) => {
+        let list: any[] = [];
+        if (row2 && row2.value) {
+          try {
+            list = JSON.parse(row2.value);
+          } catch {}
+        }
+        list = list.map((r) => (r.id === reqId ? { ...r, status, resolvedAt: new Date().toISOString() } : r));
+        db.run(
+          `INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('joinRequests', ?, ?)`,
+          [JSON.stringify(list), currentVersion]
+        );
+      });
+    });
+  });
+
+  res.json({ success: true, id: reqId, status, version: currentVersion });
 });
 
 // Endpoint de Jugadores

@@ -6,7 +6,6 @@ import {
   Trophy,
   Plus,
   FileDown,
-  Bell,
   CheckCircle2,
   Sparkles,
   Edit2,
@@ -20,6 +19,8 @@ import {
   Image as ImageIcon,
   Users,
   X,
+  Eye,
+  Lock,
 } from 'lucide-react';
 import { Match, MatchModality, TeamInfo, Player, AppUser, Language } from '../types';
 import { getT } from '../utils/translations';
@@ -44,6 +45,19 @@ interface MatchCalendarProps {
   activeReminders?: string[];
   toggleMatchReminder?: (match: Match) => void;
 }
+
+export const isMatchTimeOrLive = (match: Match): boolean => {
+  if (match.status === 'live' || match.status === 'finished') return true;
+  if (!match.date) return false;
+  try {
+    const timeStr = match.time ? match.time : '00:00';
+    const matchDateTime = new Date(`${match.date}T${timeStr}:00`);
+    if (isNaN(matchDateTime.getTime())) return false;
+    return Date.now() >= matchDateTime.getTime();
+  } catch {
+    return false;
+  }
+};
 
 export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   matches = [],
@@ -423,9 +437,9 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
           const modalityInfo = getModalityInfo(match.modality);
           const mvpActive = isMvpVoteAvailable(match);
           const minutesElapsed = getMinutesElapsed(match);
-          const isReminded = activeReminders.includes(match.id);
+          const isReadyForMatch = isMatchTimeOrLive(match);
 
-              return (
+          return (
             <div
               key={match.id}
               id={`match-card-${match.id}`}
@@ -498,8 +512,72 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 )}
               </div>
 
-              {/* Teams & Scoreboard Visual - Full Names & Badges */}
-              <div className="bg-[#F0F2F5] dark:bg-[#18191A] p-4 rounded-xl border border-[#E4E6EB] dark:border-white/10 flex items-center justify-between gap-3">
+              {/* Teams & Scoreboard Visual - Optimized for Mobile & Desktop */}
+              {/* Mobile View (< sm): 2-row sports layout so team names like 'FC BAYERN MUNICH' never wrap awkwardly */}
+              <div className="sm:hidden bg-[#F0F2F5] dark:bg-[#18191A] p-2.5 rounded-2xl border border-[#CED0D4]/80 dark:border-white/10 space-y-2">
+                {/* Home Team Row */}
+                <div className="flex items-center justify-between gap-2.5 p-2 bg-white dark:bg-[#242526] rounded-xl border border-[#CED0D4]/60 dark:border-white/5 shadow-2xs">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <img
+                      src={match.isHome ? team.logoUrl : match.rivalLogo}
+                      alt={match.isHome ? team.name : match.rival}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?auto=format&fit=crop&w=150&q=80';
+                      }}
+                      className="w-9 h-9 rounded-xl object-cover border border-[#1877F2]/30 shrink-0 shadow-2xs"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs font-black text-[#050505] dark:text-white truncate">
+                          {match.isHome ? team.name : match.rival}
+                        </h4>
+                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-blue-50 text-[#1877F2] shrink-0">
+                          Local
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-base font-black font-sport px-2.5 py-1 bg-[#F0F2F5] dark:bg-black/40 rounded-lg text-[#050505] dark:text-white shrink-0 min-w-[32px] text-center">
+                    {match.scoreUs !== null && match.scoreThem !== null
+                      ? (match.isHome ? match.scoreUs : match.scoreThem)
+                      : '-'}
+                  </div>
+                </div>
+
+                {/* Away Team Row */}
+                <div className="flex items-center justify-between gap-2.5 p-2 bg-white dark:bg-[#242526] rounded-xl border border-[#CED0D4]/60 dark:border-white/5 shadow-2xs">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <img
+                      src={!match.isHome ? team.logoUrl : match.rivalLogo}
+                      alt={!match.isHome ? team.name : match.rival}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1518091043644-c1d4457512c6?auto=format&fit=crop&w=150&q=80';
+                      }}
+                      className="w-9 h-9 rounded-xl object-cover border border-[#CED0D4] dark:border-white/10 shrink-0 shadow-2xs"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs font-black text-[#050505] dark:text-white truncate">
+                          {!match.isHome ? team.name : match.rival}
+                        </h4>
+                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 shrink-0">
+                          Visita
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-base font-black font-sport px-2.5 py-1 bg-[#F0F2F5] dark:bg-black/40 rounded-lg text-[#050505] dark:text-white shrink-0 min-w-[32px] text-center">
+                    {match.scoreUs !== null && match.scoreThem !== null
+                      ? (!match.isHome ? match.scoreUs : match.scoreThem)
+                      : '-'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop View (>= sm): Generous 3-column scoreboard with full team names */}
+              <div className="hidden sm:flex bg-[#F0F2F5] dark:bg-[#18191A] p-4 rounded-xl border border-[#E4E6EB] dark:border-white/10 items-center justify-between gap-3">
                 {/* Our Team - Full Name */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <img
@@ -512,7 +590,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover border border-[#1877F2]/30 shrink-0 shadow-xs"
                   />
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white leading-snug break-words">
+                    <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white leading-snug break-normal truncate" title={team.name}>
                       {team.name}
                     </h4>
                     <span className="text-[10px] uppercase font-bold text-[#1877F2] dark:text-[#60A5FA] tracking-wider block mt-0.5">
@@ -522,7 +600,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 </div>
 
                 {/* Center Score or VS */}
-                <div className="flex flex-col items-center justify-center px-2.5 sm:px-3 py-1.5 bg-white dark:bg-[#242526] rounded-xl border border-[#CED0D4] dark:border-white/10 shrink-0 min-w-[65px] sm:min-w-[75px] shadow-xs">
+                <div className="flex flex-col items-center justify-center px-3 py-1.5 bg-white dark:bg-[#242526] rounded-xl border border-[#CED0D4] dark:border-white/10 shrink-0 min-w-[70px] shadow-xs">
                   {match.scoreUs !== null && match.scoreThem !== null ? (
                     <div className="text-xl sm:text-2xl font-black font-sport tracking-wider text-[#050505] dark:text-white flex items-center">
                       <span className="text-[#1877F2] dark:text-emerald-400">{match.scoreUs}</span>
@@ -542,7 +620,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 {/* Rival Team - Full Name */}
                 <div className="flex items-center justify-end gap-3 flex-1 min-w-0 text-right">
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white leading-snug break-words">
+                    <h4 className="text-xs sm:text-sm font-black text-[#050505] dark:text-white leading-snug break-normal truncate" title={match.rival}>
                       {match.rival}
                     </h4>
                     <span className="text-[10px] uppercase font-bold text-[#65676B] dark:text-gray-400 tracking-wider block mt-0.5">
@@ -621,40 +699,33 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
               {/* Action Buttons: Strict RBAC for Players vs Owner */}
               <div className="flex items-center justify-between pt-3 border-t border-[#CED0D4] dark:border-white/5 gap-2 flex-wrap">
                 {!isOwner ? (
-                  /* Player Role: ONLY Recordatorio, Alineación, and Guardar Foto buttons */
+                  /* Player Role: Alineación and Guardar Foto buttons */
                   <div className="flex items-center gap-2 flex-wrap w-full">
-                    {/* 1. Recordatorio */}
-                    <button
-                      id={`btn-reminder-${match.id}`}
-                      onClick={() => toggleMatchReminder(match)}
-                      className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                        isReminded
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
-                          : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4]'
-                      }`}
-                      title="Activar recordatorio para el partido"
-                    >
-                      <Bell className={`w-3.5 h-3.5 ${isReminded ? 'fill-emerald-500 text-emerald-500' : ''}`} />
-                      <span>{isReminded ? 'Recordatorio Activo' : 'Recordatorio'}</span>
-                    </button>
-
-                    {/* 2. Alineación */}
+                    {/* 1. Alineación Button */}
                     <button
                       id={`btn-goto-lineup-${match.id}`}
                       onClick={() => onNavigateToLineup(match.id)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all cursor-pointer shadow-xs"
-                      title="Ver alineación del partido"
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                        match.isLineupSaved
+                          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                          : 'bg-[#E7F3FF] hover:bg-[#DBEAFE] text-[#1877F2] border border-[#1877F2]/30'
+                      }`}
+                      title={match.isLineupSaved ? 'Ver alineación oficial confirmada' : 'Ver alineación del partido'}
                     >
-                      <Shield className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Alineación</span>
+                      {match.isLineupSaved ? (
+                        <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Shield className="w-3.5 h-3.5 text-[#1877F2]" />
+                      )}
+                      <span>{match.isLineupSaved ? 'Ver Alineación' : 'Alineación'}</span>
                     </button>
 
-                    {/* 3. Guardar Foto */}
+                    {/* 2. Guardar Foto */}
                     <button
                       id={`btn-download-img-${match.id}`}
                       onClick={() => handleDownloadMatchImage(match)}
                       disabled={downloadingMatchId === match.id}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#E7F3FF] hover:bg-[#DBEAFE] text-[#1877F2] text-xs font-bold border border-[#1877F2]/30 transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] text-xs font-bold border border-[#CED0D4] transition-all disabled:opacity-50 cursor-pointer shadow-xs"
                       title="Descargar imagen oficial del partido"
                     >
                       <Download className="w-3.5 h-3.5 text-[#1877F2]" />
@@ -662,10 +733,10 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     </button>
                   </div>
                 ) : (
-                  /* Owner Role: Full administrative tool suite */
+                  /* Owner Role: Full administrative tool suite (Recordatorio removed) */
                   <>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      {/* Download Match Photo / Image to Gallery Button */}
+                      {/* Download Match Photo */}
                       <button
                         id={`btn-download-img-${match.id}`}
                         onClick={() => handleDownloadMatchImage(match)}
@@ -675,20 +746,6 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                       >
                         <Download className="w-3.5 h-3.5 text-[#1877F2] dark:text-[#60A5FA]" />
                         <span>{downloadingMatchId === match.id ? 'Guardando...' : 'Guardar Foto'}</span>
-                      </button>
-
-                      {/* Push Notification Button */}
-                      <button
-                        id={`btn-reminder-${match.id}`}
-                        onClick={() => toggleMatchReminder(match)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                          isReminded
-                            ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/30'
-                            : 'bg-[#F0F2F5] hover:bg-[#E4E6EB] dark:bg-white/5 dark:hover:bg-white/10 text-[#050505] dark:text-gray-300 border border-[#CED0D4] dark:border-white/10'
-                        }`}
-                      >
-                        <Bell className={`w-3.5 h-3.5 ${isReminded ? 'fill-emerald-500 text-emerald-500' : ''}`} />
-                        {isReminded ? t.calendar.notified : t.calendar.notifyMe}
                       </button>
 
                       {/* Export PDF Button */}
@@ -716,49 +773,73 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                         <span>Convocatoria</span>
                       </button>
 
-                      {/* Jump to Lineup Pitch */}
+                      {/* Jump to Lineup: Toggles to "Ver Alineación" once saved */}
                       <button
                         id={`btn-goto-lineup-${match.id}`}
                         onClick={() => onNavigateToLineup(match.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all cursor-pointer shadow-xs"
-                        title="Ver y armar alineación táctica 7v7 en la cancha"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                          match.isLineupSaved
+                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        }`}
+                        title={match.isLineupSaved ? 'Ver alineación confirmada y táctica' : 'Armar y configurar alineación para el partido'}
                       >
-                        <Shield className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Alineación</span>
+                        {match.isLineupSaved ? (
+                          <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                        )}
+                        <span>{match.isLineupSaved ? 'Ver Alineación' : 'Armar Alineación'}</span>
                       </button>
 
-                      {/* Enter Live Match Mode */}
+                      {/* Enter Live Match Mode: Enabled strictly at match date/time or when live/finished */}
                       {onStartLiveMatch && (
                         <button
                           id={`btn-live-match-${match.id}`}
-                          onClick={() => onStartLiveMatch(match.id)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                            match.status === 'live'
-                              ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md'
+                          onClick={() => {
+                            if (isReadyForMatch) onStartLiveMatch(match.id);
+                          }}
+                          disabled={!isReadyForMatch}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
+                            !isReadyForMatch
+                              ? 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-white/10 cursor-not-allowed opacity-65'
+                              : match.status === 'live'
+                              ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md cursor-pointer'
                               : match.status === 'finished'
-                              ? 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4]'
-                              : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200'
+                              ? 'bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] border border-[#CED0D4] cursor-pointer'
+                              : 'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 cursor-pointer'
                           }`}
                           title={
-                            match.status === 'live'
+                            !isReadyForMatch
+                              ? `Modo Partido se habilitará a la fecha y hora del encuentro (${match.date} a las ${match.time} hrs)`
+                              : match.status === 'live'
                               ? 'Modo Partido en Vivo'
                               : match.status === 'finished'
                               ? 'Ver Resumen del Partido'
                               : 'Iniciar Modo Partido en Vivo'
                           }
                         >
-                          <Zap
-                            className={`w-3.5 h-3.5 ${
-                              match.status === 'live' ? 'fill-white text-white' : 'text-rose-500'
-                            }`}
-                          />
-                          <span>
-                            {match.status === 'live'
-                              ? 'Modo Partido'
-                              : match.status === 'finished'
-                              ? 'Resumen'
-                              : 'Modo Partido'}
-                          </span>
+                          {!isReadyForMatch ? (
+                            <>
+                              <Lock className="w-3.5 h-3.5 text-gray-400" />
+                              <span>Modo Partido</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap
+                                className={`w-3.5 h-3.5 ${
+                                  match.status === 'live' ? 'fill-white text-white' : 'text-rose-500'
+                                }`}
+                              />
+                              <span>
+                                {match.status === 'live'
+                                  ? 'Modo Partido'
+                                  : match.status === 'finished'
+                                  ? 'Resumen'
+                                  : 'Modo Partido'}
+                              </span>
+                            </>
+                          )}
                         </button>
                       )}
 

@@ -50,12 +50,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const role = userRole || currentUser?.role || 'player';
   const isOwner = role === 'owner';
   const isLeagueAdmin = role === 'league_admin';
+  const isUnassignedPlayer = role === 'player' && !currentUser?.teamId;
 
   // Primary tabs visible in mobile bottom dock
   const primaryTabs = isLeagueAdmin
     ? [
         { id: 'wall', label: t.nav.wall || 'Muro', icon: MessageSquare, isLive: false },
         { id: 'tables', label: t.nav.tables || 'Tablas', icon: Trophy, isLive: false },
+      ]
+    : isUnassignedPlayer
+    ? [
+        { id: 'leagues', label: 'Ligas y Equipos', icon: Trophy, isLive: false },
+        { id: 'wall', label: 'Muro de la Liga', icon: MessageSquare, isLive: false },
       ]
     : [
         { id: 'calendar', label: t.nav.calendar, icon: CalendarDays, isLive: false },
@@ -248,8 +254,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             );
           })}
 
-          {/* Tab: Más / Menú (solo para jugadores y DT) */}
-          {!isLeagueAdmin && (
+          {/* Tab: Más / Menú (solo para jugadores con equipo y DT) */}
+          {!isLeagueAdmin && !isUnassignedPlayer && (
             <button
               id="mobile-tab-more"
               onClick={() => setIsMoreMenuOpen(true)}

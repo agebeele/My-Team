@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Trophy,
   Flame,
@@ -19,12 +19,13 @@ import {
   Share2,
   Trash2,
 } from 'lucide-react';
-import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory } from '../types';
+import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory, STANDARD_LEAGUES } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage, captureElementAsDataUrl } from '../utils/imageDownloader';
 import { TableAiScannerModal } from './TableAiScannerModal';
 import { getCrestForTeam } from '../utils/tableAiScanner';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
+import { getStandingsForLeague } from '../utils/storage';
 
 interface StandingsAndScorersProps {
   standings: StandingsRow[];
@@ -58,8 +59,35 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   const [isDirectEditing, setIsDirectEditing] = useState(false);
   const [editRows, setEditRows] = useState<StandingsRow[]>([]);
 
+  const isLeagueAdmin = currentUser.role === 'league_admin';
+  const defaultLeague = team.leagueName || 'Champions League';
+  const [adminSelectedLeague, setAdminSelectedLeague] = useState<string>(defaultLeague);
+
+  // Normal players and team owners/coaches ONLY see their team's league table
+  const activeLeague = isLeagueAdmin ? adminSelectedLeague : (team.leagueName || 'Champions League');
+
+  // Filter standings rows strictly for activeLeague
+  const currentLeagueStandings = useMemo(() => {
+    const normActive = activeLeague.trim().toLowerCase();
+    const matched = standings.filter((r) => {
+      if (r.leagueName) {
+        return r.leagueName.trim().toLowerCase() === normActive;
+      }
+      return normActive === 'champions league' || normActive === 'liga premier fútbol 7';
+    });
+
+    if (matched.length > 0) {
+      return matched.map((r) => ({
+        ...r,
+        isOurTeam: team?.name ? r.name.trim().toLowerCase() === team.name.trim().toLowerCase() : r.isOurTeam,
+      }));
+    }
+
+    return getStandingsForLeague(activeLeague, team);
+  }, [standings, activeLeague, team]);
+
   const handleStartDirectEdit = () => {
-    setEditRows(JSON.parse(JSON.stringify(standings)));
+    setEditRows(JSON.parse(JSON.stringify(currentLeagueStandings)));
     setIsDirectEditing(true);
   };
 
@@ -69,8 +97,15 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
 
   const handleSaveDirectEdit = () => {
     if (setStandings) {
-      setStandings(editRows);
-      setToastMessage('¡Datos de la tabla guardados exitosamente!');
+      const taggedRows = editRows.map((r) => ({ ...r, leagueName: activeLeague }));
+      setStandings((prev) => {
+        const normActive = activeLeague.trim().toLowerCase();
+        const others = prev.filter(
+          (r) => r.leagueName && r.leagueName.trim().toLowerCase() !== normActive
+        );
+        return [...others, ...taggedRows];
+      });
+      setToastMessage(`¡Datos de la tabla (${activeLeague}) guardados exitosamente!`);
       setTimeout(() => setToastMessage(null), 3500);
     }
     setIsDirectEditing(false);
@@ -253,16 +288,38 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
       {/* Top Header Card */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white dark:bg-[#242526] p-5 rounded-2xl border border-[#CED0D4] dark:border-white/10 shadow-xs transition-colors">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-[#050505] dark:text-white tracking-tight flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-amber-500" />
-            {t.tables.title}
+          <h2 className="text-xl sm:text-2xl font-black text-[#050505] dark:text-white tracking-tight flex items-center gap-2 flex-wrap">
+            <Trophy className="w-6 h-6 text-amber-500 shrink-0" />
+            <span>{t.tables.title}</span>
+            <span className="text-xs sm:text-sm font-bold px-2.5 py-0.5 rounded-full bg-[#E7F3FF] text-[#1877F2] border border-[#1877F2]/30">
+              {activeLeague}
+            </span>
           </h2>
-          <p className="text-xs sm:text-sm text-[#65676B] dark:text-gray-400 mt-0.5 font-medium">
-            {team.leagueName}
+          <p className="text-xs sm:text-sm text-[#65676B] dark:text-gray-400 mt-1 font-medium">
+            {isLeagueAdmin
+              ? 'Panel Oficial de Liga: Supervisando tabla de clasificación oficial'
+              : `Clasificación y estadísticas exclusivas de tu liga: ${activeLeague}`}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* League Selector strictly for League Admin */}
+          {isLeagueAdmin && (
+            <div className="flex items-center gap-1.5 bg-[#F0F2F5] dark:bg-black/40 px-3 py-1.5 rounded-xl border border-[#CED0D4] dark:border-white/10">
+              <span className="text-xs font-bold text-[#65676B] dark:text-gray-300">Liga:</span>
+              <select
+                value={adminSelectedLeague}
+                onChange={(e) => setAdminSelectedLeague(e.target.value)}
+                className="bg-transparent text-xs font-bold text-[#050505] dark:text-white focus:outline-none cursor-pointer"
+              >
+                {STANDARD_LEAGUES.map((lg) => (
+                  <option key={lg} value={lg} className="text-[#050505] dark:text-white dark:bg-[#242526]">
+                    {lg}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Download button for current active tab */}
           <button
@@ -705,7 +762,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                     </tr>
                   ))
                 ) : (
-                  standings.map((row) => {
+                  currentLeagueStandings.map((row) => {
                     const isCurrent = Boolean(
                       (team?.name && row.name.trim().toLowerCase() === team.name.trim().toLowerCase()) ||
                       (team?.shortName && row.name.trim().toLowerCase() === team.shortName.trim().toLowerCase()) ||
@@ -791,11 +848,19 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
           onClose={() => setIsAiScanModalOpen(false)}
           team={team}
           onApplyStandings={(newRows, updatedLeague) => {
-            setStandings(newRows);
+            const targetLeague = updatedLeague || activeLeague;
+            const tagged = newRows.map((r) => ({ ...r, leagueName: targetLeague }));
+            setStandings((prev) => {
+              const normTarget = targetLeague.trim().toLowerCase();
+              const others = prev.filter(
+                (r) => r.leagueName && r.leagueName.trim().toLowerCase() !== normTarget
+              );
+              return [...others, ...tagged];
+            });
             if (updatedLeague && setTeam) {
               setTeam((prev) => ({ ...prev, leagueName: updatedLeague }));
             }
-            setToastMessage('¡Tabla general actualizada con IA exitosamente!');
+            setToastMessage(`¡Tabla de ${targetLeague} actualizada con IA exitosamente!`);
             setTimeout(() => setToastMessage(null), 4000);
           }}
         />

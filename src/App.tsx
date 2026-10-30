@@ -8,6 +8,8 @@ import {
   StandingsRow,
   AppUser,
   Language,
+  TeamJoinRequest,
+  TeamInvitation,
 } from './types';
 import {
   INITIAL_TEAM,
@@ -46,6 +48,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { AppSplashAnimation } from './components/AppSplashAnimation';
 import { WelcomeModal } from './components/WelcomeModal';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
+import { LeagueExplorerAndJoin } from './components/LeagueExplorerAndJoin';
 import { isSupabaseConfigured } from './utils/supabaseClient';
 import {
   supabaseFetchPlayers,
@@ -59,7 +62,6 @@ import {
   subscribeToSupabaseTable,
 } from './utils/supabaseService';
 import { fetchBackendSync, pushBackendSync, pushBackendSyncImmediate } from './utils/backendSync';
-import { TeamInvitation } from './types';
 
 export default function App() {
   // Persistence state
@@ -76,6 +78,14 @@ export default function App() {
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [welcomeInvitation, setWelcomeInvitation] = useState<TeamInvitation | null>(null);
   const deletedMatchIdsRef = useRef<Set<string>>(new Set());
+  const [joinRequests, setJoinRequests] = useState<TeamJoinRequest[]>(() => {
+    try {
+      const stored = localStorage.getItem('teamgol_join_requests');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // App Navigation & Language state
   const [activeTab, setActiveTab] = useState<string>('calendar');
@@ -335,9 +345,30 @@ export default function App() {
       }
       if (data.users && data.users.length > 0) {
         setUsers(data.users);
+        // If current user was accepted into a team, refresh their local state immediately
+        if (currentUser && currentUser.role === 'player' && !currentUser.teamId) {
+          const freshMe = data.users.find(
+            (u: any) => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase()
+          );
+          if (freshMe && freshMe.teamId) {
+            setCurrentUser(freshMe);
+            saveDeviceSession(freshMe);
+            const teamAssigned = data.allTeams?.find((t: any) => t.id === freshMe.teamId);
+            if (teamAssigned) {
+              setTeam(teamAssigned);
+              setActiveTab('calendar');
+            }
+          }
+        }
       }
       if (data.standings && data.standings.length > 0) {
         setStandings(data.standings);
+      }
+      if (data.joinRequests) {
+        setJoinRequests(data.joinRequests);
+        try {
+          localStorage.setItem('teamgol_join_requests', JSON.stringify(data.joinRequests));
+        } catch {}
       }
     };
 
@@ -452,6 +483,16 @@ export default function App() {
     }
   }, [currentUser?.role, activeTab]);
 
+  // Restrict navigation for unassigned player (without team) to leagues explorer and league wall
+  useEffect(() => {
+    if (currentUser?.role === 'player' && !currentUser?.teamId) {
+      const allowed = ['leagues', 'wall'];
+      if (!allowed.includes(activeTab)) {
+        setActiveTab('leagues');
+      }
+    }
+  }, [currentUser?.role, currentUser?.teamId, activeTab]);
+
   const currentPlayer = players.find((p) => p.id === selectedPlayerId) || players[0];
 
   const handleOpenMvpForMatch = (matchId: string) => {
@@ -467,6 +508,109 @@ export default function App() {
   const handleViewPlayerProfile = (playerId: string) => {
     setSelectedPlayerId(playerId);
     setActiveTab('profile');
+  };
+
+  const handleAcceptJoinRequest = async (req: TeamJoinRequest) => {
+    // 1. Update requests
+    const updatedRequests = joinRequests.map((r) =>
+      r.id === req.id ? { ...r, status: 'accepted' as const, respondedAt: new Date().toISOString() } : r
+    );
+    setJoinRequests(updatedRequests);
+    try {
+      localStorage.setItem('teamgol_join_requests', JSON.stringify(updatedRequests));
+    } catch {}
+
+    // 2. Add player to the squad
+    const newPlayerId = `p_${Date.now()}`;
+    const newPlayer: Player = {
+      id: newPlayerId,
+      name: req.playerName,
+      number: req.playerNumber || Math.floor(Math.random() * 80) + 10,
+      position: req.playerPosition || 'MED',
+      avatarUrl: req.playerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      goals: 0,
+      assists: 0,
+      matches: 0,
+      yellowCards: 0,
+      redCards: 0,
+      isCalledUp: true,
+      isStarter: false,
+      teamId: req.teamId,
+    };
+    const updatedPlayers = [...players, newPlayer];
+    setPlayers(updatedPlayers);
+    savePlayersForTeam(req.teamId, updatedPlayers);
+
+    // 3. Update users list
+    const updatedUsers = users.map((u) => {
+      if (u.id === req.userId || u.email.toLowerCase() === req.playerEmail.toLowerCase()) {
+        return {
+          ...u,
+          teamId: req.teamId,
+          teamJoinStatus: 'accepted' as const,
+          playerId: newPlayerId,
+        };
+      }
+      return u;
+    });
+    setUsers(updatedUsers);
+
+    // 4. Update SQLite backend
+    try {
+      await fetch(`/api/solicitudes/${req.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'accepted', teamId: req.teamId, teamName: req.teamName }),
+      });
+    } catch (err) {
+      console.warn('Error updating join request in backend:', err);
+    }
+
+    pushBackendSyncImmediate({
+      joinRequests: updatedRequests,
+      players: updatedPlayers,
+      users: updatedUsers,
+    });
+  };
+
+  const handleRejectJoinRequest = async (requestId: string) => {
+    const updatedRequests = joinRequests.map((r) =>
+      r.id === requestId ? { ...r, status: 'rejected' as const, respondedAt: new Date().toISOString() } : r
+    );
+    setJoinRequests(updatedRequests);
+    try {
+      localStorage.setItem('teamgol_join_requests', JSON.stringify(updatedRequests));
+    } catch {}
+
+    const req = joinRequests.find((r) => r.id === requestId);
+    let updatedUsers = users;
+    if (req) {
+      updatedUsers = users.map((u) => {
+        if (u.id === req.userId || u.email.toLowerCase() === req.playerEmail.toLowerCase()) {
+          return {
+            ...u,
+            teamJoinStatus: 'rejected' as const,
+          };
+        }
+        return u;
+      });
+      setUsers(updatedUsers);
+    }
+
+    try {
+      await fetch(`/api/solicitudes/${requestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+    } catch (err) {
+      console.warn('Error rejecting join request in backend:', err);
+    }
+
+    pushBackendSyncImmediate({
+      joinRequests: updatedRequests,
+      users: updatedUsers,
+    });
   };
 
   // If no saved device session exists, prompt user to log in or register directly
@@ -497,6 +641,8 @@ export default function App() {
             setCurrentUser(user);
             if (user.role === 'league_admin') {
               setActiveTab('wall');
+            } else if (user.role === 'player' && !user.teamId) {
+              setActiveTab('leagues');
             } else {
               const userTeamId =
                 user.teamId ||
@@ -561,6 +707,9 @@ export default function App() {
         setLanguage={setLanguage}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+        joinRequests={joinRequests}
+        onAcceptJoinRequest={handleAcceptJoinRequest}
+        onRejectJoinRequest={handleRejectJoinRequest}
       />
 
       {/* Welcome Join Alert Banner if joined via invite */}
@@ -578,138 +727,189 @@ export default function App() {
 
       {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10">
-        {/* TAB 1: Match Calendar & PDF Match Reports */}
-        {activeTab === 'calendar' && (
-          <MatchCalendar
-            matches={matches}
-            setMatches={handleSetMatches}
-            team={team}
-            players={players}
-            currentUser={currentUser}
-            language={language}
-            onOpenMvp={handleOpenMvpForMatch}
-            onStartLiveMatch={handleStartLiveMatch}
-          />
-        )}
+        {/* Unassigned Player View: only League Explorer and League Wall until admitted */}
+        {currentUser?.role === 'player' && !currentUser?.teamId ? (
+          activeTab === 'wall' ? (
+            <SocialWall
+              posts={posts}
+              setPosts={handleSetPosts}
+              team={team}
+              currentUser={currentUser}
+              language={language}
+            />
+          ) : (
+            <LeagueExplorerAndJoin
+              currentUser={currentUser}
+              setCurrentUser={(u) => {
+                setCurrentUser(u);
+                saveDeviceSession(u);
+              }}
+              allTeams={allTeams}
+              allUsers={users}
+              setUsers={handleSetUsers}
+              joinRequests={joinRequests}
+              setJoinRequests={setJoinRequests}
+              onViewLeagueWall={() => setActiveTab('wall')}
+              language={language}
+            />
+          )
+        ) : (
+          <>
+            {/* TAB 0: Ligas y Equipos Catalog */}
+            {activeTab === 'leagues' && (
+              <LeagueExplorerAndJoin
+                currentUser={currentUser}
+                setCurrentUser={(u) => {
+                  setCurrentUser(u);
+                  saveDeviceSession(u);
+                }}
+                allTeams={allTeams}
+                allUsers={users}
+                setUsers={handleSetUsers}
+                joinRequests={joinRequests}
+                setJoinRequests={setJoinRequests}
+                onViewLeagueWall={() => setActiveTab('wall')}
+                language={language}
+              />
+            )}
 
-        {/* TAB 1.5: Live Match Mode */}
-        {activeTab === 'live_match' && (
-          <LiveMatchMode
-            matches={matches}
-            setMatches={handleSetMatches}
-            players={players}
-            setPlayers={handleSetPlayers}
-            team={team}
-            currentUser={currentUser}
-            language={language}
-            selectedMatchId={selectedMatchId}
-            onBackToCalendar={() => setActiveTab('calendar')}
-            onOpenMvp={(matchId) => {
-              setSelectedMatchId(matchId);
-              setActiveTab('mvp');
-            }}
-          />
-        )}
+            {/* TAB 1: Match Calendar & PDF Match Reports */}
+            {activeTab === 'calendar' && (
+              <MatchCalendar
+                matches={matches}
+                setMatches={handleSetMatches}
+                team={team}
+                players={players}
+                currentUser={currentUser}
+                language={language}
+                onOpenMvp={handleOpenMvpForMatch}
+                onStartLiveMatch={handleStartLiveMatch}
+              />
+            )}
 
-        {/* TAB 2: Convocatoria Squad Graphic Generator & Roster */}
-        {activeTab === 'convocatoria' && (
-          <ConvocatoriaGraphic
-            team={team}
-            setTeam={setTeam}
-            players={players}
-            setPlayers={handleSetPlayers}
-            matches={matches}
-            currentUser={currentUser}
-            language={language}
-            selectedMatchId={selectedMatchId}
-          />
-        )}
+            {/* TAB 1.5: Live Match Mode */}
+            {activeTab === 'live_match' && (
+              <LiveMatchMode
+                matches={matches}
+                setMatches={handleSetMatches}
+                players={players}
+                setPlayers={handleSetPlayers}
+                team={team}
+                currentUser={currentUser}
+                language={language}
+                selectedMatchId={selectedMatchId}
+                onBackToCalendar={() => setActiveTab('calendar')}
+                onOpenMvp={(matchId) => {
+                  setSelectedMatchId(matchId);
+                  setActiveTab('mvp');
+                }}
+              />
+            )}
 
-        {/* TAB 3: Interactive Tactical Pitch Lineup */}
-        {activeTab === 'lineup' && (
-          <TacticalPitch
-            team={team}
-            setTeam={setTeam}
-            players={players}
-            matches={matches}
-            setMatches={handleSetMatches}
-            currentUser={currentUser}
-            language={language}
-            selectedMatchId={selectedMatchId}
-          />
-        )}
+            {/* TAB 2: Convocatoria Squad Graphic Generator & Roster */}
+            {activeTab === 'convocatoria' && (
+              <ConvocatoriaGraphic
+                team={team}
+                setTeam={setTeam}
+                players={players}
+                setPlayers={handleSetPlayers}
+                matches={matches}
+                currentUser={currentUser}
+                language={language}
+                selectedMatchId={selectedMatchId}
+              />
+            )}
 
-        {/* TAB 4: MVP Voting (50min rule) & Automatic Camera */}
-        {activeTab === 'mvp' && (
-          <MVPVotingAndCamera
-            team={team}
-            matches={matches}
-            setMatches={handleSetMatches}
-            players={players}
-            setPlayers={handleSetPlayers}
-            currentUser={currentUser}
-            language={language}
-            selectedMatchId={selectedMatchId}
-            onViewPlayerProfile={handleViewPlayerProfile}
-          />
-        )}
+            {/* TAB 3: Interactive Tactical Pitch Lineup */}
+            {activeTab === 'lineup' && (
+              <TacticalPitch
+                team={team}
+                setTeam={setTeam}
+                players={players}
+                matches={matches}
+                setMatches={handleSetMatches}
+                currentUser={currentUser}
+                language={language}
+                selectedMatchId={selectedMatchId}
+              />
+            )}
 
-        {/* TAB 5: Standings & Golden Boot Scorers */}
-        {(activeTab === 'standings' || activeTab === 'tables') && (
-          <StandingsAndScorers
-            standings={standings}
-            setStandings={setStandings}
-            players={players}
-            team={team}
-            setTeam={setTeam}
-            currentUser={currentUser}
-            language={language}
-            onViewPlayerProfile={handleViewPlayerProfile}
-          />
-        )}
+            {/* TAB 4: MVP Voting (50min rule) & Automatic Camera */}
+            {activeTab === 'mvp' && (
+              <MVPVotingAndCamera
+                team={team}
+                matches={matches}
+                setMatches={handleSetMatches}
+                players={players}
+                setPlayers={handleSetPlayers}
+                currentUser={currentUser}
+                language={language}
+                selectedMatchId={selectedMatchId}
+                onViewPlayerProfile={handleViewPlayerProfile}
+              />
+            )}
 
-        {/* TAB 6: Social Wall & Club Announcements */}
-        {activeTab === 'wall' && (
-          <SocialWall
-            posts={posts}
-            setPosts={handleSetPosts}
-            team={team}
-            currentUser={currentUser}
-            language={language}
-          />
-        )}
+            {/* TAB 5: Standings & Golden Boot Scorers */}
+            {(activeTab === 'standings' || activeTab === 'tables') && (
+              <StandingsAndScorers
+                standings={standings}
+                setStandings={setStandings}
+                players={players}
+                team={team}
+                setTeam={setTeam}
+                currentUser={currentUser}
+                language={language}
+                onViewPlayerProfile={handleViewPlayerProfile}
+              />
+            )}
 
-        {/* TAB 7: Player Profile & MVP Trophy Cabinet */}
-        {activeTab === 'profile' && currentPlayer && (
-          <PlayerProfileView
-            player={currentPlayer}
-            setPlayers={handleSetPlayers}
-            team={team}
-            currentUser={currentUser}
-            language={language}
-          />
-        )}
+            {/* TAB 6: Social Wall & Club Announcements */}
+            {activeTab === 'wall' && (
+              <SocialWall
+                posts={posts}
+                setPosts={handleSetPosts}
+                team={team}
+                currentUser={currentUser}
+                language={language}
+              />
+            )}
 
-        {/* TAB 8: Team Owner & Admin Panel */}
-        {(activeTab === 'admin' || activeTab === 'owner_admin') && (
-          <OwnerAdminPanel
-            team={team}
-            setTeam={handleSetTeam}
-            users={users}
-            setUsers={handleSetUsers}
-            players={players}
-            setPlayers={handleSetPlayers}
-            matches={matches}
-            standings={standings}
-            setStandings={setStandings}
-            currentUser={currentUser}
-            setCurrentUser={(u) => {
-              setCurrentUser(u);
-              saveDeviceSession(u);
-            }}
-            language={language}
-            onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
-          />
+            {/* TAB 7: Player Profile & MVP Trophy Cabinet */}
+            {activeTab === 'profile' && currentPlayer && (
+              <PlayerProfileView
+                player={currentPlayer}
+                setPlayers={handleSetPlayers}
+                team={team}
+                currentUser={currentUser}
+                language={language}
+              />
+            )}
+
+            {/* TAB 8: Team Owner & Admin Panel */}
+            {(activeTab === 'admin' || activeTab === 'owner_admin') && (
+              <OwnerAdminPanel
+                team={team}
+                setTeam={handleSetTeam}
+                users={users}
+                setUsers={handleSetUsers}
+                players={players}
+                setPlayers={handleSetPlayers}
+                matches={matches}
+                standings={standings}
+                setStandings={setStandings}
+                currentUser={currentUser}
+                setCurrentUser={(u) => {
+                  setCurrentUser(u);
+                  saveDeviceSession(u);
+                }}
+                language={language}
+                onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+                joinRequests={joinRequests}
+                onAcceptJoinRequest={handleAcceptJoinRequest}
+                onRejectJoinRequest={handleRejectJoinRequest}
+              />
+            )}
+          </>
         )}
       </main>
 

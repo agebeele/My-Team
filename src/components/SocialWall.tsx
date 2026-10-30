@@ -76,9 +76,19 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   const isLeagueAdmin = currentUser.role === 'league_admin';
 
   const relevantPosts = posts.filter((p) => {
-    // If current user is League Admin, they ONLY see their own publications!
+    // If current user is League Admin, they can view official publications and their own posts
     if (isLeagueAdmin) {
-      return p.authorId === currentUser.id || p.authorRole === 'league_admin';
+      return p.authorId === currentUser.id || p.authorRole === 'league_admin' || p.category === 'Liga';
+    }
+
+    // For player without an assigned team yet: they see official league posts or their own posts
+    if (!currentUser.teamId) {
+      return (
+        p.authorId === currentUser.id ||
+        p.isLeagueOfficial ||
+        p.category === 'Liga' ||
+        p.authorRole === 'league_admin'
+      );
     }
 
     // For team players and owners:
@@ -87,7 +97,12 @@ export const SocialWall: React.FC<SocialWallProps> = ({
       return true;
     }
 
-    // 2. Official league posts: only if targeted to "Todas las Ligas" or this team's league!
+    // 2. Posts authored by this user:
+    if (p.authorId === currentUser.id) {
+      return true;
+    }
+
+    // 3. Official league posts: only if targeted to "Todas las Ligas" or this team's league!
     const isOfficialLeaguePost =
       p.isLeagueOfficial ||
       p.category === 'Liga' ||
@@ -141,13 +156,23 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     setAttachedMediaName(null);
   };
 
+  const handleDeletePost = (postId: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta publicación?')) return;
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    fetch(`/api/publicaciones/${postId}`, { method: 'DELETE' }).catch(() => {});
+    if (isSupabaseConfigured()) {
+      supabaseDeletePost(postId);
+    }
+  };
+
   const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) return;
 
     const isOwner = currentUser.role === 'owner' || currentUser.role === 'league_admin';
     const isLeagueOfficialPost = newCategory === 'Liga' || currentUser.role === 'league_admin';
-    const postStatus: Post['status'] = isOwner ? 'approved' : 'pending';
+    // All posts created in the app are approved and visible immediately
+    const postStatus: Post['status'] = 'approved';
 
     const selectedLeague = currentUser.role === 'league_admin' ? targetLeague : (team?.leagueName || 'Champions League');
 
@@ -177,7 +202,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
       comments: [],
     };
 
-    setPosts([post, ...posts]);
+    setPosts((prev) => [post, ...prev.filter((p) => p.id !== post.id)]);
     if (isSupabaseConfigured()) {
       supabaseUpsertPost(post);
     }
@@ -186,14 +211,8 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     setNewContent('');
     handleRemoveAttachedMedia();
 
-    if (isOwner) {
-      setFormFeedback('¡Publicación aprobada y agregada al muro oficial!');
-    } else {
-      setFormFeedback(
-        '¡Publicación enviada a revisión! El Administrador/DT la autorizará para que aparezca en el muro.'
-      );
-    }
-    setTimeout(() => setFormFeedback(null), 6000);
+    setFormFeedback('¡Publicación agregada exitosamente al muro!');
+    setTimeout(() => setFormFeedback(null), 5000);
   };
 
   const handleApprovePost = (postId: string) => {
@@ -473,9 +492,22 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                     </div>
                   </div>
 
-                  <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F0F2F5] text-[#65676B] font-bold border border-[#CED0D4]/70">
-                    {post.category}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] px-2.5 py-1 rounded-full bg-[#F0F2F5] text-[#65676B] font-bold border border-[#CED0D4]/70">
+                      {post.category}
+                    </span>
+                    {(currentUser.role === 'owner' ||
+                      currentUser.role === 'league_admin' ||
+                      post.authorId === currentUser.id) && (
+                      <button
+                        onClick={() => handleDeletePost(post.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Eliminar publicación"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Title & Body Content */}

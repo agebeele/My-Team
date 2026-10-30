@@ -44,6 +44,7 @@ import {
   ALL_POSITIONS,
   getPositionBadgeClass,
   TeamInvitation,
+  TeamJoinRequest,
 } from '../types';
 import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
@@ -68,6 +69,9 @@ interface OwnerAdminPanelProps {
   currentUser: AppUser;
   setCurrentUser?: (user: AppUser) => void;
   language: Language;
+  joinRequests?: TeamJoinRequest[];
+  onAcceptJoinRequest?: (req: TeamJoinRequest) => void;
+  onRejectJoinRequest?: (reqId: string) => void;
 }
 
 export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
@@ -84,6 +88,9 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   currentUser,
   setCurrentUser,
   language,
+  joinRequests = [],
+  onAcceptJoinRequest,
+  onRejectJoinRequest,
 }) => {
   const t = getT(language);
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
@@ -936,6 +943,107 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
             <span>{playerFormError}</span>
           </div>
         )}
+
+        {/* PENDING PLAYER JOIN REQUESTS */}
+        {(() => {
+          const pendingTeamRequests = joinRequests.filter(
+            (r) => r.teamId === team.id && r.status === 'pending'
+          );
+          if (pendingTeamRequests.length === 0) return null;
+
+          return (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-3 w-3 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-[#1877F2]" />
+                  </span>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-[#1877F2]">
+                    Solicitudes de Jugadores para Unirse al Plantel ({pendingTeamRequests.length})
+                  </h4>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#1877F2]">
+                  Acción Requerida
+                </span>
+              </div>
+              <p className="text-xs text-[#65676B]">
+                Futbolistas registrados en la liga que han solicitado ingresar a <span className="font-bold text-[#050505]">{team.name}</span>. Acéptalos para sumarlos a tu plantilla oficial.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {pendingTeamRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="p-3 rounded-xl bg-white border border-blue-200 shadow-2xs space-y-2.5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={req.playerAvatar || DEFAULT_FACEBOOK_AVATAR}
+                        alt={req.playerName}
+                        className="w-11 h-11 rounded-full object-cover ring-2 ring-blue-500 shrink-0 bg-gray-100"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_FACEBOOK_AVATAR;
+                        }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-xs text-[#050505] truncate">
+                            {req.playerName}
+                          </span>
+                          {req.playerNumber && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-gray-100 text-[#050505]">
+                              #{req.playerNumber}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-[#65676B] block truncate">
+                          {req.playerEmail}
+                        </span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {req.playerPosition && (
+                            <span className="text-[10px] font-bold px-2 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              Pos: {req.playerPosition}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-gray-400">
+                            {req.requestedAt ? new Date(req.requestedAt).toLocaleDateString('es-MX') : 'Reciente'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onAcceptJoinRequest) onAcceptJoinRequest(req);
+                          setNotificationStatus(`¡${req.playerName} aceptado en el plantel de ${team.name}!`);
+                          setTimeout(() => setNotificationStatus(null), 4000);
+                        }}
+                        className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Aceptar al Plantel</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onRejectJoinRequest) onRejectJoinRequest(req.id);
+                          setNotificationStatus(`Solicitud de ${req.playerName} rechazada.`);
+                          setTimeout(() => setNotificationStatus(null), 4000);
+                        }}
+                        className="py-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* FORM: Add new player */}
         <div className="p-4 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] space-y-3">

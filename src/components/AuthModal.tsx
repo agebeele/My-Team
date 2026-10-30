@@ -269,6 +269,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       role: 'player', // Registered players always receive the player role with restrictions
       avatarUrl: newPlayer.avatarUrl,
       playerId: newPlayerId,
+      teamId: undefined,
+      teamJoinStatus: 'none',
+      position: newPlayerForm.position,
+      jerseyNumber: dorsal,
       provider: 'email',
     };
 

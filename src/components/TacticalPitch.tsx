@@ -12,6 +12,9 @@ import {
   X,
   Trash2,
   Download,
+  Pencil,
+  Eye,
+  CheckCircle2,
 } from 'lucide-react';
 import { Match, Player, AppUser, Language, LineupPosition, MatchModality, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
@@ -301,6 +304,9 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isViewOnlyMode, setIsViewOnlyMode] = useState<boolean>(() => {
+    return Boolean(activeMatch?.isLineupSaved);
+  });
 
   // Drag and drop & swap states
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -319,9 +325,10 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
       } else {
         setPitchLineup(DEFAULT_LINEUP);
       }
+      setIsViewOnlyMode(Boolean(activeMatch.isLineupSaved));
       setSelectedSlotIndex(null);
     }
-  }, [activeMatchId]);
+  }, [activeMatchId, activeMatch?.isLineupSaved]);
 
   // Handler to switch modality (Fut 5, Fut 7, Fut 9, Fut 11)
   const handleSelectModality = (newMod: MatchModality) => {
@@ -493,7 +500,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   // Slot click handler: tap one then tap another to swap, or tap to assign bench
   const handleSlotClick = (index: number) => {
-    if (!isOwnerOrAdmin) return;
+    if (!isOwnerOrAdmin || isViewOnlyMode) return;
     if (selectedSlotIndex === null) {
       setSelectedSlotIndex(index);
     } else if (selectedSlotIndex === index) {
@@ -507,7 +514,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   // Desktop HTML5 Drag & Drop handlers
   const handleDragStart = (e: React.DragEvent, index: number) => {
-    if (!isOwnerOrAdmin) return;
+    if (!isOwnerOrAdmin || isViewOnlyMode) return;
     setDraggingIndex(index);
     e.dataTransfer.setData('text/plain', String(index));
     e.dataTransfer.effectAllowed = 'move';
@@ -515,6 +522,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    if (isViewOnlyMode) return;
     e.dataTransfer.dropEffect = 'move';
     if (dragOverIndex !== index) {
       setDragOverIndex(index);
@@ -523,6 +531,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   const handleDrop = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
+    if (isViewOnlyMode) return;
     const fromIndexStr = e.dataTransfer.getData('text/plain');
     const fromIndex = fromIndexStr !== '' ? Number(fromIndexStr) : draggingIndex;
     if (fromIndex !== null && !isNaN(fromIndex) && fromIndex !== targetIndex) {
@@ -539,6 +548,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   // Mobile Touch Drag handlers (hold & drag across the field)
   const handleTouchStart = (e: React.TouchEvent, index: number) => {
+    if (!isOwnerOrAdmin || isViewOnlyMode) return;
     const touch = e.touches[0];
     setDraggingIndex(index);
     setTouchCoord({ x: touch.clientX, y: touch.clientY });
@@ -601,11 +611,13 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
               ...m,
               modality,
               lineup: pitchLineup,
+              isLineupSaved: true,
             }
           : m
       )
     );
     setSaveSuccess(true);
+    setIsViewOnlyMode(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };
 
@@ -620,7 +632,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
         <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3 shadow-xs">
           <Shield className="w-5 h-5 text-[#1877F2] shrink-0 mt-0.5" />
           <div className="text-xs leading-relaxed">
-            <span className="font-bold text-[#050505]">Alineación Oficial (Modo Jugador):</span> Puedes consultar la formación táctica de 7 jugadores y los titulares designados por el cuerpo técnico, y descargar la imagen oficial. La edición de titulares y formaciones está reservada para el Administrador / Dueño.
+            <span className="font-bold text-[#050505]">Alineación Oficial (Modo Jugador):</span> Consulta la formación táctica de 7 jugadores y los titulares confirmados por el cuerpo técnico.
           </div>
         </div>
       )}
@@ -647,7 +659,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
             >
               {matches.map((m) => (
                 <option key={m.id} value={m.id}>
-                  vs {m.rival} ({m.date})
+                  vs {m.rival} ({m.date}) {m.isLineupSaved ? '✓ Confirmada' : ''}
                 </option>
               ))}
             </select>
@@ -663,19 +675,79 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
               <span>Descargar Alineación</span>
             </button>
 
-            {/* Save Button */}
+            {/* Toggle View vs Edit / Save Button */}
             {isOwnerOrAdmin && (
-              <button
-                id="btn-save-lineup"
-                onClick={handleSaveLineupToMatch}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
-              >
-                {saveSuccess ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                {saveSuccess ? t.lineup.savedSuccess : t.lineup.saveLineup}
-              </button>
+              <>
+                {isViewOnlyMode ? (
+                  <button
+                    id="btn-modify-lineup"
+                    onClick={() => setIsViewOnlyMode(false)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs shadow-xs transition-all cursor-pointer"
+                    title="Modificar los 7 titulares y táctica"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    <span>Modificar Alineación</span>
+                  </button>
+                ) : (
+                  <button
+                    id="btn-save-lineup"
+                    onClick={handleSaveLineupToMatch}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                  >
+                    {saveSuccess ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                    <span>{saveSuccess ? '¡Guardada!' : t.lineup.saveLineup}</span>
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
+
+        {/* Confirmed View Banner */}
+        {isViewOnlyMode && (
+          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <div>
+                <p className="text-xs font-black">
+                  Alineación Confirmada y Guardada (vs {activeMatch?.rival || 'Rival'})
+                </p>
+                <p className="text-[11px] text-emerald-800">
+                  Mostrando los 7 titulares oficiales registrados en el terreno de juego.
+                </p>
+              </div>
+            </div>
+            {isOwnerOrAdmin && (
+              <button
+                onClick={() => setIsViewOnlyMode(false)}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs transition-all flex items-center gap-1.5"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                <span>Editar</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Edit Mode Instruction Banner */}
+        {!isViewOnlyMode && isOwnerOrAdmin && (
+          <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 flex items-center justify-between gap-2 text-xs shadow-xs">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-[#1877F2] shrink-0" />
+              <span>
+                <strong>Modo Edición:</strong> Arrastra jugadores o pulsa en una posición para hacer cambios. Al terminar, pulsa <strong>"Guardar Alineación"</strong> para confirmarla.
+              </span>
+            </div>
+            {activeMatch?.isLineupSaved && (
+              <button
+                onClick={() => setIsViewOnlyMode(true)}
+                className="text-xs font-bold text-blue-700 hover:text-blue-900 underline shrink-0 cursor-pointer ml-2"
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Modality & Formations Controller Strip */}
         <div className="pt-3 border-t border-[#CED0D4] dark:border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-3">

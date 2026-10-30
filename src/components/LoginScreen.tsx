@@ -460,9 +460,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       mvpHistory: [],
     };
 
-    // Determine the chosen team
-    const chosenTeam = teamList.find((t) => t.id === selectedTeamId) || teamList[0] || team;
-
+    // No hardcoded team assignment during registration
     const newUser: AppUser = {
       id: newUserId,
       name,
@@ -472,61 +470,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       role: 'player',
       avatarUrl: newPlayer.avatarUrl,
       playerId: newPlayerId,
-      teamId: chosenTeam.id,
+      teamId: undefined,
+      teamJoinStatus: 'none',
+      position: newPlayerForm.position,
+      jerseyNumber: dorsal,
       provider: 'email',
     };
 
-    // Save player specifically into chosenTeam's squad
-    const existingTeamPlayers = getPlayersForTeam(chosenTeam.id);
-    const updatedTeamPlayers = [
-      ...existingTeamPlayers.filter((p) => p.name.toLowerCase() !== newPlayer.name.toLowerCase()),
-      newPlayer,
-    ];
-    savePlayersForTeam(chosenTeam.id, updatedTeamPlayers);
-    const teamMatches = getMatchesForTeam(chosenTeam.id);
-    const teamStandings = getStandingsForLeague(chosenTeam.leagueName, chosenTeam);
-
-    if (setPlayers) {
-      setPlayers(updatedTeamPlayers);
-    }
-    if (setMatches) {
-      setMatches(teamMatches);
-    }
-    if (setStandings) {
-      setStandings(teamStandings);
-    }
-    if (setUsers) {
-      setUsers((prev) => [...prev, newUser]);
-    }
-    if (isSupabaseConfigured()) {
-      supabaseUpsertUser(newUser);
-      supabaseUpsertPlayer(chosenTeam.id, newPlayer);
-    }
-    pushBackendSync({
-      team: chosenTeam,
-      players: updatedTeamPlayers,
-      users: [...allUsers, newUser],
-    });
-    if (setTeam) {
-      setTeam(chosenTeam);
-    }
-    try {
-      localStorage.setItem('teamgol_team_data', JSON.stringify(chosenTeam));
-    } catch {
-      // ignore
-    }
-
-    // Check if this email was invited by an admin/DT for this team
+    // Check if this email was invited by an admin/DT for a team
     try {
       const storedInvs = localStorage.getItem('teamgol_sent_invitations');
       if (storedInvs) {
         const invList: TeamInvitation[] = JSON.parse(storedInvs);
         const matchIndex = invList.findIndex(
-          (inv) =>
-            inv.email.toLowerCase() === email.toLowerCase() &&
-            (inv.teamId === chosenTeam.id || !inv.teamId)
+          (inv) => inv.email.toLowerCase() === email.toLowerCase()
         );
         if (matchIndex >= 0) {
+          const matchedInv = invList[matchIndex];
+          if (matchedInv.teamId) {
+            newUser.teamId = matchedInv.teamId;
+            newUser.teamJoinStatus = 'accepted';
+            const matchedTeam = teamList.find((t) => t.id === matchedInv.teamId);
+            if (matchedTeam && setTeam) setTeam(matchedTeam);
+          }
           invList[matchIndex] = { ...invList[matchIndex], status: 'accepted' };
           localStorage.setItem('teamgol_sent_invitations', JSON.stringify(invList));
           if (onInvitationSent) {
@@ -538,7 +504,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       // ignore
     }
 
-    setLoginSuccess(`¡Cuenta creada con éxito! Bienvenido a ${chosenTeam.name} (${chosenTeam.stadium}).`);
+    if (setUsers) {
+      setUsers((prev) => [...prev, newUser]);
+    }
+    if (isSupabaseConfigured()) {
+      supabaseUpsertUser(newUser);
+    }
+    pushBackendSync({
+      users: [...allUsers, newUser],
+    });
+
+    setLoginSuccess(`¡Perfil de jugador creado con éxito! Bienvenido, ${name}.`);
     setTimeout(() => {
       onLoginSuccess(newUser, rememberDevice);
     }, 600);
@@ -758,7 +734,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         {/* Main Card */}
         <div className="bg-white rounded-3xl border border-[#CED0D4] shadow-xl p-6 space-y-4">
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-4 bg-[#F0F2F5] p-1.5 rounded-2xl border border-[#E4E6EB] gap-1">
+          <div className="grid grid-cols-3 bg-[#F0F2F5] p-1.5 rounded-2xl border border-[#E4E6EB] gap-1">
             <button
               type="button"
               id="tab-login-mode"
@@ -768,13 +744,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 setRegisterError(null);
                 setTeamCreateError(null);
               }}
-              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
                 activeTab === 'login'
                   ? 'bg-white text-[#1877F2] shadow-xs'
                   : 'text-[#65676B] hover:text-[#050505]'
               }`}
             >
-              <Lock className="w-3 h-3 shrink-0" />
+              <Lock className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">Ingresar</span>
             </button>
 
@@ -787,13 +763,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 setRegisterError(null);
                 setTeamCreateError(null);
               }}
-              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
                 activeTab === 'register'
                   ? 'bg-[#1877F2] text-white shadow-xs'
                   : 'text-[#65676B] hover:text-[#050505]'
               }`}
             >
-              <UserPlus className="w-3 h-3 shrink-0" />
+              <UserPlus className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">Registro</span>
             </button>
 
@@ -806,33 +782,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 setRegisterError(null);
                 setTeamCreateError(null);
               }}
-              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
+              className={`py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate ${
                 activeTab === 'create_team'
                   ? 'bg-amber-500 text-white shadow-xs'
                   : 'text-amber-800 hover:text-amber-900'
               }`}
             >
-              <Crown className="w-3 h-3 shrink-0 text-amber-500" />
+              <Crown className="w-3.5 h-3.5 shrink-0 text-amber-500" />
               <span className="truncate font-black">Mi Club</span>
-            </button>
-
-            <button
-              type="button"
-              id="tab-teams-list-mode"
-              onClick={() => {
-                setActiveTab('teams_list');
-                setLoginError(null);
-                setRegisterError(null);
-                setTeamCreateError(null);
-              }}
-              className={`py-2 text-[10px] sm:text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer truncate ${
-                activeTab === 'teams_list'
-                  ? 'bg-[#1877F2] text-white shadow-xs'
-                  : 'text-[#65676B] hover:text-[#050505]'
-              }`}
-            >
-              <MapPin className="w-3 h-3 shrink-0" />
-              <span className="truncate">Equipos ({teamList.length})</span>
             </button>
           </div>
 
@@ -1091,77 +1048,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
               </div>
 
-              {/* Seleccionar a qué equipo unirse */}
-              <div className="space-y-2 pt-2 border-t border-[#CED0D4]/70">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[#050505] flex items-center gap-1.5">
-                    <Shield className="w-3.5 h-3.5 text-[#1877F2]" />
-                    <span>Selecciona tu Equipo (¿Dónde juegas?) *</span>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('create_team')}
-                    className="text-[11px] font-bold text-amber-600 hover:text-amber-700 underline cursor-pointer"
-                  >
-                    + Crear mi propio equipo
-                  </button>
-                </div>
-                <p className="text-[10px] text-[#65676B]">
-                  Elige en la lista el equipo y la cancha donde juegas tus partidos de Fútbol 7:
-                </p>
-
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {teamList.map((t) => {
-                    const isSelected = selectedTeamId === t.id;
-                    return (
-                      <div
-                        key={t.id}
-                        onClick={() => setSelectedTeamId(t.id)}
-                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between gap-3 ${
-                          isSelected
-                            ? 'bg-[#E7F3FF] border-[#1877F2] ring-2 ring-[#1877F2]/30 shadow-xs'
-                            : 'bg-white hover:bg-gray-50 border-[#CED0D4]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <img
-                            src={t.logoUrl}
-                            alt={t.name}
-                            className="w-10 h-10 rounded-lg object-cover border border-[#CED0D4] bg-white shrink-0"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                          <div className="min-w-0">
-                            <div className="font-bold text-[#050505] flex items-center gap-1.5 truncate">
-                              <span className="truncate">{t.name}</span>
-                              {isSelected && (
-                                <span className="text-[10px] bg-[#1877F2] text-white px-1.5 py-0.2 rounded font-black shrink-0">
-                                  Elegido
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-[#65676B] font-medium truncate flex items-center gap-1 mt-0.5">
-                              <MapPin className="w-3 h-3 text-[#1877F2] shrink-0" />
-                              <span className="truncate"><strong>{t.stadium}</strong> • {t.location || 'Sede Local'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0">
-                          <div
-                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                              isSelected
-                                ? 'border-[#1877F2] bg-[#1877F2] text-white'
-                                : 'border-[#CED0D4] bg-white'
-                            }`}
-                          >
-                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {/* Notice: Selection of Team is done after registration via official league catalog */}
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-blue-950 text-xs flex items-start gap-2.5 shadow-xs">
+                <Shield className="w-4 h-4 text-[#1877F2] shrink-0 mt-0.5" />
+                <div className="leading-relaxed">
+                  <span className="font-bold block text-[#1877F2]">Selección de Club posterior al registro:</span>
+                  Al crear tu cuenta ingresarás directamente al catálogo de las <strong>5 Ligas Oficiales</strong> para solicitar unirte al equipo de tu preferencia. El Director Técnico recibirá tu notificación para aceptarte en el plantel.
                 </div>
               </div>
 
@@ -1183,7 +1075,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 id="btn-submit-register"
                 className="w-full py-3 px-4 rounded-2xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Registrarme y Unirme a {selectedTeam?.name || 'mi Club'}</span>
+                <span>Registrar mi Perfil de Jugador</span>
                 <CheckCircle2 className="w-4 h-4" />
               </button>
             </form>

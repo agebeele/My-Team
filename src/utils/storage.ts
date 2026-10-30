@@ -13,6 +13,10 @@ import {
   INITIAL_PLAYERS,
   INITIAL_MATCHES,
   INITIAL_STANDINGS,
+  INITIAL_STANDINGS_LIGA_MEXICANA,
+  INITIAL_STANDINGS_LIGA_ESP,
+  INITIAL_STANDINGS_LIGA_FRA,
+  INITIAL_STANDINGS_COPA_MUNDO,
   INITIAL_POSTS,
   INITIAL_USERS,
   DEFAULT_LINEUP,
@@ -129,7 +133,7 @@ export const saveMatchesForTeam = (teamId: string, matches: Match[]) => {
 
 // Retrieve standings for a specific league name
 export const getStandingsForLeague = (leagueName: string, activeTeam?: TeamInfo): StandingsRow[] => {
-  const normKey = (leagueName || 'Liga Premier Fútbol 7').trim().toLowerCase();
+  const normKey = (leagueName || 'Champions League').trim().toLowerCase();
   let baseRows: StandingsRow[] | null = null;
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.STANDINGS_BY_LEAGUE);
@@ -143,14 +147,23 @@ export const getStandingsForLeague = (leagueName: string, activeTeam?: TeamInfo)
     // ignore
   }
 
-  // If no stored standings exist for this league yet:
+  // If no stored standings exist for this league yet, use default preset:
   if (!baseRows || baseRows.length === 0) {
-    if (normKey === 'liga premier fútbol 7') {
+    if (normKey === 'champions league' || normKey === 'liga premier fútbol 7') {
       baseRows = INITIAL_STANDINGS;
+    } else if (normKey === 'liga mexicana') {
+      baseRows = INITIAL_STANDINGS_LIGA_MEXICANA;
+    } else if (normKey === 'liga española') {
+      baseRows = INITIAL_STANDINGS_LIGA_ESP;
+    } else if (normKey === 'liga francesa') {
+      baseRows = INITIAL_STANDINGS_LIGA_FRA;
+    } else if (normKey === 'copa del mundo') {
+      baseRows = INITIAL_STANDINGS_COPA_MUNDO;
     } else {
-      // For a new or different league, start with a clean table for this league
+      // For a custom league, start with a clean table for this league
       const initialRow: StandingsRow = {
         id: `st_${activeTeam?.id || Date.now()}_1`,
+        leagueName: leagueName || 'Champions League',
         rank: 1,
         name: activeTeam?.name || 'Mi Equipo',
         logo: activeTeam?.logoUrl || DEFAULT_GREY_SHIELD_SVG,

@@ -118,6 +118,7 @@ export interface Player {
   mvpHistory: MVPRecord[];
   linkedUserId?: string;
   invitationStatus?: 'pending' | 'confirmed' | 'declined';
+  teamId?: string;
 }
 
 export interface TeamInfo {
@@ -192,6 +193,7 @@ export interface Match {
   mvpPlayerName?: string;
   mvpPhotoUrl?: string;
   mvpVotes?: Record<string, number>;
+  isLineupSaved?: boolean; // Whether the starting lineup has been configured and saved for this match
   createdAtTimestamp: number;
   matchStartTimestamp: number;
   finishedAtTimestamp?: number;
@@ -199,6 +201,7 @@ export interface Match {
 
 export interface StandingsRow {
   id: string;
+  leagueName?: string; // League this row belongs to (e.g. Champions League, Liga Mexicana, etc.)
   rank: number;
   name: string;
   logo: string;
@@ -265,6 +268,36 @@ export interface AppUser {
   bio?: string;
   position?: PlayerPosition;
   jerseyNumber?: number;
+  teamJoinStatus?: 'none' | 'pending' | 'accepted' | 'rejected';
+  requestedTeamId?: string;
+  requestedTeamName?: string;
+  requestedLeague?: string;
+}
+
+export interface TeamJoinRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  playerName?: string; // alias
+  userEmail: string;
+  playerEmail?: string; // alias
+  userAvatar?: string;
+  playerAvatar?: string; // alias
+  position?: PlayerPosition;
+  playerPosition?: PlayerPosition; // alias
+  number?: string | number;
+  playerNumber?: number; // alias
+  phone?: string;
+  teamId: string;
+  teamName: string;
+  teamLeague?: string;
+  leagueName?: string; // alias
+  teamLogo?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+  requestedAt?: string; // alias
+  resolvedAt?: string;
+  respondedAt?: string; // alias
 }
 
 export type StoryType = 'custom' | 'match' | 'match_result' | 'mvp' | 'standings' | 'scorers' | 'convocatoria' | 'lineup' | 'player_card';

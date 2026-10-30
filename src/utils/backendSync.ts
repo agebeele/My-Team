@@ -1,5 +1,5 @@
 // Centralized backend synchronization with SQLite API (/api/sync)
-import { TeamInfo, Player, Match, Post, StandingsRow, AppUser } from '../types';
+import { TeamInfo, Player, Match, Post, StandingsRow, AppUser, TeamJoinRequest } from '../types';
 
 export interface AppSyncData {
   team?: TeamInfo;
@@ -9,6 +9,7 @@ export interface AppSyncData {
   posts?: Post[];
   standings?: StandingsRow[];
   users?: AppUser[];
+  joinRequests?: TeamJoinRequest[];
   version?: number;
 }
 

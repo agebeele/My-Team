@@ -18,7 +18,7 @@ import {
   ArrowRight,
   Database,
 } from 'lucide-react';
-import { AppUser, Language, TeamInfo, UserRole, TeamInvitation } from '../types';
+import { AppUser, Language, TeamInfo, UserRole, TeamInvitation, TeamJoinRequest } from '../types';
 import { getT } from '../utils/translations';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
 import { INITIAL_TEAMS } from '../data/initialData';
@@ -46,6 +46,9 @@ interface NavbarProps {
   onOpenAuth?: () => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
+  joinRequests?: TeamJoinRequest[];
+  onAcceptJoinRequest?: (req: TeamJoinRequest) => void;
+  onRejectJoinRequest?: (reqId: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -65,6 +68,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSupabaseModal,
   theme = 'light',
   onToggleTheme,
+  joinRequests = [],
+  onAcceptJoinRequest,
+  onRejectJoinRequest,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
@@ -93,7 +99,11 @@ export const Navbar: React.FC<NavbarProps> = ({
     (inv) => inv.email.toLowerCase() === currentUser?.email.toLowerCase() && inv.status === 'sent'
   );
 
-  const totalUnreadCount = unreadAlertsCount + myPendingInvitations.length;
+  const pendingTeamRequests = currentUser?.role === 'owner'
+    ? joinRequests.filter((r) => r.teamId === team.id && r.status === 'pending')
+    : [];
+
+  const totalUnreadCount = unreadAlertsCount + myPendingInvitations.length + pendingTeamRequests.length;
 
   const handleAcceptInvite = (inv: TeamInvitation) => {
     const updated = sentInvitations.map((i) =>
@@ -223,6 +233,31 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   🏆 {t.nav.tables}
+                </button>
+              </>
+            ) : !currentUser.teamId && currentUser.role === 'player' ? (
+              <>
+                <button
+                  id="nav-btn-leagues"
+                  onClick={() => handleTabChange('leagues')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'leagues'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  🏆 Ligas y Equipos
+                </button>
+                <button
+                  id="nav-btn-wall"
+                  onClick={() => handleTabChange('wall')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'wall'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  📰 Muro de la Liga
                 </button>
               </>
             ) : (
@@ -388,62 +423,125 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="py-2 space-y-3 max-h-80 overflow-y-auto">
-                    {myPendingInvitations.length > 0 ? (
-                      myPendingInvitations.map((inv) => (
-                        <div
-                          key={inv.id}
-                          className="p-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 space-y-2.5"
-                        >
-                          <div className="flex items-start gap-2.5">
-                            {inv.teamLogo ? (
-                              <img
-                                src={inv.teamLogo}
-                                alt={inv.teamName}
-                                className="w-9 h-9 rounded-xl object-cover ring-1 ring-blue-300 shrink-0"
-                              />
-                            ) : (
-                              <div className="w-9 h-9 rounded-xl bg-blue-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
-                                ⚽
-                              </div>
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <span className="font-bold text-xs text-[#050505] dark:text-white block">
-                                Convocatoria Oficial de Equipo
+                    {/* 1. Pending Player Join Requests for this Team's DT */}
+                    {pendingTeamRequests.map((req) => (
+                      <div
+                        key={req.id}
+                        className="p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/50 dark:from-amber-950/40 dark:to-orange-950/30 border border-amber-300 dark:border-amber-700/60 space-y-2.5"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <img
+                            src={req.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+                            alt={req.userName}
+                            className="w-10 h-10 rounded-xl object-cover ring-2 ring-amber-400 shrink-0 bg-white"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-xs text-[#050505] dark:text-white block truncate">
+                                {req.userName}
                               </span>
-                              <p className="text-[11px] text-[#65676B] dark:text-gray-300 mt-0.5 leading-snug">
-                                Has sido convocado para unirte al club <span className="font-bold text-blue-600 dark:text-blue-400">{inv.teamName}</span> en la cancha {inv.stadium || 'local'}.
-                              </p>
-                              <span className="text-[10px] text-gray-400 mt-1 block">
-                                {inv.sentAt}
-                              </span>
+                              {req.number && (
+                                <span className="text-[10px] bg-black text-white px-1.5 py-0.2 rounded font-mono font-bold">
+                                  #{req.number}
+                                </span>
+                              )}
+                              {req.position && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
+                                  {req.position}
+                                </span>
+                              )}
                             </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => handleAcceptInvite(inv)}
-                              className="flex-1 py-1.5 px-3 rounded-lg bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Aceptar y Unirme</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeclineInvite(inv.id)}
-                              className="py-1.5 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-[#65676B] dark:text-gray-300 font-bold text-xs transition-colors cursor-pointer"
-                            >
-                              Rechazar
-                            </button>
+                            <p className="text-[11px] text-[#65676B] dark:text-gray-300 mt-0.5 leading-snug">
+                              Solicita unirse al plantel oficial de <strong>{team.name}</strong>.
+                            </p>
+                            <span className="text-[10px] text-gray-400 mt-0.5 block truncate">
+                              {req.userEmail}
+                            </span>
                           </div>
                         </div>
-                      ))
-                    ) : (
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onAcceptJoinRequest) onAcceptJoinRequest(req);
+                              setShowNotificationsMenu(false);
+                            }}
+                            className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Aceptar Jugador</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onRejectJoinRequest) onRejectJoinRequest(req.id);
+                            }}
+                            className="py-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors cursor-pointer"
+                          >
+                            Rechazar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* 2. Team invitations sent to this player */}
+                    {myPendingInvitations.map((inv) => (
+                      <div
+                        key={inv.id}
+                        className="p-3 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800/60 space-y-2.5"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          {inv.teamLogo ? (
+                            <img
+                              src={inv.teamLogo}
+                              alt={inv.teamName}
+                              className="w-9 h-9 rounded-xl object-cover ring-1 ring-blue-300 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-blue-500 text-white font-black flex items-center justify-center shrink-0 text-xs">
+                              ⚽
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-xs text-[#050505] dark:text-white block">
+                              Convocatoria Oficial de Equipo
+                            </span>
+                            <p className="text-[11px] text-[#65676B] dark:text-gray-300 mt-0.5 leading-snug">
+                              Has sido convocado para unirte al club <span className="font-bold text-blue-600 dark:text-blue-400">{inv.teamName}</span> en la cancha {inv.stadium || 'local'}.
+                            </p>
+                            <span className="text-[10px] text-gray-400 mt-1 block">
+                              {inv.sentAt}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptInvite(inv)}
+                            className="flex-1 py-1.5 px-3 rounded-lg bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Aceptar y Unirme</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeclineInvite(inv.id)}
+                            className="py-1.5 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-[#65676B] dark:text-gray-300 font-bold text-xs transition-colors cursor-pointer"
+                          >
+                            Rechazar
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {pendingTeamRequests.length === 0 && myPendingInvitations.length === 0 && (
                       <div className="py-6 text-center space-y-1">
                         <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto opacity-70" />
                         <p className="text-xs font-bold text-[#050505] dark:text-white">Al día</p>
                         <p className="text-[11px] text-[#65676B] dark:text-gray-400">
-                          No tienes invitaciones de equipos pendientes.
+                          No tienes notificaciones pendientes.
                         </p>
                       </div>
                     )}
