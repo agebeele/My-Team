@@ -49,7 +49,7 @@ import { AppSplashAnimation } from './components/AppSplashAnimation';
 import { WelcomeModal } from './components/WelcomeModal';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
 import { LeagueExplorerAndJoin } from './components/LeagueExplorerAndJoin';
-import { isSupabaseConfigured } from './utils/supabaseClient';
+import { isSupabaseConfigured, initSupabaseFromServer } from './utils/supabaseClient';
 import {
   supabaseFetchPlayers,
   supabaseFetchMatches,
@@ -123,6 +123,15 @@ export default function App() {
   const [joinSuccessAlert, setJoinSuccessAlert] = useState<string | null>(null);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [supabaseVersion, setSupabaseVersion] = useState(0);
+
+  // Initialize shared Supabase configuration from central backend
+  useEffect(() => {
+    initSupabaseFromServer().then((creds) => {
+      if (creds) {
+        setSupabaseVersion((v) => v + 1);
+      }
+    });
+  }, []);
 
   // Real-time synchronization with Supabase when configured
   useEffect(() => {
@@ -309,39 +318,20 @@ export default function App() {
         }
       }
 
-      if (data.matches) {
+      if (data.team && data.team.id === team.id) {
+        setTeam((prev) => ({ ...prev, ...data.team }));
+      }
+
+      if (data.matches && Array.isArray(data.matches)) {
         const currentMatches = data.matches.filter(
           (m: any) => (!m.teamId || m.teamId === team.id) && !deletedMatchIdsRef.current.has(m.id)
         );
-        setMatches((prev) => {
-          const map = new Map<string, Match>();
-          currentMatches.forEach((m: any) => {
-            if (!deletedMatchIdsRef.current.has(m.id)) {
-              map.set(m.id, m);
-            }
-          });
-          // Preserve newly added local matches that might still be in-flight
-          prev.forEach((m) => {
-            if (!map.has(m.id) && !deletedMatchIdsRef.current.has(m.id)) {
-              map.set(m.id, m);
-            }
-          });
-          return Array.from(map.values());
-        });
+        setMatches(currentMatches);
+        saveMatchesForTeam(team.id, currentMatches);
       }
 
-      if (data.posts && data.posts.length > 0) {
-        setPosts((prev) => {
-          const map = new Map<string, Post>();
-          data.posts.forEach((p: any) => map.set(p.id, p));
-          // Preserve newly created local posts so they never flash or disappear
-          prev.forEach((p) => {
-            if (!map.has(p.id)) {
-              map.set(p.id, p);
-            }
-          });
-          return Array.from(map.values());
-        });
+      if (data.posts && Array.isArray(data.posts) && data.posts.length > 0) {
+        setPosts(data.posts);
       }
       if (data.users && data.users.length > 0) {
         setUsers(data.users);
@@ -633,6 +623,7 @@ export default function App() {
           setUsers={handleSetUsers}
           players={players}
           setPlayers={handleSetPlayers}
+          matches={matches}
           setMatches={handleSetMatches}
           setStandings={setStandings}
           language={language}

@@ -24,7 +24,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
 // Permite peticiones desde tu frontend
 app.use(express.json({ limit: '50mb' }));
@@ -259,11 +259,29 @@ function inicializarBD() {
       user_email TEXT,
       team_id TEXT,
       team_name TEXT,
-      status TEXT DEFAULT 'pending',
       payload TEXT,
       created_at INTEGER,
       updated_at INTEGER
     )`);
+
+    // Columnas de soporte para sincronización híbrida
+    const addCol = (tbl: string, col: string, def: string) => {
+      db.run(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${def}`, () => {
+        // Ignorar si la columna ya existe
+      });
+    };
+    addCol('partidos', 'team_id', 'TEXT');
+    addCol('partidos', 'rival', 'TEXT');
+    addCol('partidos', 'cancha', 'TEXT');
+    addCol('partidos', 'payload', 'TEXT');
+    addCol('partidos', 'updated_at', 'INTEGER');
+
+    addCol('publicaciones', 'team_id', 'TEXT');
+    addCol('publicaciones', 'autor_nombre', 'TEXT');
+    addCol('publicaciones', 'autor_rol', 'TEXT');
+    addCol('publicaciones', 'categoria', 'TEXT');
+    addCol('publicaciones', 'payload', 'TEXT');
+    addCol('publicaciones', 'updated_at', 'INTEGER');
 
     // Sembrar ligas si está vacía
     db.get(`SELECT COUNT(*) as count FROM ligas`, (err, row: any) => {
@@ -609,6 +627,42 @@ app.get('/api/publicaciones/liga', (_req, res) => {
   });
 });
 
+// Endpoints para sincronización compartida de Supabase entre diferentes dispositivos
+app.get('/api/supabase-config', (_req, res) => {
+  db.get(`SELECT value FROM app_store WHERE key = 'supabase_config'`, (err, row: any) => {
+    let creds = {
+      url: process.env.VITE_SUPABASE_URL || '',
+      anonKey: process.env.VITE_SUPABASE_ANON_KEY || '',
+    };
+    if (!err && row && row.value) {
+      try {
+        const parsed = JSON.parse(row.value);
+        if (parsed.url) creds.url = parsed.url;
+        if (parsed.anonKey) creds.anonKey = parsed.anonKey;
+      } catch {}
+    }
+    res.json({
+      url: creds.url,
+      anonKey: creds.anonKey,
+      isConfigured: Boolean(creds.url && creds.anonKey && creds.url.startsWith('http')),
+    });
+  });
+});
+
+app.post('/api/supabase-config', (req, res) => {
+  const { url, anonKey } = req.body;
+  const config = { url: (url || '').trim(), anonKey: (anonKey || '').trim() };
+  currentVersion = Date.now();
+  db.run(
+    `INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('supabase_config', ?, ?)`,
+    [JSON.stringify(config), currentVersion],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true, isConfigured: Boolean(config.url && config.anonKey) });
+    }
+  );
+});
+
 // Sincronización general en tiempo real (GET /api/sync)
 app.get('/api/sync', (_req, res) => {
   db.all(`SELECT key, value, updated_at FROM app_store`, (err, rows: any[]) => {
@@ -760,6 +814,24 @@ app.post('/api/sync', (req, res) => {
     // Write merged state to SQLite app_store and relational tables
     db.serialize(() => {
       const stmt = db.prepare(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES (?, ?, ?)`);
+      if (updates.team) {
+        stmt.run('team', JSON.stringify(updates.team), currentVersion);
+        db.run(
+          `INSERT OR REPLACE INTO equipos (id, nombre_equipo, logo, direccion, liga_id, admin_id, color_primario, color_secundario)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            updates.team.id || 'team_01',
+            updates.team.name || 'FC Bayern Munich',
+            updates.team.logoUrl || '',
+            updates.team.stadium || updates.team.location || '',
+            'liga_01',
+            'u_admin',
+            updates.team.primaryColor || '#1877F2',
+            updates.team.secondaryColor || '#0866FF'
+          ],
+          () => {}
+        );
+      }
       stmt.run('allTeams', JSON.stringify(mergedAllTeams), currentVersion);
       stmt.run('users', JSON.stringify(mergedUsers), currentVersion);
       stmt.run('players', JSON.stringify(mergedPlayers), currentVersion);
@@ -783,47 +855,72 @@ app.post('/api/sync', (req, res) => {
           const placeholders = taggedMatches.map(() => '?').join(',');
           db.run(
             `DELETE FROM partidos WHERE team_id = ? AND id NOT IN (${placeholders})`,
-            [targetTeamId, ...taggedMatches.map((m: any) => m.id)]
+            [targetTeamId, ...taggedMatches.map((m: any) => m.id)],
+            () => {}
           );
         } else {
-          db.run(`DELETE FROM partidos WHERE team_id = ?`, [targetTeamId]);
+          db.run(`DELETE FROM partidos WHERE team_id = ?`, [targetTeamId], () => {});
         }
 
-        const matchStmt = db.prepare(`INSERT OR REPLACE INTO partidos (id, team_id, rival, fecha, hora, cancha, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-        taggedMatches.forEach((m: any) => {
-          matchStmt.run(
-            m.id,
-            m.teamId || targetTeamId,
-            m.rival || '',
-            m.date || '',
-            m.time || '',
-            m.stadium || '',
-            JSON.stringify(m),
-            currentVersion
-          );
-        });
-        matchStmt.finalize();
+        try {
+          const matchStmt = db.prepare(`
+            INSERT OR REPLACE INTO partidos (
+              id, liga_id, equipo_local_id, equipo_visita_id, fecha, hora, ubicacion, team_id, rival, cancha, payload, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          taggedMatches.forEach((m: any) => {
+            matchStmt.run(
+              m.id,
+              m.leagueId || 'liga_01',
+              m.teamId || targetTeamId,
+              m.rivalId || 'rival_default',
+              m.date || '',
+              m.time || '',
+              m.stadium || m.location || '',
+              m.teamId || targetTeamId,
+              m.rival || '',
+              m.stadium || '',
+              JSON.stringify(m),
+              currentVersion
+            );
+          });
+          matchStmt.finalize();
+        } catch (e) {
+          console.warn('Error saving matches in SQLite table:', e);
+        }
       }
 
       // Upsert individual posts into relational table 'publicaciones'
       if (updates.posts && Array.isArray(updates.posts)) {
-        const postStmt = db.prepare(`INSERT OR REPLACE INTO publicaciones (id, team_id, autor_id, autor_nombre, autor_rol, es_oficial_liga, categoria, titulo, contenido, payload, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        mergedPosts.forEach((p: any) => {
-          postStmt.run(
-            p.id,
-            p.teamId || null,
-            p.authorId || null,
-            p.authorName || '',
-            p.authorRole || 'player',
-            p.isLeagueOfficial || p.authorRole === 'league_admin' ? 1 : 0,
-            p.category || 'Anuncio',
-            p.title || '',
-            p.content || '',
-            JSON.stringify(p),
-            currentVersion
-          );
-        });
-        postStmt.finalize();
+        try {
+          const postStmt = db.prepare(`
+            INSERT OR REPLACE INTO publicaciones (
+              id, autor_id, equipo_id, team_id, liga_id, autor_nombre, autor_rol, categoria, titulo, contenido, img, es_oficial_liga, estado, payload, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          mergedPosts.forEach((p: any) => {
+            postStmt.run(
+              p.id,
+              p.authorId || 'u_admin',
+              p.teamId || null,
+              p.teamId || null,
+              p.leagueId || 'liga_01',
+              p.authorName || '',
+              p.authorRole || 'player',
+              p.category || 'Anuncio',
+              p.title || '',
+              p.content || '',
+              p.imageUrl || null,
+              p.isLeagueOfficial || p.authorRole === 'league_admin' ? 1 : 0,
+              p.status || 'aprobado',
+              JSON.stringify(p),
+              currentVersion
+            );
+          });
+          postStmt.finalize();
+        } catch (e) {
+          console.warn('Error saving posts in SQLite table:', e);
+        }
       }
 
       // Upsert individual join requests into 'solicitudes_equipo'

@@ -3,6 +3,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const STORAGE_KEY_URL = 'teamgol_supabase_url';
 const STORAGE_KEY_ANON = 'teamgol_supabase_anon_key';
 
+let inMemoryUrl = '';
+let inMemoryKey = '';
+
 export const getSupabaseCredentials = (): { url: string; anonKey: string } => {
   const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
   const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -16,13 +19,15 @@ export const getSupabaseCredentials = (): { url: string; anonKey: string } => {
     // ignore
   }
 
-  const url = localUrl || envUrl;
-  const anonKey = localKey || envKey;
+  const url = inMemoryUrl || localUrl || envUrl;
+  const anonKey = inMemoryKey || localKey || envKey;
 
   return { url, anonKey };
 };
 
 export const saveSupabaseCredentials = (url: string, anonKey: string) => {
+  inMemoryUrl = (url || '').trim();
+  inMemoryKey = (anonKey || '').trim();
   try {
     if (url) {
       localStorage.setItem(STORAGE_KEY_URL, url.trim());
@@ -37,6 +42,34 @@ export const saveSupabaseCredentials = (url: string, anonKey: string) => {
   } catch (err) {
     console.warn('Could not save Supabase credentials to localStorage', err);
   }
+
+  // Also push to backend so other devices automatically receive it
+  fetch('/api/supabase-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: (url || '').trim(), anonKey: (anonKey || '').trim() }),
+  }).catch(() => {});
+};
+
+export const initSupabaseFromServer = async (): Promise<{ url: string; anonKey: string } | null> => {
+  try {
+    const res = await fetch('/api/supabase-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url && data.anonKey) {
+        inMemoryUrl = data.url;
+        inMemoryKey = data.anonKey;
+        try {
+          localStorage.setItem(STORAGE_KEY_URL, data.url);
+          localStorage.setItem(STORAGE_KEY_ANON, data.anonKey);
+        } catch {}
+        return { url: data.url, anonKey: data.anonKey };
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch shared Supabase config from server:', err);
+  }
+  return null;
 };
 
 let cachedClient: SupabaseClient | null = null;

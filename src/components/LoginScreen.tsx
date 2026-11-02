@@ -61,6 +61,7 @@ interface LoginScreenProps {
   setUsers?: React.Dispatch<React.SetStateAction<AppUser[]>>;
   players: Player[];
   setPlayers?: React.Dispatch<React.SetStateAction<Player[]>>;
+  matches?: Match[];
   setMatches?: React.Dispatch<React.SetStateAction<Match[]>>;
   setStandings?: React.Dispatch<React.SetStateAction<StandingsRow[]>>;
   onLoginSuccess: (user: AppUser, rememberDevice: boolean) => void;
@@ -108,6 +109,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   setUsers,
   players,
   setPlayers,
+  matches,
   setMatches,
   setStandings,
   onLoginSuccess,
@@ -263,12 +265,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         team;
 
       if (setTeam) setTeam(bayernTeam);
-      const teamPlayers = getPlayersForTeam(bayernTeam.id);
-      const teamMatches = getMatchesForTeam(bayernTeam.id);
-      const teamStandings = getStandingsForLeague(bayernTeam.leagueName, bayernTeam);
 
-      if (setPlayers) setPlayers(teamPlayers.length > 0 ? teamPlayers : players);
-      if (setMatches) setMatches(teamMatches);
+      // Priorizar datos sincronizados del servidor; solo recurrir a almacenamiento local si la memoria está vacía
+      const activeMatches = (matches || []).filter((m) => !m.teamId || m.teamId === bayernTeam.id);
+      if (activeMatches.length > 0) {
+        if (setMatches) setMatches(activeMatches);
+      } else {
+        const localMatches = getMatchesForTeam(bayernTeam.id);
+        if (localMatches.length > 0 && setMatches) setMatches(localMatches);
+      }
+
+      const activePlayers = (players || []).filter((p) => !p.teamId || p.teamId === bayernTeam.id);
+      if (activePlayers.length > 0) {
+        if (setPlayers) setPlayers(activePlayers);
+      } else {
+        const localPlayers = getPlayersForTeam(bayernTeam.id);
+        if (localPlayers.length > 0 && setPlayers) setPlayers(localPlayers);
+      }
+
+      const teamStandings = getStandingsForLeague(bayernTeam.leagueName, bayernTeam);
       if (setStandings) setStandings(teamStandings);
 
       try {
@@ -348,12 +363,24 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     if (matchedUser.teamId) {
       const userTeam = teamList.find((t) => t.id === matchedUser.teamId);
       if (userTeam) {
-        const teamPlayers = getPlayersForTeam(userTeam.id);
-        const teamMatches = getMatchesForTeam(userTeam.id);
-        const teamStandings = getStandingsForLeague(userTeam.leagueName, userTeam);
         if (setTeam) setTeam(userTeam);
-        if (setPlayers) setPlayers(teamPlayers);
-        if (setMatches) setMatches(teamMatches);
+        const activeMatches = (matches || []).filter((m) => !m.teamId || m.teamId === userTeam.id);
+        if (activeMatches.length > 0) {
+          if (setMatches) setMatches(activeMatches);
+        } else {
+          const localMatches = getMatchesForTeam(userTeam.id);
+          if (localMatches.length > 0 && setMatches) setMatches(localMatches);
+        }
+
+        const activePlayers = (players || []).filter((p) => !p.teamId || p.teamId === userTeam.id);
+        if (activePlayers.length > 0) {
+          if (setPlayers) setPlayers(activePlayers);
+        } else {
+          const localPlayers = getPlayersForTeam(userTeam.id);
+          if (localPlayers.length > 0 && setPlayers) setPlayers(localPlayers);
+        }
+
+        const teamStandings = getStandingsForLeague(userTeam.leagueName, userTeam);
         if (setStandings) setStandings(teamStandings);
         try {
           localStorage.setItem('teamgol_team_data', JSON.stringify(userTeam));
