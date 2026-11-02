@@ -202,10 +202,7 @@ VALUES (
   '#1877F2',
   '#0866FF'
 )
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  short_name = EXCLUDED.short_name,
-  logo_url = EXCLUDED.logo_url;
+ON CONFLICT (id) DO NOTHING;
 
 -- Administrador oficial
 INSERT INTO app_users (id, name, email, username, password, role, player_id, team_id, provider)
@@ -220,10 +217,7 @@ VALUES (
   'team_01',
   'email'
 )
-ON CONFLICT (email) DO UPDATE SET
-  password = EXCLUDED.password,
-  role = EXCLUDED.role,
-  team_id = EXCLUDED.team_id;
+ON CONFLICT (email) DO NOTHING;
 
 -- 17 Jugadores del Bayern Munich
 INSERT INTO players (id, team_id, name, nickname, number, position, is_starter, is_called_up)
@@ -245,11 +239,7 @@ VALUES
   ('p_15', 'team_01', 'Moises Treviño', 'Pitbull', '33', 'DFC', false, true),
   ('p_16', 'team_01', 'Fernando', '', '', 'DEL', false, true),
   ('p_17', 'team_01', 'Luis', 'Pepino', '', 'DFC', false, true)
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  nickname = EXCLUDED.nickname,
-  number = EXCLUDED.number,
-  position = EXCLUDED.position;
+ON CONFLICT (id) DO NOTHING;
 
 -- Publicación inicial de bienvenida
 INSERT INTO posts (id, team_id, league_name, is_league_official, author_id, author_name, author_role, category, title, content, status, created_at)

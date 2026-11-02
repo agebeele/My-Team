@@ -55,10 +55,13 @@ import {
   supabaseFetchMatches,
   supabaseFetchPosts,
   supabaseFetchUsers,
+  supabaseFetchTeams,
   supabaseUpsertPlayer,
+  supabaseDeletePlayer,
   supabaseUpsertMatch,
   supabaseUpsertPost,
   supabaseUpsertUser,
+  supabaseUpsertTeam,
   subscribeToSupabaseTable,
 } from './utils/supabaseService';
 import { fetchBackendSync, pushBackendSync, pushBackendSyncImmediate } from './utils/backendSync';
@@ -141,15 +144,23 @@ export default function App() {
 
     const syncFromSupabase = async () => {
       try {
-        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers] = await Promise.all([
+        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams] = await Promise.all([
           supabaseFetchPlayers(team.id),
           supabaseFetchMatches(team.id),
           supabaseFetchPosts(team.id),
           supabaseFetchUsers(),
+          supabaseFetchTeams(),
         ]);
 
         if (!isMounted) return;
 
+        if (cloudTeams && cloudTeams.length > 0) {
+          setAllTeams(cloudTeams);
+          const currentCloudTeam = cloudTeams.find((t) => t.id === team.id);
+          if (currentCloudTeam) {
+            setTeam(currentCloudTeam);
+          }
+        }
         if (cloudPlayers && cloudPlayers.length > 0) {
           setPlayers(cloudPlayers);
         }
@@ -170,6 +181,16 @@ export default function App() {
     syncFromSupabase();
 
     // Subscribe to real-time events across tables
+    const unsubTeams = subscribeToSupabaseTable('teams', () => {
+      supabaseFetchTeams().then((fresh) => {
+        if (isMounted && fresh && fresh.length > 0) {
+          setAllTeams(fresh);
+          const currentFresh = fresh.find((t) => t.id === team.id);
+          if (currentFresh) setTeam(currentFresh);
+        }
+      });
+    });
+
     const unsubPosts = subscribeToSupabaseTable('posts', () => {
       supabaseFetchPosts(team.id).then((fresh) => {
         if (isMounted && fresh) setPosts(fresh);
@@ -196,6 +217,7 @@ export default function App() {
 
     return () => {
       isMounted = false;
+      unsubTeams();
       unsubPosts();
       unsubPlayers();
       unsubMatches();
@@ -223,8 +245,14 @@ export default function App() {
   const handleSetPlayers: React.Dispatch<React.SetStateAction<Player[]>> = (action) => {
     setPlayers((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      pushBackendSync({ players: next });
+      pushBackendSyncImmediate({ players: next });
       if (isSupabaseConfigured()) {
+        const nextIds = new Set(next.map((p) => p.id));
+        prev.forEach((oldP) => {
+          if (!nextIds.has(oldP.id)) {
+            supabaseDeletePlayer(oldP.id);
+          }
+        });
         next.forEach((pl) => {
           supabaseUpsertPlayer(team.id, pl);
         });
@@ -281,13 +309,16 @@ export default function App() {
         if (!updated.some((t) => t.id === next.id)) {
           updated.push(next);
         }
-        pushBackendSync({ team: next, allTeams: updated });
+        pushBackendSyncImmediate({ team: next, allTeams: updated });
         return updated;
       });
       try {
         localStorage.setItem('teamgol_team_data', JSON.stringify(next));
       } catch {
         // ignore
+      }
+      if (isSupabaseConfigured()) {
+        supabaseUpsertTeam(next);
       }
       return next;
     });
@@ -645,7 +676,7 @@ export default function App() {
               if (userTeamId) {
                 const targetTeam =
                   allTeams.find((t) => t.id === userTeamId) ||
-                  (userTeamId === 'team_01' ? INITIAL_TEAM : undefined);
+                  (userTeamId === 'team_01' ? team : undefined);
                 if (targetTeam) {
                   handleSwitchTeam(targetTeam);
                 }

@@ -438,15 +438,6 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
       ...teamForm,
     };
     setTeam(updatedTeam);
-    pushBackendSync({
-      team: updatedTeam,
-      allTeams: [updatedTeam],
-    });
-    try {
-      localStorage.setItem('teamgol_team_data', JSON.stringify(updatedTeam));
-    } catch {
-      // ignore
-    }
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
   };

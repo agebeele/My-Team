@@ -383,10 +383,77 @@ export const supabaseUpsertUser = async (user: AppUser): Promise<boolean> => {
 };
 
 // ==========================================
+// TEAMS SERVICE
+// ==========================================
+export const supabaseFetchTeams = async (): Promise<TeamInfo[] | null> => {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client.from('teams').select('*');
+    if (error) {
+      console.warn('Supabase fetchTeams error:', error);
+      return null;
+    }
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      shortName: row.short_name || row.name,
+      logoUrl: row.logo_url || '',
+      bannerUrl: row.banner_url || '',
+      leagueName: row.league_name || 'Champions League',
+      season: row.season || 'Temporada 2026',
+      stadium: row.stadium || '',
+      location: row.location || '',
+      foundedYear: row.founded_year || '2021',
+      primaryColor: row.primary_color || '#1877F2',
+      secondaryColor: row.secondary_color || '#0866FF',
+    }));
+  } catch (err) {
+    console.warn('Supabase fetchTeams exception:', err);
+    return null;
+  }
+};
+
+export const supabaseUpsertTeam = async (team: TeamInfo): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const row = {
+      id: team.id,
+      name: team.name,
+      short_name: team.shortName || team.name,
+      logo_url: team.logoUrl || null,
+      banner_url: team.bannerUrl || null,
+      league_name: team.leagueName || 'Champions League',
+      season: team.season || 'Temporada 2026',
+      stadium: team.stadium || '',
+      location: team.location || null,
+      founded_year: team.foundedYear || '2021',
+      primary_color: team.primaryColor || '#1877F2',
+      secondary_color: team.secondaryColor || '#0866FF',
+    };
+
+    const { error } = await client.from('teams').upsert(row, { onConflict: 'id' });
+    if (error) {
+      console.warn('Supabase upsertTeam error:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('Supabase upsertTeam exception:', err);
+    return false;
+  }
+};
+
+// ==========================================
 // REALTIME SUBSCRIPTIONS
 // ==========================================
 export const subscribeToSupabaseTable = (
-  table: 'posts' | 'players' | 'matches' | 'app_users',
+  table: 'posts' | 'players' | 'matches' | 'app_users' | 'teams',
   onPayload: (payload: any) => void
 ) => {
   const client = getSupabaseClient();
