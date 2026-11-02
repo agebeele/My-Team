@@ -535,6 +535,7 @@ export default function App() {
       redCards: 0,
       isCalledUp: true,
       isStarter: false,
+      mvpHistory: [],
       teamId: req.teamId,
     };
     const updatedPlayers = [...players, newPlayer];

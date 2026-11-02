@@ -277,27 +277,28 @@ export interface AppUser {
 export interface TeamJoinRequest {
   id: string;
   userId: string;
-  userName: string;
-  playerName?: string; // alias
-  userEmail: string;
-  playerEmail?: string; // alias
+  userName?: string;
+  playerName: string;
+  userEmail?: string;
+  playerEmail: string;
   userAvatar?: string;
-  playerAvatar?: string; // alias
+  playerAvatar?: string;
   position?: PlayerPosition;
-  playerPosition?: PlayerPosition; // alias
+  playerPosition?: PlayerPosition;
   number?: string | number;
-  playerNumber?: number; // alias
+  playerNumber?: number;
   phone?: string;
   teamId: string;
   teamName: string;
   teamLeague?: string;
-  leagueName?: string; // alias
+  leagueName?: string;
   teamLogo?: string;
   status: 'pending' | 'accepted' | 'rejected';
-  createdAt: string;
-  requestedAt?: string; // alias
+  createdAt?: string;
+  requestedAt?: string;
   resolvedAt?: string;
-  respondedAt?: string; // alias
+  respondedAt?: string;
+  mensaje?: string;
 }
 
 export type StoryType = 'custom' | 'match' | 'match_result' | 'mvp' | 'standings' | 'scorers' | 'convocatoria' | 'lineup' | 'player_card';

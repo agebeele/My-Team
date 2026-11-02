@@ -84,17 +84,25 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
       id: `req_${Date.now()}`,
       userId: currentUser.id,
       userName: currentUser.name,
+      playerName: currentUser.name,
       userEmail: currentUser.email,
+      playerEmail: currentUser.email,
       userAvatar: currentUser.avatarUrl,
+      playerAvatar: currentUser.avatarUrl,
       position: currentUser.position || 'MED',
+      playerPosition: currentUser.position || 'MED',
       number: currentUser.jerseyNumber || 10,
+      playerNumber: currentUser.jerseyNumber || 10,
       phone: currentUser.phone,
       teamId: targetTeam.id,
       teamName: targetTeam.name,
       teamLeague: targetTeam.leagueName,
+      leagueName: targetTeam.leagueName,
       teamLogo: targetTeam.logoUrl,
       status: 'pending',
       createdAt: new Date().toISOString(),
+      requestedAt: new Date().toISOString(),
+      mensaje: 'Desea unirse al plantel',
     };
 
     const updatedRequests = [newRequest, ...joinRequests.filter((r) => r.userId !== currentUser.id)];
@@ -117,7 +125,17 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
       localStorage.setItem('teamgol_current_user', JSON.stringify(updatedUser));
     } catch {}
 
-    // Send to backend SQLite
+    // Send to backend SQLite via both endpoints (generic and specific notificaciones)
+    fetch('/api/notificaciones/solicitar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        usuarioId: currentUser.id,
+        equipoId: targetTeam.id,
+        mensaje: 'Desea unirse al plantel',
+      }),
+    }).catch(() => {});
+
     await fetch('/api/solicitudes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

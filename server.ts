@@ -102,69 +102,156 @@ const INITIAL_SERVER_USERS = [
 
 function inicializarBD() {
   db.serialize(() => {
-    // 1. Tabla de estado centralizado (cache rápido de sincronización)
+    db.run(`PRAGMA foreign_keys = ON;`);
+
+    // 1. LIGAS (Dueño de la Liga)
+    db.run(`CREATE TABLE IF NOT EXISTS ligas (
+      id TEXT PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      correo TEXT UNIQUE NOT NULL,
+      contrasena TEXT NOT NULL,
+      rol TEXT DEFAULT 'league_admin',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // 2. EQUIPOS (Pertenecen a una Liga)
+    db.run(`CREATE TABLE IF NOT EXISTS equipos (
+      id TEXT PRIMARY KEY,
+      nombre_equipo TEXT NOT NULL,
+      logo TEXT,
+      direccion TEXT,
+      liga_id TEXT NOT NULL,
+      admin_id TEXT NOT NULL,
+      color_primario TEXT DEFAULT '#1877F2',
+      color_secundario TEXT DEFAULT '#000000',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (liga_id) REFERENCES ligas(id) ON DELETE CASCADE,
+      FOREIGN KEY (admin_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    )`);
+
+    // 3. USUARIOS Y JUGADORES
+    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
+      id TEXT PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      correo TEXT UNIQUE NOT NULL,
+      contrasena TEXT NOT NULL,
+      posicion TEXT DEFAULT 'MED',
+      dorsal INTEGER,
+      rol TEXT DEFAULT 'player',
+      equipo_id TEXT,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE SET NULL
+    )`);
+
+    // 4. NOTIFICACIONES / SOLICITUDES DE UNIRSE A EQUIPO
+    db.run(`CREATE TABLE IF NOT EXISTS notificaciones (
+      id TEXT PRIMARY KEY,
+      usuario_id TEXT NOT NULL,
+      equipo_id TEXT NOT NULL,
+      tipo TEXT DEFAULT 'solicitud_ingreso',
+      estado TEXT DEFAULT 'pendiente',
+      mensaje TEXT,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE CASCADE
+    )`);
+
+    // 5. PARTIDOS (Calendario y Marcador)
+    db.run(`CREATE TABLE IF NOT EXISTS partidos (
+      id TEXT PRIMARY KEY,
+      liga_id TEXT NOT NULL,
+      equipo_local_id TEXT NOT NULL,
+      equipo_visita_id TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      hora TEXT NOT NULL,
+      ubicacion TEXT,
+      goles_local INTEGER DEFAULT 0,
+      goles_visita INTEGER DEFAULT 0,
+      estado TEXT DEFAULT 'programado',
+      mvp_jugador_id TEXT,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (liga_id) REFERENCES ligas(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipo_local_id) REFERENCES equipos(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipo_visita_id) REFERENCES equipos(id) ON DELETE CASCADE,
+      FOREIGN KEY (mvp_jugador_id) REFERENCES usuarios(id) ON DELETE SET NULL
+    )`);
+
+    // 6. MODO EN VIVO (Eventos por Partido: Goles, Tarjetas, Cambios, Lesiones)
+    db.run(`CREATE TABLE IF NOT EXISTS partido_eventos (
+      id TEXT PRIMARY KEY,
+      partido_id TEXT NOT NULL,
+      equipo_id TEXT NOT NULL,
+      jugador_id TEXT NOT NULL,
+      jugador_sale_id TEXT,
+      tipo_evento TEXT NOT NULL,
+      minuto INTEGER,
+      tiempo TEXT DEFAULT '1T',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE CASCADE,
+      FOREIGN KEY (jugador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+      FOREIGN KEY (jugador_sale_id) REFERENCES usuarios(id) ON DELETE SET NULL
+    )`);
+
+    // 7. CONVOCATORIAS Y ALINEACIONES (Pizarra Táctica)
+    db.run(`CREATE TABLE IF NOT EXISTS alineaciones (
+      id TEXT PRIMARY KEY,
+      partido_id TEXT NOT NULL,
+      equipo_id TEXT NOT NULL,
+      jugador_id TEXT NOT NULL,
+      posicion_x REAL,
+      posicion_y REAL,
+      es_titular INTEGER DEFAULT 0,
+      formacion TEXT DEFAULT '1-2-3-1',
+      FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE CASCADE,
+      FOREIGN KEY (jugador_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    )`);
+
+    // 8. VOTACIONES DE MVP
+    db.run(`CREATE TABLE IF NOT EXISTS votaciones_mvp (
+      id TEXT PRIMARY KEY,
+      partido_id TEXT NOT NULL,
+      votante_id TEXT NOT NULL,
+      candidato_id TEXT NOT NULL,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(partido_id, votante_id),
+      FOREIGN KEY (partido_id) REFERENCES partidos(id) ON DELETE CASCADE,
+      FOREIGN KEY (votante_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+      FOREIGN KEY (candidato_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    )`);
+
+    // 9. PUBLICACIONES Y COMUNICADOS
+    db.run(`CREATE TABLE IF NOT EXISTS publicaciones (
+      id TEXT PRIMARY KEY,
+      autor_id TEXT NOT NULL,
+      equipo_id TEXT,
+      liga_id TEXT,
+      titulo TEXT NOT NULL,
+      contenido TEXT NOT NULL,
+      img TEXT,
+      es_oficial_liga INTEGER DEFAULT 0,
+      estado TEXT DEFAULT 'aprobado',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (autor_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+      FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE CASCADE,
+      FOREIGN KEY (liga_id) REFERENCES ligas(id) ON DELETE CASCADE
+    )`);
+
+    // ÍNDICES DE RENDIMIENTO
+    db.run(`CREATE INDEX IF NOT EXISTS idx_usuarios_equipo ON usuarios(equipo_id);`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_notif_equipo ON notificaciones(equipo_id);`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_partidos_liga ON partidos(liga_id);`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_eventos_partido ON partido_eventos(partido_id);`);
+    db.run(`CREATE INDEX IF NOT EXISTS idx_alineaciones_partido ON alineaciones(partido_id);`);
+
+    // Tablas de soporte para sincronización rápida
     db.run(`CREATE TABLE IF NOT EXISTS app_store (
       key TEXT PRIMARY KEY,
       value TEXT,
       updated_at INTEGER
     )`);
 
-    // 2. Tabla relacional de partidos
-    db.run(`CREATE TABLE IF NOT EXISTS partidos (
-      id TEXT PRIMARY KEY,
-      team_id TEXT,
-      rival TEXT,
-      fecha TEXT,
-      hora TEXT,
-      cancha TEXT,
-      payload TEXT,
-      updated_at INTEGER
-    )`);
-
-    // 3. Tabla relacional de publicaciones y anuncios
-    db.run(`CREATE TABLE IF NOT EXISTS publicaciones (
-      id TEXT PRIMARY KEY,
-      team_id TEXT,
-      autor_id TEXT,
-      autor_nombre TEXT,
-      autor_rol TEXT,
-      es_oficial_liga INTEGER,
-      categoria TEXT,
-      titulo TEXT,
-      contenido TEXT,
-      payload TEXT,
-      updated_at INTEGER
-    )`);
-
-    // 4. Tabla relacional de equipos
-    db.run(`CREATE TABLE IF NOT EXISTS equipos (
-      id TEXT PRIMARY KEY,
-      nombre TEXT,
-      payload TEXT,
-      updated_at INTEGER
-    )`);
-
-    // 5. Tabla relacional de usuarios
-    db.run(`CREATE TABLE IF NOT EXISTS usuarios (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
-      payload TEXT,
-      updated_at INTEGER
-    )`);
-
-    // 6. Tabla clásica de jugadores
-    db.run(`CREATE TABLE IF NOT EXISTS jugadores (
-      id TEXT PRIMARY KEY,
-      nombre TEXT NOT NULL,
-      posicion TEXT NOT NULL,
-      numero INTEGER,
-      edad INTEGER,
-      telefono TEXT,
-      estado TEXT DEFAULT 'Activo',
-      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    // 7. Tabla relacional de solicitudes para unirse a equipos
     db.run(`CREATE TABLE IF NOT EXISTS solicitudes_equipo (
       id TEXT PRIMARY KEY,
       user_id TEXT,
@@ -177,6 +264,19 @@ function inicializarBD() {
       created_at INTEGER,
       updated_at INTEGER
     )`);
+
+    // Sembrar ligas si está vacía
+    db.get(`SELECT COUNT(*) as count FROM ligas`, (err, row: any) => {
+      if (!err && row && row.count === 0) {
+        const insLiga = db.prepare('INSERT OR REPLACE INTO ligas (id, nombre, correo, contrasena, rol) VALUES (?, ?, ?, ?, ?)');
+        insLiga.run('liga_01', 'Champions League', 'admin@dreamteam.com', 'admin', 'league_admin');
+        insLiga.run('liga_02', 'Liga Mexicana', 'mexicana@dreamteam.com', 'admin', 'league_admin');
+        insLiga.run('liga_03', 'Liga Española', 'espanola@dreamteam.com', 'admin', 'league_admin');
+        insLiga.run('liga_04', 'Liga Francesa', 'francesa@dreamteam.com', 'admin', 'league_admin');
+        insLiga.run('liga_05', 'Copa del Mundo', 'mundial@dreamteam.com', 'admin', 'league_admin');
+        insLiga.finalize();
+      }
+    });
 
     // Comprobar si app_store ya tiene datos; si no, poblarlo
     db.get(`SELECT COUNT(*) as count FROM app_store`, (err, row: any) => {
@@ -192,7 +292,7 @@ function inicializarBD() {
           {
             id: 'post_init_01',
             teamId: 'team_01',
-            leagueName: 'Liga Premier Fútbol 7',
+            leagueName: 'Champions League',
             isLeagueOfficial: false,
             authorId: 'u_admin',
             authorName: 'Administrador (Admin)',
@@ -217,6 +317,296 @@ function inicializarBD() {
 
 app.get('/api/ping', (_req, res) => {
   res.json({ mensaje: '¡Servidor funcionando!' });
+});
+
+// ==========================================
+// 1. ENDPOINTS DE SOLICITUDES / NOTIFICACIONES
+// ==========================================
+
+// Obtener equipos disponibles para jugadores sin equipo
+app.get('/api/equipos-disponibles', (_req, res) => {
+  const sql = `
+    SELECT e.id, e.nombre_equipo, e.logo, e.direccion, l.nombre AS nombre_liga
+    FROM equipos e
+    JOIN ligas l ON e.liga_id = l.id
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// Jugador solicita unirse a un equipo
+app.post('/api/notificaciones/solicitar', (req, res) => {
+  const { usuarioId, equipoId, mensaje } = req.body;
+  if (!usuarioId || !equipoId) {
+    return res.status(400).json({ error: 'Faltan datos obligatorios (usuarioId, equipoId).' });
+  }
+
+  const notifId = `notif_${Date.now()}`;
+  const sql = `
+    INSERT INTO notificaciones (id, usuario_id, equipo_id, tipo, estado, mensaje)
+    VALUES (?, ?, ?, 'solicitud_ingreso', 'pendiente', ?)
+  `;
+
+  db.run(sql, [notifId, usuarioId, equipoId, mensaje || 'Desea unirse al equipo'], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+
+    // Also update app_store cache for real-time frontend sync
+    currentVersion = Date.now();
+    db.get(`SELECT nombre, correo, avatarUrl, posicion, jerseyNumber FROM usuarios WHERE id = ?`, [usuarioId], (_errU, uRow: any) => {
+      db.get(`SELECT nombre_equipo FROM equipos WHERE id = ?`, [equipoId], (_errE, eRow: any) => {
+        const reqObj = {
+          id: notifId,
+          userId: usuarioId,
+          userName: uRow?.nombre || '',
+          playerName: uRow?.nombre || '',
+          userEmail: uRow?.correo || '',
+          playerEmail: uRow?.correo || '',
+          userAvatar: uRow?.avatarUrl || '',
+          playerAvatar: uRow?.avatarUrl || '',
+          position: uRow?.posicion || 'MED',
+          playerPosition: uRow?.posicion || 'MED',
+          number: uRow?.dorsal || 10,
+          playerNumber: uRow?.dorsal || 10,
+          teamId: equipoId,
+          teamName: eRow?.nombre_equipo || '',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          requestedAt: new Date().toISOString(),
+          mensaje: mensaje || 'Desea unirse al plantel',
+        };
+
+        db.get(`SELECT value FROM app_store WHERE key = 'joinRequests'`, (_errS, sRow: any) => {
+          let list: any[] = [];
+          if (sRow && sRow.value) {
+            try { list = JSON.parse(sRow.value); } catch {}
+          }
+          list = [reqObj, ...list.filter((r) => r.id !== notifId && r.userId !== usuarioId)];
+          db.run(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('joinRequests', ?, ?)`, [JSON.stringify(list), currentVersion]);
+        });
+      });
+    });
+
+    res.json({ success: true, notificacionId: notifId, estado: 'pendiente' });
+  });
+});
+
+// Obtener notificaciones pendientes para el Admin de un Equipo
+app.get('/api/notificaciones/equipo/:equipoId', (req, res) => {
+  const { equipoId } = req.params;
+  const sql = `
+    SELECT n.id AS notificacion_id, u.id AS usuario_id, u.nombre, u.correo, u.posicion, n.mensaje, n.creado_en
+    FROM notificaciones n
+    JOIN usuarios u ON n.usuario_id = u.id
+    WHERE n.equipo_id = ? AND n.estado = 'pendiente'
+    ORDER BY n.creado_en DESC
+  `;
+
+  db.all(sql, [equipoId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// Admin resuelve solicitud (Aceptar o Rechazar)
+app.put('/api/notificaciones/responder', (req, res) => {
+  const { notificacionId, usuarioId, equipoId, accion } = req.body; // accion: 'aceptar' | 'rechazar'
+
+  if (!notificacionId || !['aceptar', 'rechazar'].includes(accion)) {
+    return res.status(400).json({ error: 'Acción no válida.' });
+  }
+
+  const nuevoEstado = accion === 'aceptar' ? 'aceptada' : 'rechazada';
+
+  db.serialize(() => {
+    // 1. Actualizar estado de la notificación
+    db.run(`UPDATE notificaciones SET estado = ? WHERE id = ?`, [nuevoEstado, notificacionId]);
+
+    // 2. Si se acepta, asignar el equipo_id al jugador
+    if (accion === 'aceptar' && usuarioId && equipoId) {
+      db.run(`UPDATE usuarios SET equipo_id = ? WHERE id = ?`, [equipoId, usuarioId]);
+    }
+
+    // 3. Keep app_store joinRequests and users in sync
+    currentVersion = Date.now();
+    db.get(`SELECT value FROM app_store WHERE key = 'joinRequests'`, (_errJ, jRow: any) => {
+      if (jRow && jRow.value) {
+        try {
+          const jList = JSON.parse(jRow.value).map((r: any) =>
+            r.id === notificacionId ? { ...r, status: accion === 'aceptar' ? 'accepted' : 'rejected' } : r
+          );
+          db.run(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('joinRequests', ?, ?)`, [JSON.stringify(jList), currentVersion]);
+        } catch {}
+      }
+    });
+
+    if (accion === 'aceptar' && usuarioId && equipoId) {
+      db.get(`SELECT value FROM app_store WHERE key = 'users'`, (_errU, uRow: any) => {
+        if (uRow && uRow.value) {
+          try {
+            const uList = JSON.parse(uRow.value).map((u: any) =>
+              u.id === usuarioId ? { ...u, teamId: equipoId, teamJoinStatus: 'accepted' } : u
+            );
+            db.run(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES ('users', ?, ?)`, [JSON.stringify(uList), currentVersion]);
+          } catch {}
+        }
+      });
+    }
+
+    res.json({ success: true, estado: nuevoEstado });
+  });
+});
+
+// ==========================================
+// 2. ENDPOINTS DE MODO PARTIDO (EN VIVO)
+// ==========================================
+
+// Cambiar estado del partido ('1T', 'entretiempo', '2T', 'finalizado')
+app.put('/api/partidos/:id/estado', (req, res) => {
+  const partidoId = req.params.id;
+  const { estado } = req.body;
+
+  db.run(`UPDATE partidos SET estado = ? WHERE id = ?`, [estado, partidoId], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, partidoId, estado });
+  });
+});
+
+// Registrar un evento en vivo (Gol, Tarjeta, Cambio, Lesión)
+app.post('/api/partidos/evento', (req, res) => {
+  const { partidoId, equipoId, jugadorId, jugadorSaleId, tipoEvento, minuto, tiempo } = req.body;
+  
+  if (!partidoId || !equipoId || !jugadorId || !tipoEvento) {
+    return res.status(400).json({ error: 'Datos de evento incompletos.' });
+  }
+
+  const eventoId = `evt_${Date.now()}`;
+
+  db.serialize(() => {
+    // 1. Insertar evento
+    const sqlInsert = `
+      INSERT INTO partido_eventos (id, partido_id, equipo_id, jugador_id, jugador_sale_id, tipo_evento, minuto, tiempo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    db.run(sqlInsert, [eventoId, partidoId, equipoId, jugadorId, jugadorSaleId || null, tipoEvento, minuto || 0, tiempo || '1T']);
+
+    // 2. Si es Gol, incrementar el marcador del partido
+    if (tipoEvento === 'gol') {
+      db.get(`SELECT equipo_local_id FROM partidos WHERE id = ?`, [partidoId], (err, row: any) => {
+        if (!err && row) {
+          const esLocal = row.equipo_local_id === equipoId;
+          const campoGol = esLocal ? 'goles_local' : 'goles_visita';
+          db.run(`UPDATE partidos SET ${campoGol} = ${campoGol} + 1 WHERE id = ?`, [partidoId]);
+        }
+      });
+    }
+
+    res.json({ success: true, eventoId });
+  });
+});
+
+// ==========================================
+// 3. TABLAS DE POSICIONES Y GOLEO (PICHICHI)
+// ==========================================
+
+// Tabla de Goleadores (Pichichi) de una Liga
+app.get('/api/tablas/goleadores/:ligaId', (req, res) => {
+  const { ligaId } = req.params;
+  const sql = `
+    SELECT u.id AS jugador_id, u.nombre AS jugador_nombre, u.dorsal, e.nombre_equipo, COUNT(pe.id) AS goles
+    FROM partido_eventos pe
+    JOIN usuarios u ON pe.jugador_id = u.id
+    JOIN equipos e ON pe.equipo_id = e.id
+    WHERE e.liga_id = ? AND pe.tipo_evento = 'gol'
+    GROUP BY u.id
+    ORDER BY goles DESC
+  `;
+
+  db.all(sql, [ligaId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// Tabla de Posiciones de la Liga
+app.get('/api/tablas/posiciones/:ligaId', (req, res) => {
+  const { ligaId } = req.params;
+  const sql = `
+    SELECT 
+        e.id AS equipo_id,
+        e.nombre_equipo,
+        e.logo,
+        COUNT(p.id) AS PJ,
+        SUM(CASE 
+            WHEN (p.equipo_local_id = e.id AND p.goles_local > p.goles_visita) OR (p.equipo_visita_id = e.id AND p.goles_visita > p.goles_local) THEN 3
+            WHEN p.goles_local = p.goles_visita AND p.id IS NOT NULL THEN 1 ELSE 0 END) AS PTS
+    FROM equipos e
+    LEFT JOIN partidos p ON (e.id = p.equipo_local_id OR e.id = p.equipo_visita_id) AND p.estado = 'finalizado'
+    WHERE e.liga_id = ?
+    GROUP BY e.id
+    ORDER BY PTS DESC
+  `;
+
+  db.all(sql, [ligaId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// ==========================================
+// 4. VOTACIÓN DE MVP
+// ==========================================
+
+// Emitir voto para MVP del partido
+app.post('/api/partidos/votar-mvp', (req, res) => {
+  const { partidoId, votanteId, candidatoId } = req.body;
+  const votoId = `voto_${Date.now()}`;
+
+  const sql = `INSERT INTO votaciones_mvp (id, partido_id, votante_id, candidato_id) VALUES (?, ?, ?, ?)`;
+  
+  db.run(sql, [votoId, partidoId, votanteId, candidatoId], function (err) {
+    if (err) {
+      if (err.message && err.message.includes('UNIQUE constraint failed')) {
+        return res.status(400).json({ error: 'Ya has emitido tu voto para este partido.' });
+      }
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ success: true, mensaje: 'Voto registrado exitosamente.' });
+  });
+});
+
+// Obtener conteo y ganador MVP
+app.get('/api/partidos/:id/resultado-mvp', (req, res) => {
+  const partidoId = req.params.id;
+  const sql = `
+    SELECT u.id, u.nombre, u.dorsal, COUNT(v.id) AS votos
+    FROM votaciones_mvp v
+    JOIN usuarios u ON v.candidato_id = u.id
+    WHERE v.partido_id = ?
+    GROUP BY u.id
+    ORDER BY votos DESC
+  `;
+
+  db.all(sql, [partidoId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ ranking: rows, ganador: rows[0] || null });
+  });
+});
+
+// ==========================================
+// 5. MURO DE PUBLICACIONES OFICIALES DE LA LIGA
+// ==========================================
+app.get('/api/publicaciones/liga', (_req, res) => {
+  const sql = `
+    SELECT * FROM publicaciones 
+    WHERE es_oficial_liga = 1 
+    ORDER BY creado_en DESC
+  `;
+  db.all(sql, [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
 });
 
 // Sincronización general en tiempo real (GET /api/sync)
