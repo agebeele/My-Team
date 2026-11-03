@@ -188,6 +188,7 @@ export interface Match {
   calledUpPlayerIds: string[];
   modality?: MatchModality;
   lineup: LineupPosition[];
+  formation?: string;
   events?: MatchEvent[];
   mvpId?: string;
   mvpPlayerName?: string;

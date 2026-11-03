@@ -170,42 +170,69 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
           {/* Left Brand & Active Club */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            {/* Team Crest */}
-            <div className="relative shrink-0">
-              <img
-                src={team.logoUrl}
-                alt={team.name}
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-                className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-[#1877F2]/40 shadow-xs"
-              />
-              <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px] font-black shadow-xs">
-                7
-              </span>
-            </div>
+            {currentUser.role === 'league_admin' ? (
+              /* Dedicated League Admin Shield / Trophy */
+              <>
+                <div className="relative shrink-0">
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center text-white text-xl shadow-md border border-amber-300">
+                    🏆
+                  </div>
+                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-600 text-white flex items-center justify-center text-[9px] font-black shadow-xs">
+                    ★
+                  </span>
+                </div>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
-                  <span>{currentUser.role === 'league_admin' ? 'Panel de Liga' : team.shortName}</span>
-                </h1>
-                {hasLiveMatch && currentUser.role !== 'league_admin' && (
-                  <button
-                    onClick={() => handleTabChange('live_match')}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-wider animate-pulse cursor-pointer shadow-xs hover:bg-rose-100 transition-colors"
-                    title="Hay un partido de Fútbol 7 en juego"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                    <span>EN VIVO</span>
-                  </button>
-                )}
-              </div>
-              <p className="text-[11px] sm:text-xs text-[#65676B] dark:text-gray-400 truncate max-w-[150px] sm:max-w-xs font-medium">
-                {team.leagueName || 'Liga Premier Fútbol 7'}
-              </p>
-            </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
+                      <span>Administrador de Liga</span>
+                    </h1>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-[#65676B] dark:text-gray-400 truncate max-w-[150px] sm:max-w-xs font-semibold">
+                    Panel General • Todas las Ligas
+                  </p>
+                </div>
+              </>
+            ) : (
+              /* Standard Club Crest & Details */
+              <>
+                <div className="relative shrink-0">
+                  <img
+                    src={team.logoUrl}
+                    alt={team.name}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = 'none';
+                    }}
+                    className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-[#1877F2]/40 shadow-xs"
+                  />
+                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px] font-black shadow-xs">
+                    7
+                  </span>
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
+                      <span>{team.shortName}</span>
+                    </h1>
+                    {hasLiveMatch && (
+                      <button
+                        onClick={() => handleTabChange('live_match')}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-wider animate-pulse cursor-pointer shadow-xs hover:bg-rose-100 transition-colors"
+                        title="Hay un partido de Fútbol 7 en juego"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                        <span>EN VIVO</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-[#65676B] dark:text-gray-400 truncate max-w-[150px] sm:max-w-xs font-medium">
+                    {team.leagueName || 'Liga Premier Fútbol 7'}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Desktop Navigation Tabs */}
@@ -601,14 +628,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/60 dark:border-white/10">
-                      <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-semibold">
-                        Club actual:
-                      </span>
-                      <span className="text-xs font-bold text-[#1877F2] truncate max-w-[120px]">
-                        {team.name}
-                      </span>
-                    </div>
+                    {currentUser.role === 'league_admin' ? (
+                      <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/60 dark:border-white/10">
+                        <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-semibold">
+                          Ámbito:
+                        </span>
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate max-w-[140px]">
+                          🏆 Todas las Ligas
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between pt-1.5 border-t border-gray-200/60 dark:border-white/10">
+                        <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-semibold">
+                          Club actual:
+                        </span>
+                        <span className="text-xs font-bold text-[#1877F2] truncate max-w-[120px]">
+                          {team.name}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Direct Actions for Active User */}
@@ -625,17 +663,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>Ver mi perfil y estadísticas</span>
                     </button>
 
-                    <button
-                      id="btn-menu-switch-team"
-                      onClick={() => {
-                        setShowRoleMenu(false);
-                        setShowTeamSwitcherModal(true);
-                      }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#1877F2] hover:bg-[#E7F3FF] dark:hover:bg-[#1877F2]/10 transition-colors cursor-pointer"
-                    >
-                      <Shield className="w-4 h-4 text-[#1877F2]" />
-                      <span>Cambiar de Equipo ({allTeams.length} registrados)</span>
-                    </button>
+                    {currentUser.role !== 'league_admin' && (
+                      <button
+                        id="btn-menu-switch-team"
+                        onClick={() => {
+                          setShowRoleMenu(false);
+                          setShowTeamSwitcherModal(true);
+                        }}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#1877F2] hover:bg-[#E7F3FF] dark:hover:bg-[#1877F2]/10 transition-colors cursor-pointer"
+                      >
+                        <Shield className="w-4 h-4 text-[#1877F2]" />
+                        <span>Cambiar de Equipo ({allTeams.length} registrados)</span>
+                      </button>
+                    )}
 
                     {currentUser.role === 'owner' && (
                       <button

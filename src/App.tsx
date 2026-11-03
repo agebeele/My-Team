@@ -684,16 +684,20 @@ export default function App() {
             } else if (user.role === 'player' && !user.teamId) {
               setActiveTab('leagues');
             } else {
-              const userTeamId =
-                user.teamId ||
-                (user.email.toLowerCase() === 'agbl141201@gmail.com' || user.username?.toLowerCase() === 'admin'
-                  ? 'team_01'
-                  : null);
+              const isAdmin =
+                user.email.toLowerCase() === 'agbl141201@gmail.com' ||
+                user.username?.toLowerCase() === 'admin';
+              const userTeamId = isAdmin ? 'team_01' : user.teamId || null;
 
-              if (userTeamId) {
-                const targetTeam =
-                  allTeams.find((t) => t.id === userTeamId) ||
-                  (userTeamId === 'team_01' ? team : undefined);
+              if (isAdmin) {
+                // FC Bayern Munich must strictly be loaded for agbl141201@gmail.com
+                const bayernMatch =
+                  allTeams.find((t) => t.id === 'team_01' && t.name.toLowerCase().includes('bayern')) ||
+                  allTeams.find((t) => t.name.toLowerCase().includes('bayern')) ||
+                  INITIAL_TEAM;
+                handleSwitchTeam(bayernMatch);
+              } else if (userTeamId) {
+                const targetTeam = allTeams.find((t) => t.id === userTeamId);
                 if (targetTeam) {
                   handleSwitchTeam(targetTeam);
                 }
@@ -738,6 +742,7 @@ export default function App() {
         onLogout={() => {
           clearDeviceSession();
           setCurrentUser(null);
+          handleSwitchTeam(INITIAL_TEAM);
         }}
         allUsers={users}
         activeTab={activeTab}

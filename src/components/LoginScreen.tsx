@@ -37,7 +37,7 @@ import {
   ALL_POSITIONS,
   TeamInvitation,
 } from '../types';
-import { INITIAL_TEAMS } from '../data/initialData';
+import { INITIAL_TEAM, INITIAL_TEAMS } from '../data/initialData';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
 import {
@@ -258,11 +258,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         provider: 'email',
       };
 
-      // Explicitly load and switch to FC Bayern Munich
+      // Explicitly load and switch to FC Bayern Munich strictly
       const bayernTeam =
-        teamList.find((t) => t.id === 'team_01' || t.name.toLowerCase().includes('bayern')) ||
-        INITIAL_TEAMS[0] ||
-        team;
+        teamList.find((t) => t.id === 'team_01' && t.name.toLowerCase().includes('bayern')) ||
+        teamList.find((t) => t.name.toLowerCase().includes('bayern')) ||
+        INITIAL_TEAM;
 
       if (setTeam) setTeam(bayernTeam);
 

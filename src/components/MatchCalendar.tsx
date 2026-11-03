@@ -29,6 +29,7 @@ import { downloadElementAsImage } from '../utils/imageDownloader';
 import { getModalityInfo, ALL_MODALITIES } from '../utils/modalityHelper';
 import { generateMatchPosterCanvas } from '../utils/matchPosterGenerator';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
+import { MatchLineupViewerModal } from './MatchLineupViewerModal';
 
 interface MatchCalendarProps {
   matches: Match[];
@@ -83,6 +84,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [showResultModal, setShowResultModal] = useState<Match | null>(null);
   const [matchToDelete, setMatchToDelete] = useState<Match | null>(null);
+  const [viewingLineupMatch, setViewingLineupMatch] = useState<Match | null>(null);
 
   // Form states for creating / editing match
   const [formData, setFormData] = useState({
@@ -704,20 +706,37 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     {/* 1. Alineación Button */}
                     <button
                       id={`btn-goto-lineup-${match.id}`}
-                      onClick={() => onNavigateToLineup(match.id)}
+                      onClick={() => {
+                        const hasSavedLineup = Boolean(
+                          match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
+                        );
+                        if (hasSavedLineup) {
+                          setViewingLineupMatch(match);
+                        } else {
+                          onNavigateToLineup(match.id);
+                        }
+                      }}
                       className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                        match.isLineupSaved
+                        match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
                           ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
                           : 'bg-[#E7F3FF] hover:bg-[#DBEAFE] text-[#1877F2] border border-[#1877F2]/30'
                       }`}
-                      title={match.isLineupSaved ? 'Ver alineación oficial confirmada' : 'Ver alineación del partido'}
+                      title={
+                        match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
+                          ? 'Ver imagen y táctica de alineación oficial confirmada'
+                          : 'Ver alineación del partido'
+                      }
                     >
-                      {match.isLineupSaved ? (
+                      {match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0) ? (
                         <Eye className="w-3.5 h-3.5 text-emerald-600" />
                       ) : (
                         <Shield className="w-3.5 h-3.5 text-[#1877F2]" />
                       )}
-                      <span>{match.isLineupSaved ? 'Ver Alineación' : 'Alineación'}</span>
+                      <span>
+                        {match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
+                          ? 'Ver Alineación'
+                          : 'Alineación'}
+                      </span>
                     </button>
 
                     {/* 2. Guardar Foto */}
@@ -776,20 +795,37 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                       {/* Jump to Lineup: Toggles to "Ver Alineación" once saved */}
                       <button
                         id={`btn-goto-lineup-${match.id}`}
-                        onClick={() => onNavigateToLineup(match.id)}
+                        onClick={() => {
+                          const hasSavedLineup = Boolean(
+                            match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
+                          );
+                          if (hasSavedLineup) {
+                            setViewingLineupMatch(match);
+                          } else {
+                            onNavigateToLineup(match.id);
+                          }
+                        }}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                          match.isLineupSaved
+                          match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
                             ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300'
                             : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200'
                         }`}
-                        title={match.isLineupSaved ? 'Ver alineación confirmada y táctica' : 'Armar y configurar alineación para el partido'}
+                        title={
+                          match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
+                            ? 'Ver imagen y afiche de alineación confirmada'
+                            : 'Armar y configurar alineación para el partido'
+                        }
                       >
-                        {match.isLineupSaved ? (
+                        {match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0) ? (
                           <Eye className="w-3.5 h-3.5 text-emerald-600" />
                         ) : (
                           <Shield className="w-3.5 h-3.5 text-emerald-600" />
                         )}
-                        <span>{match.isLineupSaved ? 'Ver Alineación' : 'Armar Alineación'}</span>
+                        <span>
+                          {match.isLineupSaved || (Array.isArray(match.lineup) && match.lineup.length > 0)
+                            ? 'Ver Alineación'
+                            : 'Armar Alineación'}
+                        </span>
                       </button>
 
                       {/* Enter Live Match Mode: Enabled strictly at match date/time or when live/finished */}
@@ -1241,6 +1277,22 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
           imageUrl={photoPreview.imageUrl}
           blob={photoPreview.blob}
           fileName={photoPreview.fileName}
+        />
+      )}
+
+      {/* Official 7v7 Lineup Tactical Card Modal */}
+      {viewingLineupMatch && (
+        <MatchLineupViewerModal
+          isOpen={Boolean(viewingLineupMatch)}
+          onClose={() => setViewingLineupMatch(null)}
+          match={viewingLineupMatch}
+          team={team}
+          players={players}
+          canEdit={isOwner}
+          onEditLineup={(matchId) => {
+            setViewingLineupMatch(null);
+            onNavigateToLineup(matchId);
+          }}
         />
       )}
     </div>

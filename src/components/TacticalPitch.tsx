@@ -610,6 +610,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
           ? {
               ...m,
               modality,
+              formation,
               lineup: pitchLineup,
               isLineupSaved: true,
             }
