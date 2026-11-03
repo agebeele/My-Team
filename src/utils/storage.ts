@@ -1,44 +1,21 @@
-import {
-  TeamInfo,
-  Player,
-  Match,
-  StandingsRow,
-  Post,
-  AppUser,
-  Language,
-} from '../types';
-import {
-  INITIAL_TEAM,
-  INITIAL_TEAMS,
-  INITIAL_PLAYERS,
-  INITIAL_MATCHES,
-  INITIAL_STANDINGS,
-  INITIAL_STANDINGS_LIGA_MEXICANA,
-  INITIAL_STANDINGS_LIGA_ESP,
-  INITIAL_STANDINGS_LIGA_FRA,
-  INITIAL_STANDINGS_COPA_MUNDO,
-  INITIAL_POSTS,
-  INITIAL_USERS,
-  DEFAULT_LINEUP,
-} from '../data/initialData';
-import { DEFAULT_GREY_SHIELD_SVG } from './ocrTableParser';
+import { Player, TeamInfo, Match, StandingsRow, Post, AppUser } from '../types';
 
-const STORAGE_KEYS = {
-  TEAM: 'teamgol_team_data',
-  ALL_TEAMS: 'teamgol_all_teams_data',
-  PLAYERS: 'teamgol_players_data',
-  PLAYERS_BY_TEAM: 'teamgol_players_by_team',
-  MATCHES: 'teamgol_matches_data',
-  MATCHES_BY_TEAM: 'teamgol_matches_by_team',
-  STANDINGS: 'teamgol_standings_data',
-  STANDINGS_BY_LEAGUE: 'teamgol_standings_by_league',
-  POSTS: 'teamgol_posts_data',
-  USERS: 'teamgol_users_data',
-  CURRENT_USER: 'teamgol_current_user',
-  LANGUAGE: 'teamgol_language',
-  DEVICE_SESSION_SAVED: 'teamgol_device_session_saved',
-  SENT_INVITATIONS: 'teamgol_sent_invitations',
-};
+export const INITIAL_TEAM: TeamInfo | null = null;
+export const INITIAL_TEAMS: TeamInfo[] = [];
+export const INITIAL_PLAYERS: Player[] = [];
+export const INITIAL_POSTS: Post[] = [];
+export const INITIAL_MATCHES: Match[] = [];
+export const INITIAL_USERS: AppUser[] = [];
+export const INITIAL_STANDINGS: StandingsRow[] = [];
+
+// Ligas vacías
+export const INITIAL_STANDINGS_LIGA_MEXICANA: StandingsRow[] = [];
+export const INITIAL_STANDINGS_LIGA_ESP: StandingsRow[] = [];
+export const INITIAL_STANDINGS_LIGA_FRA: StandingsRow[] = [];
+export const INITIAL_STANDINGS_COPA_MUNDO: StandingsRow[] = [];
+
+// Lineup vacía
+export const DEFAULT_LINEUP: any[] = [];
 
 // Retrieve players for a specific team
 export const getPlayersForTeam = (teamId: string): Player[] => {
@@ -103,88 +80,20 @@ export const saveMatchesForTeam = (teamId: string, matches: Match[]) => {
 // Retrieve standings for a specific league name
 export const getStandingsForLeague = (leagueName: string, activeTeam?: TeamInfo): StandingsRow[] => {
   const normKey = (leagueName || 'Champions League').trim().toLowerCase();
-  let baseRows: StandingsRow[] | null = null;
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.STANDINGS_BY_LEAGUE);
     if (raw) {
       const map = JSON.parse(raw);
       if (map && map[normKey] && Array.isArray(map[normKey]) && map[normKey].length > 0) {
-        baseRows = map[normKey];
+        return map[normKey];
       }
     }
   } catch {
     // ignore
   }
 
-  // If no stored standings exist for this league yet, use default preset:
-  if (!baseRows || baseRows.length === 0) {
-    if (normKey === 'champions league' || normKey === 'liga premier fútbol 7') {
-      baseRows = INITIAL_STANDINGS;
-    } else if (normKey === 'liga mexicana') {
-      baseRows = INITIAL_STANDINGS_LIGA_MEXICANA;
-    } else if (normKey === 'liga española') {
-      baseRows = INITIAL_STANDINGS_LIGA_ESP;
-    } else if (normKey === 'liga francesa') {
-      baseRows = INITIAL_STANDINGS_LIGA_FRA;
-    } else if (normKey === 'copa del mundo') {
-      baseRows = INITIAL_STANDINGS_COPA_MUNDO;
-    } else {
-      // For a custom league, start with a clean table for this league
-      const initialRow: StandingsRow = {
-        id: `st_${activeTeam?.id || Date.now()}_1`,
-        leagueName: leagueName || 'Champions League',
-        rank: 1,
-        name: activeTeam?.name || 'Mi Equipo',
-        logo: activeTeam?.logoUrl || DEFAULT_GREY_SHIELD_SVG,
-        pj: 0,
-        g: 0,
-        e: 0,
-        p: 0,
-        gf: 0,
-        gc: 0,
-        dg: 0,
-        pts: 0,
-        isOurTeam: true,
-      };
-      return [initialRow];
-    }
-  }
-
-  // Ensure activeTeam is represented in the table and marked as our team
-  let rows = baseRows.map((row: StandingsRow) => ({
-    ...row,
-    isOurTeam: activeTeam
-      ? row.name.trim().toLowerCase() === activeTeam.name.trim().toLowerCase() ||
-        row.name.trim().toLowerCase() === activeTeam.shortName.trim().toLowerCase()
-      : false,
-  }));
-
-  if (activeTeam) {
-    const teamInTable = rows.some(
-      (r) =>
-        r.name.trim().toLowerCase() === activeTeam.name.trim().toLowerCase() ||
-        r.name.trim().toLowerCase() === activeTeam.shortName.trim().toLowerCase()
-    );
-    if (!teamInTable) {
-      rows.push({
-        id: `st_${activeTeam.id || Date.now()}`,
-        rank: rows.length + 1,
-        name: activeTeam.name,
-        logo: activeTeam.logoUrl || DEFAULT_GREY_SHIELD_SVG,
-        pj: 0,
-        g: 0,
-        e: 0,
-        p: 0,
-        gf: 0,
-        gc: 0,
-        dg: 0,
-        pts: 0,
-        isOurTeam: true,
-      });
-    }
-  }
-
-  return rows;
+  // Si no hay tabla guardada, inicia con una tabla vacía
+  return [];
 };
 
 // Save standings for a specific league
