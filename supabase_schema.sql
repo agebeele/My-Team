@@ -189,82 +189,20 @@ END $$;
 -- Carga inicial del FC Bayern Munich, administrador y 17 jugadores
 -- ========================================================
 
--- Equipo FC Bayern Munich
-INSERT INTO teams (id, name, short_name, logo_url, banner_url, league_name, stadium, primary_color, secondary_color)
-VALUES (
-  'team_01',
-  'FC Bayern Munich',
-  'BAYERN',
-  '/fc_bayern_logo.png',
-  'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
-  'Liga Premier Fútbol 7',
-  'Cancha Sintética San Pedro',
-  '#1877F2',
-  '#0866FF'
-)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   short_name = EXCLUDED.short_name,
   logo_url = EXCLUDED.logo_url;
 
--- Administrador oficial
-INSERT INTO app_users (id, name, email, username, password, role, player_id, team_id, provider)
-VALUES (
-  'u_admin',
-  'Administrador (Admin)',
-  'agbl141201@gmail.com',
-  'admin',
-  'root',
-  'owner',
-  'p_1',
-  'team_01',
-  'email'
-)
 ON CONFLICT (email) DO UPDATE SET
   password = EXCLUDED.password,
   role = EXCLUDED.role,
   team_id = EXCLUDED.team_id;
 
--- 17 Jugadores del Bayern Munich
-INSERT INTO players (id, team_id, name, nickname, number, position, is_starter, is_called_up)
-VALUES
-  ('p_1', 'team_01', 'Brandon García', 'Lucho', '6', 'MCD', true, true),
-  ('p_2', 'team_01', 'Daniel Usuga', 'Parce', '88', 'DFC', true, true),
-  ('p_3', 'team_01', 'Ivan Hernandez', 'Nito', '99', 'ED', false, true),
-  ('p_4', 'team_01', 'Oskar Batalla', 'Batalla', '9', 'DEL', true, true),
-  ('p_5', 'team_01', 'Angel Tamayo', 'Cucu', '1', 'POR', true, true),
-  ('p_6', 'team_01', 'Raul Aguayo', 'Rulo', '11', 'DFC', true, true),
-  ('p_7', 'team_01', 'Hugo Aguayo', 'Hugo', '22', 'DEL', false, true),
-  ('p_8', 'team_01', 'Angel Ivan', 'Arturito', '', 'MCD', false, true),
-  ('p_9', 'team_01', 'Axiel', 'Tortas', '15', 'MED', false, true),
-  ('p_10', 'team_01', 'Eliu', 'Eliu', '', 'DFC', false, true),
-  ('p_11', 'team_01', 'Angel Terron', 'Terron', '21', 'MCO', true, true),
-  ('p_12', 'team_01', 'Emilio Garcia', 'Champi', '7', 'EI', true, true),
-  ('p_13', 'team_01', 'Carlos', 'Cafe', '', 'ED', false, true),
-  ('p_14', 'team_01', 'Oskar Hernandez', 'Oskarin', '', 'MED', false, true),
-  ('p_15', 'team_01', 'Moises Treviño', 'Pitbull', '33', 'DFC', false, true),
-  ('p_16', 'team_01', 'Fernando', '', '', 'DEL', false, true),
-  ('p_17', 'team_01', 'Luis', 'Pepino', '', 'DFC', false, true)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   nickname = EXCLUDED.nickname,
   number = EXCLUDED.number,
   position = EXCLUDED.position;
 
--- Publicación inicial de bienvenida
-INSERT INTO posts (id, team_id, league_name, is_league_official, author_id, author_name, author_role, category, title, content, status, created_at)
-VALUES (
-  'post_init_01',
-  'team_01',
-  'Liga Premier Fútbol 7',
-  false,
-  'u_admin',
-  'Administrador (Admin)',
-  'owner',
-  'Anuncio',
-  '¡Bienvenidos a la plataforma oficial del FC Bayern Munich!',
-  'Plantilla oficial sincronizada en tiempo real. Todos los jugadores pueden revisar sus estadísticas, confirmar convocatoria y votar por el MVP de la jornada.',
-  'approved',
-  'Hace un momento'
-)
 ON CONFLICT (id) DO NOTHING;
