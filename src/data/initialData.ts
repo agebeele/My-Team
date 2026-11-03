@@ -14,3 +14,7 @@ export const INITIAL_MATCHES: Match[] = [];
 export const INITIAL_USERS: AppUser[] = [];
 
 export const INITIAL_STANDINGS: StandingsRow[] = [];
+
+export const INITIAL_STANDINGS_LIGA_MEXICANA: StandingsRow[] = [];
+export const INITIAL_STANDINGS_LIGA_ESP: StandingsRow[] = [];
+export const INITIAL_STANDINGS_LIGA_FRA: StandingsRow[] = [];
