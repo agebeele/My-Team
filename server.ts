@@ -41,18 +41,10 @@ const db = new sqlite3.Database('./equipo.db', (err) => {
 
 let currentVersion = Date.now();
 
-const INITIAL_SERVER_USERS = [
-  {
-    id: 'u_league_admin',
-    name: 'Administrador de Liga',
-    email: 'admin@dreamteam.com',
-    username: 'admin@dreamteam.com',
-    password: 'admin',
-    role: 'league_admin',
-    avatarUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=200&q=80',
-    provider: 'email',
-  },
-];
+// --- DATOS INICIALES VACÍOS (Sin autorrecuperación de datos estáticos) ---
+const INITIAL_SERVER_TEAM: any = {};
+const INITIAL_SERVER_PLAYERS: any[] = [];
+const INITIAL_SERVER_USERS: any[] = [];
 
 function inicializarBD() {
   db.serialize(() => {
@@ -191,7 +183,7 @@ function inicializarBD() {
       FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE CASCADE,
       FOREIGN KEY (liga_id) REFERENCES ligas(id) ON DELETE CASCADE
     )`);
-
+    
     // ÍNDICES DE RENDIMIENTO
     db.run(`CREATE INDEX IF NOT EXISTS idx_usuarios_equipo ON usuarios(equipo_id);`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_notif_equipo ON notificaciones(equipo_id);`);
