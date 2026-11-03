@@ -18,3 +18,6 @@ export const INITIAL_STANDINGS: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_MEXICANA: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_ESP: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_FRA: StandingsRow[] = [];
+export const INITIAL_STANDINGS_COPA_MUNDO: StandingsRow[] = [];
+
+export const DEFAULT_LINEUP: any[] = [];
