@@ -8,13 +8,13 @@ export const INITIAL_MATCHES: Match[] = [];
 export const INITIAL_USERS: AppUser[] = [];
 export const INITIAL_STANDINGS: StandingsRow[] = [];
 
-// Ligas vacías
+// Constantes de ligas vacías
 export const INITIAL_STANDINGS_LIGA_MEXICANA: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_ESP: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_FRA: StandingsRow[] = [];
 export const INITIAL_STANDINGS_COPA_MUNDO: StandingsRow[] = [];
 
-// Lineup vacía
+// Alineación por defecto vacía para evitar fallos de importación
 export const DEFAULT_LINEUP: any[] = [];
 
 // Retrieve players for a specific team
