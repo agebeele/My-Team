@@ -243,39 +243,25 @@ function inicializarBD() {
     });
 
     // Comprobar si app_store ya tiene datos; si no, poblarlo
+    // Inicializar app_store con colecciones vacías si la base de datos es nueva
     db.get(`SELECT COUNT(*) as count FROM app_store`, (err, row: any) => {
       if (!err && row && row.count === 0) {
-        console.log('Sembrando datos iniciales en SQLite...');
+        console.log('Inicializando app_store limpia...');
         const stmt = db.prepare(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES (?, ?, ?)`);
-        stmt.run('team', JSON.stringify(INITIAL_SERVER_TEAM), Date.now());
-        stmt.run('allTeams', JSON.stringify([INITIAL_SERVER_TEAM]), Date.now());
-        stmt.run('players', JSON.stringify(INITIAL_SERVER_PLAYERS), Date.now());
-        stmt.run('users', JSON.stringify(INITIAL_SERVER_USERS), Date.now());
+        stmt.run('team', JSON.stringify({}), Date.now());
+        stmt.run('allTeams', JSON.stringify([]), Date.now());
+        stmt.run('players', JSON.stringify([]), Date.now());
+        stmt.run('users', JSON.stringify([]), Date.now());
         stmt.run('matches', JSON.stringify([]), Date.now());
-        stmt.run('posts', JSON.stringify([
-          {
-            id: 'post_init_01',
-            teamId: 'team_01',
-            leagueName: 'Champions League',
-            isLeagueOfficial: false,
-            authorId: 'u_admin',
-            authorName: 'Administrador (Admin)',
-            authorRole: 'owner',
-            category: 'Anuncio',
-            title: '¡Bienvenidos al FC Bayern Munich!',
-            content: 'Plataforma oficial del equipo sincronizada en tiempo real para todos los jugadores y cuerpo técnico.',
-            status: 'approved',
-            createdAt: 'Hace un momento',
-            reactions: { likes: 0, fire: 0, clap: 0, goal: 0, userReactions: {} },
-            comments: []
-          }
-        ]), Date.now());
+        stmt.run('posts', JSON.stringify([]), Date.now());
         stmt.run('standings', JSON.stringify([]), Date.now());
+        stmt.run('joinRequests', JSON.stringify([]), Date.now());
         stmt.finalize();
       }
     });
   });
-}
+};
+
 
 // --- ENDPOINTS DE LA API ---
 
@@ -670,8 +656,8 @@ app.post('/api/sync', (req, res) => {
       });
     }
 
-    // 1. Teams: Merge allTeams so new teams are appended and Bayern is NEVER lost
-    let mergedAllTeams: any[] = currentData.allTeams || [INITIAL_SERVER_TEAM];
+    // 1. Teams: Fusionar equipos sin forzar la presencia del Bayern
+    let mergedAllTeams: any[] = currentData.allTeams || [];
     if (updates.allTeams && Array.isArray(updates.allTeams)) {
       updates.allTeams.forEach((newT: any) => {
         mergedAllTeams = [...mergedAllTeams.filter((t: any) => t.id !== newT.id), newT];
@@ -680,65 +666,51 @@ app.post('/api/sync', (req, res) => {
     if (updates.team && updates.team.id) {
       mergedAllTeams = [...mergedAllTeams.filter((t: any) => t.id !== updates.team.id), updates.team];
     }
-    // Always ensure Bayern Munich is present in allTeams
-    if (!mergedAllTeams.some((t: any) => t.id === 'team_01')) {
-      mergedAllTeams = [INITIAL_SERVER_TEAM, ...mergedAllTeams];
-    }
 
-    // 2. Users: Merge users by email so admin is NEVER lost
-    let mergedUsers: any[] = currentData.users || INITIAL_SERVER_USERS;
+    // 2. Users: Fusionar usuarios sin forzar la reaparición de admins ni correos eliminados
+    let mergedUsers: any[] = currentData.users || [];
     if (updates.users && Array.isArray(updates.users)) {
       updates.users.forEach((newU: any) => {
         mergedUsers = [...mergedUsers.filter((u: any) => u.email.toLowerCase() !== newU.email.toLowerCase()), newU];
       });
     }
-    // Always ensure admin and league_admin are present
-    if (!mergedUsers.some((u: any) => u.email.toLowerCase() === 'agbl141201@gmail.com')) {
-      mergedUsers = [...mergedUsers, INITIAL_SERVER_USERS[0]];
-    }
-    if (!mergedUsers.some((u: any) => u.email.toLowerCase() === 'admin@dreamteam.com')) {
-      mergedUsers = [...mergedUsers, INITIAL_SERVER_USERS[1]];
-    }
-
-    // 3. Players: Merge players by teamId so one team's updates NEVER erase another team's squad!
-    let mergedPlayers: any[] = currentData.players || INITIAL_SERVER_PLAYERS;
-    mergedPlayers = mergedPlayers.map((p: any) => ({
-      ...p,
-      teamId: p.teamId || 'team_01',
-    }));
+    // 3. Players: Fusionar jugadores dinámicamente sin fallbacks a team_01
+    let mergedPlayers: any[] = currentData.players || [];
 
     if (updates.players && Array.isArray(updates.players)) {
-      const targetTeamId = updates.team?.id || updates.players[0]?.teamId || 'team_01';
-      const taggedPlayers = updates.players.map((p: any) => ({
-        ...p,
-        teamId: p.teamId || targetTeamId,
-      }));
+      const targetTeamId = updates.team?.id || updates.players[0]?.teamId;
+      
+      if (targetTeamId) {
+        const taggedPlayers = updates.players.map((p: any) => ({
+          ...p,
+          teamId: p.teamId || targetTeamId,
+        }));
 
-      // Keep players from other teams + updated players from target team
-      mergedPlayers = [
-        ...mergedPlayers.filter((p: any) => p.teamId !== targetTeamId),
-        ...taggedPlayers,
-      ];
+        mergedPlayers = [
+          ...mergedPlayers.filter((p: any) => p.teamId !== targetTeamId),
+          ...taggedPlayers,
+        ];
+      } else {
+        mergedPlayers = updates.players;
+      }
     }
 
-    // If Bayern squad is somehow missing, restore the 17 players
-    const bayernPlayersCount = mergedPlayers.filter((p: any) => p.teamId === 'team_01').length;
-    if (bayernPlayersCount === 0) {
-      mergedPlayers = [...mergedPlayers, ...INITIAL_SERVER_PLAYERS];
-    }
-
-    // 4. Matches: Merge by teamId
+    // 4. Matches: Merge por teamId sin fallbacks fijos a team_01
     let mergedMatches: any[] = currentData.matches || [];
     if (updates.matches && Array.isArray(updates.matches)) {
-      const targetTeamId = updates.team?.id || updates.matches[0]?.teamId || 'team_01';
-      const taggedMatches = updates.matches.map((m: any) => ({
-        ...m,
-        teamId: m.teamId || targetTeamId,
-      }));
-      mergedMatches = [
-        ...mergedMatches.filter((m: any) => m.teamId !== targetTeamId),
-        ...taggedMatches,
-      ];
+      const targetTeamId = updates.team?.id || updates.matches[0]?.teamId;
+      if (targetTeamId) {
+        const taggedMatches = updates.matches.map((m: any) => ({
+          ...m,
+          teamId: m.teamId || targetTeamId,
+        }));
+        mergedMatches = [
+          ...mergedMatches.filter((m: any) => m.teamId !== targetTeamId),
+          ...taggedMatches,
+        ];
+      } else {
+        mergedMatches = updates.matches;
+      }
     }
 
     // 5. Posts: Merge posts by id
@@ -757,21 +729,21 @@ app.post('/api/sync', (req, res) => {
       });
     }
 
-    // Write merged state to SQLite app_store and relational tables
+    /// Write merged state to SQLite app_store and relational tables
     db.serialize(() => {
       const stmt = db.prepare(`INSERT OR REPLACE INTO app_store (key, value, updated_at) VALUES (?, ?, ?)`);
-      if (updates.team) {
+      if (updates.team && updates.team.id) {
         stmt.run('team', JSON.stringify(updates.team), currentVersion);
         db.run(
           `INSERT OR REPLACE INTO equipos (id, nombre_equipo, logo, direccion, liga_id, admin_id, color_primario, color_secundario)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            updates.team.id || 'team_01',
-            updates.team.name || 'FC Bayern Munich',
+            updates.team.id,
+            updates.team.name || 'Nuevo Equipo',
             updates.team.logoUrl || '',
             updates.team.stadium || updates.team.location || '',
-            'liga_01',
-            'u_admin',
+            updates.team.leagueId || 'liga_01',
+            updates.team.adminId || null,
             updates.team.primaryColor || '#1877F2',
             updates.team.secondaryColor || '#0866FF'
           ],
@@ -791,21 +763,23 @@ app.post('/api/sync', (req, res) => {
 
       // Upsert individual matches into relational table 'partidos'
       if (updates.matches && Array.isArray(updates.matches)) {
-        const targetTeamId = updates.team?.id || updates.matches[0]?.teamId || 'team_01';
+        const targetTeamId = updates.team?.id || updates.matches[0]?.teamId || null;
         const taggedMatches = updates.matches.map((m: any) => ({
           ...m,
           teamId: m.teamId || targetTeamId,
         }));
 
-        if (taggedMatches.length > 0) {
-          const placeholders = taggedMatches.map(() => '?').join(',');
-          db.run(
-            `DELETE FROM partidos WHERE team_id = ? AND id NOT IN (${placeholders})`,
-            [targetTeamId, ...taggedMatches.map((m: any) => m.id)],
-            () => {}
-          );
-        } else {
-          db.run(`DELETE FROM partidos WHERE team_id = ?`, [targetTeamId], () => {});
+        if (targetTeamId) {
+          if (taggedMatches.length > 0) {
+            const placeholders = taggedMatches.map(() => '?').join(',');
+            db.run(
+              `DELETE FROM partidos WHERE team_id = ? AND id NOT IN (${placeholders})`,
+              [targetTeamId, ...taggedMatches.map((m: any) => m.id)],
+              () => {}
+            );
+          } else {
+            db.run(`DELETE FROM partidos WHERE team_id = ?`, [targetTeamId], () => {});
+          }
         }
 
         try {
@@ -818,12 +792,12 @@ app.post('/api/sync', (req, res) => {
             matchStmt.run(
               m.id,
               m.leagueId || 'liga_01',
-              m.teamId || targetTeamId,
-              m.rivalId || 'rival_default',
+              m.teamId || targetTeamId || '',
+              m.rivalId || '',
               m.date || '',
               m.time || '',
               m.stadium || m.location || '',
-              m.teamId || targetTeamId,
+              m.teamId || targetTeamId || '',
               m.rival || '',
               m.stadium || '',
               JSON.stringify(m),
@@ -847,7 +821,7 @@ app.post('/api/sync', (req, res) => {
           mergedPosts.forEach((p: any) => {
             postStmt.run(
               p.id,
-              p.authorId || 'u_admin',
+              p.authorId || null,
               p.teamId || null,
               p.teamId || null,
               p.leagueId || 'liga_01',
@@ -871,22 +845,29 @@ app.post('/api/sync', (req, res) => {
 
       // Upsert individual join requests into 'solicitudes_equipo'
       if (updates.joinRequests && Array.isArray(updates.joinRequests)) {
-        const reqStmt = db.prepare(`INSERT OR REPLACE INTO solicitudes_equipo (id, user_id, user_name, user_email, team_id, team_name, status, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        mergedJoinRequests.forEach((r: any) => {
-          reqStmt.run(
-            r.id,
-            r.userId,
-            r.userName || '',
-            r.userEmail || '',
-            r.teamId,
-            r.teamName || '',
-            r.status || 'pending',
-            JSON.stringify(r),
-            Date.now(),
-            currentVersion
-          );
-        });
-        reqStmt.finalize();
+        try {
+          const reqStmt = db.prepare(`
+            INSERT OR REPLACE INTO solicitudes_equipo (
+              id, user_id, user_name, user_email, team_id, team_name, payload, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `);
+          mergedJoinRequests.forEach((r: any) => {
+            reqStmt.run(
+              r.id,
+              r.userId,
+              r.userName || '',
+              r.userEmail || '',
+              r.teamId,
+              r.teamName || '',
+              JSON.stringify(r),
+              Date.now(),
+              currentVersion
+            );
+          });
+          reqStmt.finalize();
+        } catch (e) {
+          console.warn('Error saving join requests in SQLite table:', e);
+        }
       }
 
       res.json({
