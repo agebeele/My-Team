@@ -47,39 +47,13 @@ export const getPlayersForTeam = (teamId: string): Player[] => {
     if (raw) {
       const map = JSON.parse(raw);
       if (map && map[teamId] && Array.isArray(map[teamId])) {
-        // If team_01 has old mock squad, migrate to official 17 players
-        if (teamId === 'team_01') {
-          const hasOldSquad = map[teamId].some((p: Player) => p.name === 'Carlos Mendoza' || p.id === 'p1');
-          if (hasOldSquad) {
-            const starterIds = new Set(DEFAULT_LINEUP.map((p) => p.playerId));
-            const newSquad = INITIAL_PLAYERS.map((p) => ({
-              ...p,
-              isStarter: starterIds.has(p.id),
-            }));
-            map[teamId] = newSquad;
-            localStorage.setItem(STORAGE_KEYS.PLAYERS_BY_TEAM, JSON.stringify(map));
-            localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(newSquad));
-            return newSquad;
-          }
-        }
         return map[teamId];
       }
     }
+    return [];
   } catch {
-    // ignore
+    return [];
   }
-
-  // Only team_01 (Bayern Munich default) starts with INITIAL_PLAYERS
-  if (teamId === 'team_01') {
-    const starterIds = new Set(DEFAULT_LINEUP.map((p) => p.playerId));
-    return INITIAL_PLAYERS.map((p) => ({
-      ...p,
-      isStarter: starterIds.has(p.id),
-    }));
-  }
-
-  // Any newly created or separate team starts with an EMPTY squad (0 players)
-  return [];
 };
 
 // Save squad for a specific team
@@ -109,12 +83,7 @@ export const getMatchesForTeam = (teamId: string): Match[] => {
     // ignore
   }
 
-  // Only team_01 starts with initial matches
-  if (teamId === 'team_01') {
-    return INITIAL_MATCHES;
-  }
-
-  // Brand new teams start with an empty match schedule
+  // All teams start with an empty match schedule
   return [];
 };
 
@@ -288,32 +257,14 @@ export const loadInitialState = () => {
     });
 
     // Load league-specific standings
-    const loadedStandings = getStandingsForLeague(loadedTeam.leagueName, loadedTeam);
+const loadedStandings = getStandingsForLeague(loadedTeam?.leagueName, loadedTeam);
 
-    const loadedUsersRaw = savedUsers ? (JSON.parse(savedUsers) as AppUser[]) : INITIAL_USERS;
-    // Normalize users to guarantee requested admin account
-    const hasAdmin = loadedUsersRaw.some(
-      (u) => u.email.toLowerCase() === 'agbl141201@gmail.com' || u.username === 'admin'
-    );
-    const normalizedUsers: AppUser[] = hasAdmin
-      ? loadedUsersRaw.map((u) =>
-          u.email.toLowerCase() === 'agbl141201@gmail.com' || u.username === 'admin'
-            ? {
-                ...u,
-                id: 'u_admin',
-                name: 'Administrador (Admin)',
-                email: 'agbl141201@gmail.com',
-                username: 'admin',
-                password: 'root',
-                role: 'owner' as const,
-                teamId: 'team_01',
-              }
-            : u
-        )
-      : [INITIAL_USERS[0], ...loadedUsersRaw];
+// Leer usuarios guardados sin forzar ninguna cuenta de administrador
+const loadedUsersRaw = savedUsers ? (JSON.parse(savedUsers) as AppUser[]) : INITIAL_USERS;
+const normalizedUsers: AppUser[] = loadedUsersRaw;
 
-    const savedDeviceAuth = localStorage.getItem(STORAGE_KEYS.DEVICE_SESSION_SAVED);
-    const isDeviceSessionSaved = savedDeviceAuth === 'true';
+const savedDeviceAuth = localStorage.getItem(STORAGE_KEYS.DEVICE_SESSION_SAVED);
+const isDeviceSessionSaved = savedDeviceAuth === 'true';
 
     // Only restore session if this device was explicitly authenticated & saved
     let initialCurrentUser: AppUser | null = null;
