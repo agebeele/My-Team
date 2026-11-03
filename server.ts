@@ -41,53 +41,7 @@ const db = new sqlite3.Database('./equipo.db', (err) => {
 
 let currentVersion = Date.now();
 
-const INITIAL_SERVER_TEAM = {
-  id: 'team_01',
-  name: 'FC Bayern Munich',
-  shortName: 'BAYERN',
-  logoUrl: '/fc_bayern_logo.png',
-  bannerUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
-  leagueName: 'Liga Premier Fútbol 7',
-  season: 'Temporada 2026',
-  stadium: 'Cancha Sintética San Pedro',
-  location: 'Av. Vasconcelos #300, Col. Del Valle, San Pedro Garza García, N.L.',
-  foundedYear: '2021',
-  primaryColor: '#1877F2',
-  secondaryColor: '#0866FF',
-};
-
-const INITIAL_SERVER_PLAYERS = [
-  { id: 'p_1', teamId: 'team_01', name: 'Brandon García', nickname: 'Lucho', number: '6', position: 'MCD', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_2', teamId: 'team_01', name: 'Daniel Usuga', nickname: 'Parce', number: '88', position: 'DFC', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_3', teamId: 'team_01', name: 'Ivan Hernandez', nickname: 'Nito', number: '99', position: 'ED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_4', teamId: 'team_01', name: 'Oskar Batalla', nickname: 'Batalla', number: '9', position: 'DEL', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_5', teamId: 'team_01', name: 'Angel Tamayo', nickname: 'Cucu', number: '1', position: 'POR', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_6', teamId: 'team_01', name: 'Raul Aguayo', nickname: 'Rulo', number: '11', position: 'DFC', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_7', teamId: 'team_01', name: 'Hugo Aguayo', nickname: 'Hugo', number: '22', position: 'DEL', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_8', teamId: 'team_01', name: 'Angel Ivan', nickname: 'Arturito', number: '', position: 'MCD', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_9', teamId: 'team_01', name: 'Axiel', nickname: 'Tortas', number: '15', position: 'MED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_10', teamId: 'team_01', name: 'Eliu', nickname: 'Eliu', number: '', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_11', teamId: 'team_01', name: 'Angel Terron', nickname: 'Terron', number: '21', position: 'MCO', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_12', teamId: 'team_01', name: 'Emilio Garcia', nickname: 'Champi', number: '7', position: 'EI', isCalledUp: true, isStarter: true, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_13', teamId: 'team_01', name: 'Carlos', nickname: 'Cafe', number: '', position: 'ED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_14', teamId: 'team_01', name: 'Oskar Hernandez', nickname: 'Oskarin', number: '', position: 'MED', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_15', teamId: 'team_01', name: 'Moises Treviño', nickname: 'Pitbull', number: '33', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_16', teamId: 'team_01', name: 'Fernando', nickname: '', number: '', position: 'DEL', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-  { id: 'p_17', teamId: 'team_01', name: 'Luis', nickname: 'Pepino', number: '', position: 'DFC', isCalledUp: true, isStarter: false, goals: 0, assists: 0, matches: 0, yellowCards: 0, redCards: 0 },
-];
-
 const INITIAL_SERVER_USERS = [
-  {
-    id: 'u_admin',
-    name: 'Administrador (Admin)',
-    email: 'agbl141201@gmail.com',
-    username: 'admin',
-    password: 'root',
-    role: 'owner',
-    playerId: 'p_1',
-    teamId: 'team_01',
-    provider: 'email',
-  },
   {
     id: 'u_league_admin',
     name: 'Administrador de Liga',
