@@ -293,7 +293,7 @@ export default function App() {
       try {
         localStorage.setItem('teamgol_matches_data', JSON.stringify(tagged));
       } catch {}
-      pushBackendSyncImmediate({ matches: tagged, team });
+      pushBackendSyncImmediate({ matches: tagged });
       if (isSupabaseConfigured()) {
         tagged.forEach((m) => {
           supabaseUpsertMatch(team.id, m);
@@ -319,19 +319,22 @@ export default function App() {
   const handleSetTeam: React.Dispatch<React.SetStateAction<TeamInfo>> = (action) => {
     setTeam((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
+      try {
+        localStorage.setItem('teamgol_team_data', JSON.stringify(next));
+      } catch {}
+
       setAllTeams((prevAll) => {
         const updated = prevAll.map((t) => (t.id === next.id ? next : t));
         if (!updated.some((t) => t.id === next.id)) {
           updated.push(next);
         }
+        try {
+          localStorage.setItem('teamgol_all_teams_data', JSON.stringify(updated));
+        } catch {}
         pushBackendSyncImmediate({ team: next, allTeams: updated });
         return updated;
       });
-      try {
-        localStorage.setItem('teamgol_team_data', JSON.stringify(next));
-      } catch {
-        // ignore
-      }
+
       if (isSupabaseConfigured()) {
         supabaseUpsertTeam(next);
       }
@@ -349,9 +352,12 @@ export default function App() {
 
       if (data.allTeams && data.allTeams.length > 0) {
         setAllTeams(data.allTeams);
-        // Only update current team metadata (colors, name, stadium) if it still exists
+        // Only update current team metadata (colors, name, stadium, league) if it exists
         setTeam((prev) => {
-          const match = data.allTeams?.find((t) => t.id === prev.id);
+          const match =
+            data.team && data.team.id === prev.id
+              ? data.team
+              : data.allTeams?.find((t: any) => t.id === prev.id);
           return match ? { ...prev, ...match } : prev;
         });
       }
@@ -362,10 +368,6 @@ export default function App() {
         if (currentSquad.length > 0) {
           setPlayers(currentSquad);
         }
-      }
-
-      if (data.team && data.team.id === team.id) {
-        setTeam((prev) => ({ ...prev, ...data.team }));
       }
 
       if (data.matches && Array.isArray(data.matches)) {
@@ -662,7 +664,7 @@ export default function App() {
         )}
         <LoginScreen
           team={team}
-          setTeam={setTeam}
+          setTeam={handleSetTeam}
           allTeams={allTeams}
           setAllTeams={setAllTeams}
           allUsers={users}
@@ -822,6 +824,14 @@ export default function App() {
                 language={language}
                 onOpenMvp={handleOpenMvpForMatch}
                 onStartLiveMatch={handleStartLiveMatch}
+                onNavigateToLineup={(matchId) => {
+                  setSelectedMatchId(matchId);
+                  setActiveTab('lineup');
+                }}
+                onNavigateToConvocatoria={(matchId) => {
+                  setSelectedMatchId(matchId);
+                  setActiveTab('convocatoria');
+                }}
               />
             )}
 
@@ -848,7 +858,7 @@ export default function App() {
             {activeTab === 'convocatoria' && (
               <ConvocatoriaGraphic
                 team={team}
-                setTeam={setTeam}
+                setTeam={handleSetTeam}
                 players={players}
                 setPlayers={handleSetPlayers}
                 matches={matches}
@@ -862,7 +872,7 @@ export default function App() {
             {activeTab === 'lineup' && (
               <TacticalPitch
                 team={team}
-                setTeam={setTeam}
+                setTeam={handleSetTeam}
                 players={players}
                 matches={matches}
                 setMatches={handleSetMatches}
@@ -894,7 +904,7 @@ export default function App() {
                 setStandings={setStandings}
                 players={players}
                 team={team}
-                setTeam={setTeam}
+                setTeam={handleSetTeam}
                 currentUser={currentUser}
                 language={language}
                 onViewPlayerProfile={handleViewPlayerProfile}
