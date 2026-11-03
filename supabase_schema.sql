@@ -1,6 +1,6 @@
 -- ========================================================
 -- ESQUEMA COMPLETO DE BASE DE DATOS TEAMGOL PARA SUPABASE
--- Pega este código completo en: Supabase -> SQL Editor -> Run
+-- Estratificado sin ningún tipo de datos semilla (0 filas)
 -- ========================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -12,13 +12,13 @@ CREATE TABLE IF NOT EXISTS teams (
   short_name TEXT,
   logo_url TEXT,
   banner_url TEXT,
-  league_name TEXT DEFAULT 'Liga Premier Fútbol 7',
-  season TEXT DEFAULT 'Temporada 2026',
-  stadium TEXT DEFAULT 'Cancha Sintética San Pedro',
+  league_name TEXT,
+  season TEXT,
+  stadium TEXT,
   location TEXT,
-  founded_year TEXT DEFAULT '2021',
-  primary_color TEXT DEFAULT '#1877F2',
-  secondary_color TEXT DEFAULT '#0866FF',
+  founded_year TEXT,
+  primary_color TEXT,
+  secondary_color TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS matches (
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY,
   team_id TEXT,
-  league_name TEXT DEFAULT 'Liga Premier Fútbol 7',
+  league_name TEXT,
   is_league_official BOOLEAN DEFAULT false,
   author_id TEXT NOT NULL,
   author_name TEXT NOT NULL,
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS posts (
   inserted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Migraciones idempotentes por si las tablas ya existían antes
+-- Migraciones idempotentes
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_type TEXT;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{"likes":0,"fire":0,"clap":0,"goal":0,"userReactions":{}}'::JSONB;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]'::JSONB;
@@ -143,7 +143,6 @@ CREATE TABLE IF NOT EXISTS standings (
 
 -- ========================================================
 -- POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY)
--- Permite lectura y escritura abierta mediante la clave Anon pública
 -- ========================================================
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
@@ -172,7 +171,6 @@ CREATE POLICY "Public access standings" ON standings FOR ALL USING (true) WITH C
 
 -- ========================================================
 -- TIEMPO REAL (REALTIME)
--- Permite que los cambios se reflejen de inmediato en todos los celulares
 -- ========================================================
 DO $$
 BEGIN
@@ -183,26 +181,3 @@ BEGIN
     WHEN others THEN NULL;
   END;
 END $$;
-
--- ========================================================
--- DATOS INICIALES SEMILLA (SEED DATA)
--- Carga inicial del FC Bayern Munich, administrador y 17 jugadores
--- ========================================================
-
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  short_name = EXCLUDED.short_name,
-  logo_url = EXCLUDED.logo_url;
-
-ON CONFLICT (email) DO UPDATE SET
-  password = EXCLUDED.password,
-  role = EXCLUDED.role,
-  team_id = EXCLUDED.team_id;
-
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  nickname = EXCLUDED.nickname,
-  number = EXCLUDED.number,
-  position = EXCLUDED.position;
-
-ON CONFLICT (id) DO NOTHING;
