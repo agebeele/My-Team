@@ -6,36 +6,48 @@ const STORAGE_KEY_ANON = 'teamgol_supabase_anon_key';
 let inMemoryUrl = '';
 let inMemoryKey = '';
 
+export const cleanSupabaseUrl = (raw: string): string => {
+  let u = (raw || '').trim();
+  // Strip any accidental /rest/v1 or /rest/v1/ suffix
+  u = u.replace(/\/rest\/v1\/?$/i, '');
+  // Strip trailing slashes
+  u = u.replace(/\/+$/, '');
+  return u;
+};
+
 export const getSupabaseCredentials = (): { url: string; anonKey: string } => {
-  const envUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
+  const envUrl = cleanSupabaseUrl(import.meta.env.VITE_SUPABASE_URL || '');
   const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
   let localUrl = '';
   let localKey = '';
   try {
-    localUrl = (localStorage.getItem(STORAGE_KEY_URL) || '').trim();
+    localUrl = cleanSupabaseUrl(localStorage.getItem(STORAGE_KEY_URL) || '');
     localKey = (localStorage.getItem(STORAGE_KEY_ANON) || '').trim();
   } catch {
     // ignore
   }
 
-  const url = inMemoryUrl || localUrl || envUrl;
+  const url = cleanSupabaseUrl(inMemoryUrl || localUrl || envUrl);
   const anonKey = inMemoryKey || localKey || envKey;
 
   return { url, anonKey };
 };
 
 export const saveSupabaseCredentials = (url: string, anonKey: string) => {
-  inMemoryUrl = (url || '').trim();
-  inMemoryKey = (anonKey || '').trim();
+  const sanitizedUrl = cleanSupabaseUrl(url);
+  const sanitizedKey = (anonKey || '').trim();
+
+  inMemoryUrl = sanitizedUrl;
+  inMemoryKey = sanitizedKey;
   try {
-    if (url) {
-      localStorage.setItem(STORAGE_KEY_URL, url.trim());
+    if (sanitizedUrl) {
+      localStorage.setItem(STORAGE_KEY_URL, sanitizedUrl);
     } else {
       localStorage.removeItem(STORAGE_KEY_URL);
     }
-    if (anonKey) {
-      localStorage.setItem(STORAGE_KEY_ANON, anonKey.trim());
+    if (sanitizedKey) {
+      localStorage.setItem(STORAGE_KEY_ANON, sanitizedKey);
     } else {
       localStorage.removeItem(STORAGE_KEY_ANON);
     }
@@ -47,7 +59,7 @@ export const saveSupabaseCredentials = (url: string, anonKey: string) => {
   fetch('/api/supabase-config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url: (url || '').trim(), anonKey: (anonKey || '').trim() }),
+    body: JSON.stringify({ url: sanitizedUrl, anonKey: sanitizedKey }),
   }).catch(() => {});
 };
 

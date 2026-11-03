@@ -142,33 +142,19 @@ CREATE TABLE IF NOT EXISTS standings (
 );
 
 -- ========================================================
--- POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY)
--- Permite lectura y escritura abierta mediante la clave Anon pública
+-- DESACTIVAR RLS Y PERMITIR ACCESO TOTAL A LA CLAVE ANON
+-- Evita bloqueos silenciosos al guardar partidos, jugadores y publicaciones
 -- ========================================================
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE standings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE players DISABLE ROW LEVEL SECURITY;
+ALTER TABLE app_users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE matches DISABLE ROW LEVEL SECURITY;
+ALTER TABLE posts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE standings DISABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Public access teams" ON teams;
-CREATE POLICY "Public access teams" ON teams FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public access players" ON players;
-CREATE POLICY "Public access players" ON players FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public access app_users" ON app_users;
-CREATE POLICY "Public access app_users" ON app_users FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public access matches" ON matches;
-CREATE POLICY "Public access matches" ON matches FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public access posts" ON posts;
-CREATE POLICY "Public access posts" ON posts FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public access standings" ON standings;
-CREATE POLICY "Public access standings" ON standings FOR ALL USING (true) WITH CHECK (true);
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
 
 -- ========================================================
 -- TIEMPO REAL (REALTIME)

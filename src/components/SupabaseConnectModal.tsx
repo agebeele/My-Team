@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Database, Check, Copy, ExternalLink, ShieldCheck, AlertCircle, RefreshCw, X, Sparkles } from 'lucide-react';
-import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, getSupabaseClient } from '../utils/supabaseClient';
+import { getSupabaseCredentials, saveSupabaseCredentials, isSupabaseConfigured, getSupabaseClient, cleanSupabaseUrl } from '../utils/supabaseClient';
 import { SUPABASE_SQL_SCRIPT } from '../data/supabaseSqlScript';
 
 interface SupabaseConnectModalProps {
@@ -15,7 +15,7 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
   onConnected,
 }) => {
   const currentCreds = getSupabaseCredentials();
-  const [urlInput, setUrlInput] = useState(currentCreds.url);
+  const [urlInput, setUrlInput] = useState(cleanSupabaseUrl(currentCreds.url));
   const [keyInput, setKeyInput] = useState(currentCreds.anonKey);
   const [isTesting, setIsTesting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);

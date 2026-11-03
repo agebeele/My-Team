@@ -59,11 +59,13 @@ import {
   supabaseUpsertPlayer,
   supabaseDeletePlayer,
   supabaseUpsertMatch,
+  supabaseDeleteMatch,
   supabaseUpsertPost,
+  supabaseDeletePost,
   supabaseUpsertUser,
   supabaseUpsertTeam,
   subscribeToSupabaseTable,
-} from './utils/supabaseService';
+} from './services/supabaseService';
 import { fetchBackendSync, pushBackendSync, pushBackendSyncImmediate } from './utils/backendSync';
 
 export default function App() {
@@ -232,6 +234,16 @@ export default function App() {
       try {
         localStorage.setItem('teamgol_posts_data', JSON.stringify(next));
       } catch {}
+      // Detect deleted posts
+      const nextIds = new Set(next.map((p) => p.id));
+      prev.forEach((oldP) => {
+        if (!nextIds.has(oldP.id)) {
+          fetch(`/api/publicaciones/${oldP.id}`, { method: 'DELETE' }).catch(() => {});
+          if (isSupabaseConfigured()) {
+            supabaseDeletePost(oldP.id);
+          }
+        }
+      });
       pushBackendSyncImmediate({ posts: next });
       if (isSupabaseConfigured()) {
         next.forEach((p) => {
@@ -264,12 +276,15 @@ export default function App() {
   const handleSetMatches: React.Dispatch<React.SetStateAction<Match[]>> = (action) => {
     setMatches((prev) => {
       const next = typeof action === 'function' ? action(prev) : action;
-      // Detect deleted matches and send DELETE request to backend
+      // Detect deleted matches and send DELETE request to backend & Supabase
       const nextIds = new Set(next.map((m) => m.id));
       prev.forEach((oldM) => {
         if (!nextIds.has(oldM.id)) {
           deletedMatchIdsRef.current.add(oldM.id);
           fetch(`/api/partidos/${oldM.id}`, { method: 'DELETE' }).catch(() => {});
+          if (isSupabaseConfigured()) {
+            supabaseDeleteMatch(oldM.id);
+          }
         }
       });
 
