@@ -2142,12 +2142,9 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
             </div>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-
   {users
-    .filter((u) => { 
-      // 1. Coincidir por el ID del equipo actual
+    .filter((u) => {
       if (u.teamId && team?.id && u.teamId === team.id) return true;
-      // 2. Coincidir si es el correo del dueño/admin actual
       if (currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase()) return true;
       return false;
     })
@@ -2173,47 +2170,6 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
           </div>
         </div>
 
-              {users.map((user) => {
-                const inSquad = isUserInSquad(user);
-                return (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-3 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]/60 gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={user.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
-                        alt={user.name}
-                        referrerPolicy="no-referrer"
-                        className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4]"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = DEFAULT_FACEBOOK_AVATAR;
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-bold text-[#050505] block truncate">
-                            {user.name}
-                          </span>
-                          {user.role === 'player' && (
-                            inSquad ? (
-                              <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-bold">
-                                ✓ En Plantel
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[9px] font-bold">
-                                Fuera de plantilla
-                              </span>
-                            )
-                          )}
-                        </div>
-                        <span className="text-[10px] text-[#65676B] truncate block">
-                          {user.email}
-                        </span>
-                      </div>
-                    </div>
-
-        {/* Selector de Rol */}
         <select
           value={user.role}
           onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
@@ -2224,6 +2180,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
         </select>
       </div>
     ))}
+</div>
 </div>
 
                     <div className="flex items-center gap-2 shrink-0">
