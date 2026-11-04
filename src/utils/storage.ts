@@ -274,6 +274,30 @@ export const clearDeviceSession = () => {
   }
 };
 
+// Helper para guardar de forma segura con reintento y limpieza de cuota
+const safeSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err: any) {
+    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
+      console.warn(`[Storage] Cuota excedida guardando ${key}. Limpiando datos secundarios...`);
+      // Limpiamos listas globales grandes que se regeneran desde Supabase/Backend
+      localStorage.removeItem(STORAGE_KEYS.POSTS);
+      localStorage.removeItem(STORAGE_KEYS.USERS);
+      localStorage.removeItem(STORAGE_KEYS.ALL_TEAMS);
+      
+      // Reintentamos guardar el dato prioritario
+      try {
+        localStorage.setItem(key, value);
+      } catch (retryErr) {
+        console.error(`[Storage] Imposible guardar ${key} incluso tras liberar espacio`, retryErr);
+      }
+    } else {
+      console.warn(`Error guardando ${key} a localStorage`, err);
+    }
+  }
+};
+
 export const saveToStorage = (state: {
   team?: TeamInfo;
   allTeams?: TeamInfo[];
@@ -285,38 +309,36 @@ export const saveToStorage = (state: {
   currentUser?: AppUser | null;
   language?: Language;
 }) => {
-  try {
-    if (state.team) {
-      localStorage.setItem(STORAGE_KEYS.TEAM, JSON.stringify(state.team));
-      if (state.players) {
-        savePlayersForTeam(state.team.id, state.players);
-      }
-      if (state.matches) {
-        saveMatchesForTeam(state.team.id, state.matches);
-      }
-      if (state.standings) {
-        saveStandingsForLeague(state.team.leagueName, state.standings);
-      }
+  if (state.team) {
+    safeSetItem(STORAGE_KEYS.TEAM, JSON.stringify(state.team));
+    if (state.players) {
+      savePlayersForTeam(state.team.id, state.players);
     }
-    if (state.allTeams) {
-      localStorage.setItem(STORAGE_KEYS.ALL_TEAMS, JSON.stringify(state.allTeams));
+    if (state.matches) {
+      saveMatchesForTeam(state.team.id, state.matches);
     }
-    if (state.posts) localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(state.posts));
-    if (state.users) localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
-    if (state.currentUser) {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
-      localStorage.setItem(STORAGE_KEYS.DEVICE_SESSION_SAVED, 'true');
+    if (state.standings) {
+      saveStandingsForLeague(state.team.leagueName, state.standings);
     }
-    if (state.language) localStorage.setItem(STORAGE_KEYS.LANGUAGE, state.language);
-  } catch (err) {
-    console.warn('Error saving state to localStorage', err);
+  }
+  if (state.allTeams) {
+    safeSetItem(STORAGE_KEYS.ALL_TEAMS, JSON.stringify(state.allTeams));
+  }
+  if (state.posts) {
+    safeSetItem(STORAGE_KEYS.POSTS, JSON.stringify(state.posts));
+  }
+  if (state.users) {
+    safeSetItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
+  }
+  if (state.currentUser) {
+    safeSetItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
+    safeSetItem(STORAGE_KEYS.DEVICE_SESSION_SAVED, 'true');
+  }
+  if (state.language) {
+    safeSetItem(STORAGE_KEYS.LANGUAGE, state.language);
   }
 };
 
 export const saveStateItem = <T>(key: string, value: T) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (err) {
-    console.warn(`Error persisting ${key} to storage`, err);
-  }
+  safeSetItem(key, JSON.stringify(value));
 };
