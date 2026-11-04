@@ -64,6 +64,9 @@ import {
   supabaseDeletePost,
   supabaseUpsertUser,
   supabaseUpsertTeam,
+  supabaseFetchJoinRequests,
+  supabaseUpsertJoinRequest,
+  supabaseDeleteJoinRequest,
   subscribeToSupabaseTable,
 } from './services/supabaseService';
 import { fetchBackendSync, pushBackendSync, pushBackendSyncImmediate } from './utils/backendSync';
@@ -128,6 +131,77 @@ export default function App() {
   const [joinSuccessAlert, setJoinSuccessAlert] = useState<string | null>(null);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [supabaseVersion, setSupabaseVersion] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Manual refresh function to refresh all data without logging out
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      // 1. Refresh from SQLite backend
+      const backendData = await fetchBackendSync();
+      if (backendData) {
+        if (backendData.allTeams && Array.isArray(backendData.allTeams) && backendData.allTeams.length > 0) {
+          setAllTeams(backendData.allTeams);
+          const currentT = backendData.allTeams.find((t: any) => t.id === team.id);
+          if (currentT) setTeam(currentT);
+        }
+        if (backendData.players && Array.isArray(backendData.players)) {
+          const teamPlayers = backendData.players.filter((p: any) => !p.teamId || p.teamId === team.id);
+          setPlayers(teamPlayers);
+        }
+        if (backendData.matches && Array.isArray(backendData.matches)) {
+          const currentMatches = backendData.matches.filter(
+            (m: any) => (!m.teamId || m.teamId === team.id) && !deletedMatchIdsRef.current.has(m.id)
+          );
+          setMatches(currentMatches);
+        }
+        if (backendData.posts && Array.isArray(backendData.posts)) {
+          setPosts(backendData.posts);
+        }
+        if (backendData.users && Array.isArray(backendData.users)) {
+          setUsers(backendData.users);
+        }
+        if (backendData.joinRequests && Array.isArray(backendData.joinRequests)) {
+          setJoinRequests(backendData.joinRequests);
+          try {
+            localStorage.setItem('teamgol_join_requests', JSON.stringify(backendData.joinRequests));
+          } catch {}
+        }
+      }
+
+      // 2. Refresh from Supabase if configured
+      if (isSupabaseConfigured()) {
+        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests] = await Promise.all([
+          supabaseFetchPlayers(team.id),
+          supabaseFetchMatches(team.id),
+          supabaseFetchPosts(team.id),
+          supabaseFetchUsers(),
+          supabaseFetchTeams(),
+          supabaseFetchJoinRequests(),
+        ]);
+
+        if (cloudTeams && cloudTeams.length > 0) {
+          setAllTeams(cloudTeams);
+          const cur = cloudTeams.find((t) => t.id === team.id);
+          if (cur) setTeam(cur);
+        }
+        if (cloudPlayers && cloudPlayers.length > 0) setPlayers(cloudPlayers);
+        if (cloudMatches && cloudMatches.length > 0) setMatches(cloudMatches);
+        if (cloudPosts && cloudPosts.length > 0) setPosts(cloudPosts);
+        if (cloudUsers && cloudUsers.length > 0) setUsers(cloudUsers);
+        if (cloudRequests) {
+          setJoinRequests(cloudRequests);
+          try {
+            localStorage.setItem('teamgol_join_requests', JSON.stringify(cloudRequests));
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn('Error during manual refresh:', err);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 450);
+    }
+  };
 
   // Initialize shared Supabase configuration from central backend
   useEffect(() => {
@@ -146,12 +220,13 @@ export default function App() {
 
     const syncFromSupabase = async () => {
       try {
-        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams] = await Promise.all([
+        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests] = await Promise.all([
           supabaseFetchPlayers(team.id),
           supabaseFetchMatches(team.id),
           supabaseFetchPosts(team.id),
           supabaseFetchUsers(),
           supabaseFetchTeams(),
+          supabaseFetchJoinRequests(),
         ]);
 
         if (!isMounted) return;
@@ -174,6 +249,12 @@ export default function App() {
         }
         if (cloudUsers && cloudUsers.length > 0) {
           setUsers(cloudUsers);
+        }
+        if (cloudRequests) {
+          setJoinRequests(cloudRequests);
+          try {
+            localStorage.setItem('teamgol_join_requests', JSON.stringify(cloudRequests));
+          } catch {}
         }
       } catch (err) {
         console.warn('Error syncing from Supabase:', err);
@@ -217,6 +298,17 @@ export default function App() {
       });
     });
 
+    const unsubJoinRequests = subscribeToSupabaseTable('join_requests', () => {
+      supabaseFetchJoinRequests().then((fresh) => {
+        if (isMounted && fresh) {
+          setJoinRequests(fresh);
+          try {
+            localStorage.setItem('teamgol_join_requests', JSON.stringify(fresh));
+          } catch {}
+        }
+      });
+    });
+
     return () => {
       isMounted = false;
       unsubTeams();
@@ -224,6 +316,7 @@ export default function App() {
       unsubPlayers();
       unsubMatches();
       unsubUsers();
+      unsubJoinRequests();
     };
   }, [team.id, supabaseVersion]);
 
@@ -610,6 +703,17 @@ export default function App() {
       players: updatedPlayers,
       users: updatedUsers,
     });
+
+    // 5. Update Supabase in real-time
+    if (isSupabaseConfigured()) {
+      const acceptedReq: TeamJoinRequest = { ...req, status: 'accepted', respondedAt: new Date().toISOString() };
+      supabaseUpsertJoinRequest(acceptedReq);
+      supabaseUpsertPlayer(req.teamId, newPlayer);
+      const matchedUser = updatedUsers.find((u) => u.id === req.userId || u.email.toLowerCase() === req.playerEmail.toLowerCase());
+      if (matchedUser) {
+        supabaseUpsertUser(matchedUser);
+      }
+    }
   };
 
   const handleRejectJoinRequest = async (requestId: string) => {
@@ -623,13 +727,16 @@ export default function App() {
 
     const req = joinRequests.find((r) => r.id === requestId);
     let updatedUsers = users;
+    let rejectedUser: AppUser | undefined;
     if (req) {
       updatedUsers = users.map((u) => {
         if (u.id === req.userId || u.email.toLowerCase() === req.playerEmail.toLowerCase()) {
-          return {
+          const uMod = {
             ...u,
             teamJoinStatus: 'rejected' as const,
           };
+          rejectedUser = uMod;
+          return uMod;
         }
         return u;
       });
@@ -650,6 +757,19 @@ export default function App() {
       joinRequests: updatedRequests,
       users: updatedUsers,
     });
+
+    // Update Supabase in real-time
+    if (isSupabaseConfigured()) {
+      const rejectedReq: TeamJoinRequest = {
+        ...(req || { id: requestId, teamId: team.id, teamName: team.name, userId: '', playerEmail: '', playerName: '' }),
+        status: 'rejected',
+        respondedAt: new Date().toISOString(),
+      } as TeamJoinRequest;
+      supabaseUpsertJoinRequest(rejectedReq);
+      if (rejectedUser) {
+        supabaseUpsertUser(rejectedUser);
+      }
+    }
   };
 
   // If no saved device session exists, prompt user to log in or register directly
@@ -755,6 +875,8 @@ export default function App() {
         joinRequests={joinRequests}
         onAcceptJoinRequest={handleAcceptJoinRequest}
         onRejectJoinRequest={handleRejectJoinRequest}
+        onRefresh={handleManualRefresh}
+        isRefreshing={isRefreshing}
       />
 
       {/* Welcome Join Alert Banner if joined via invite */}

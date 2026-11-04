@@ -1,5 +1,5 @@
 import { getSupabaseClient, isSupabaseConfigured } from '../utils/supabaseClient';
-import { Player, Match, Post, TeamInfo, StandingsRow, AppUser } from '../types';
+import { Player, Match, Post, TeamInfo, StandingsRow, AppUser, TeamJoinRequest } from '../types';
 
 // ==========================================
 // 1. CAMELCASE <-> SNAKE_CASE MAPPERS
@@ -202,6 +202,41 @@ export const mapUserFromDb = (row: any): AppUser => ({
   playerId: row.player_id || undefined,
   teamId: row.team_id || undefined,
   provider: row.provider || 'email',
+});
+
+export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
+  id: req.id,
+  team_id: req.teamId,
+  team_name: req.teamName || null,
+  user_id: req.userId,
+  player_email: (req.playerEmail || req.userEmail || '').toLowerCase().trim(),
+  player_name: req.playerName || req.userName || 'Jugador',
+  player_position: req.playerPosition || req.position || 'MED',
+  player_number: req.playerNumber !== undefined && req.playerNumber !== null
+    ? Number(req.playerNumber)
+    : req.number !== undefined && req.number !== null
+    ? Number(req.number)
+    : null,
+  status: req.status || 'pending',
+  created_at: req.createdAt || req.requestedAt || new Date().toISOString(),
+});
+
+export const mapJoinRequestFromDb = (row: any): TeamJoinRequest => ({
+  id: row.id,
+  teamId: row.team_id,
+  teamName: row.team_name || 'Equipo',
+  userId: row.user_id,
+  userName: row.player_name || 'Jugador',
+  playerName: row.player_name || 'Jugador',
+  userEmail: row.player_email || '',
+  playerEmail: row.player_email || '',
+  position: row.player_position || 'MED',
+  playerPosition: row.player_position || 'MED',
+  number: row.player_number !== null && row.player_number !== undefined ? row.player_number : '',
+  playerNumber: row.player_number !== null && row.player_number !== undefined ? Number(row.player_number) : undefined,
+  status: (row.status || 'pending') as TeamJoinRequest['status'],
+  createdAt: row.created_at || new Date().toISOString(),
+  requestedAt: row.created_at || new Date().toISOString(),
 });
 
 // ==========================================
@@ -478,10 +513,66 @@ export const supabaseUpsertUser = async (user: AppUser): Promise<boolean> => {
 };
 
 // ==========================================
-// 7. REALTIME SUBSCRIPTIONS
+// 7. JOIN REQUESTS SERVICE
+// ==========================================
+export const supabaseFetchJoinRequests = async (): Promise<TeamJoinRequest[] | null> => {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client.from('join_requests').select('*');
+    if (error) {
+      console.warn('[Supabase] fetchJoinRequests error:', error.message);
+      return null;
+    }
+    if (!data) return [];
+    return data.map(mapJoinRequestFromDb);
+  } catch (err: any) {
+    console.warn('[Supabase] fetchJoinRequests exception:', err?.message || err);
+    return null;
+  }
+};
+
+export const supabaseUpsertJoinRequest = async (req: TeamJoinRequest): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const row = mapJoinRequestToDb(req);
+    const { error } = await client.from('join_requests').upsert(row, { onConflict: 'id' });
+    if (error) {
+      console.error('[Supabase] Error al guardar join_request:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('[Supabase] Excepción al guardar join_request:', err?.message || err);
+    return false;
+  }
+};
+
+export const supabaseDeleteJoinRequest = async (requestId: string): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('join_requests').delete().eq('id', requestId);
+    if (error) {
+      console.error('[Supabase] Error al eliminar join_request:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('[Supabase] Excepción al eliminar join_request:', err?.message || err);
+    return false;
+  }
+};
+
+// ==========================================
+// 8. REALTIME SUBSCRIPTIONS
 // ==========================================
 export const subscribeToSupabaseTable = (
-  table: 'posts' | 'players' | 'matches' | 'app_users' | 'teams',
+  table: 'posts' | 'players' | 'matches' | 'app_users' | 'teams' | 'join_requests' | 'standings' | string,
   onPayload: (payload: any) => void
 ) => {
   const client = getSupabaseClient();

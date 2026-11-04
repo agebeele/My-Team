@@ -141,6 +141,20 @@ CREATE TABLE IF NOT EXISTS standings (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 7. TABLA DE SOLICITUDES DE INGRESO A EQUIPOS (JOIN_REQUESTS)
+CREATE TABLE IF NOT EXISTS join_requests (
+  id TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  team_name TEXT,
+  user_id TEXT NOT NULL,
+  player_email TEXT NOT NULL,
+  player_name TEXT NOT NULL,
+  player_position TEXT DEFAULT 'MED',
+  player_number INTEGER,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- ========================================================
 -- POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY)
 -- ========================================================
@@ -150,6 +164,7 @@ ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE standings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE join_requests ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public access teams" ON teams;
 CREATE POLICY "Public access teams" ON teams FOR ALL USING (true) WITH CHECK (true);
@@ -169,13 +184,16 @@ CREATE POLICY "Public access posts" ON posts FOR ALL USING (true) WITH CHECK (tr
 DROP POLICY IF EXISTS "Public access standings" ON standings;
 CREATE POLICY "Public access standings" ON standings FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public access join_requests" ON join_requests;
+CREATE POLICY "Public access join_requests" ON join_requests FOR ALL USING (true) WITH CHECK (true);
+
 -- ========================================================
 -- TIEMPO REAL (REALTIME)
 -- ========================================================
 DO $$
 BEGIN
   BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE posts, players, matches, app_users, teams, standings;
+    ALTER PUBLICATION supabase_realtime ADD TABLE posts, players, matches, app_users, teams, standings, join_requests;
   EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;

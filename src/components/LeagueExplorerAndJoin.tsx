@@ -18,6 +18,12 @@ import {
 import { AppUser, TeamInfo, TeamJoinRequest, Language, PlayerPosition } from '../types';
 import { getT } from '../utils/translations';
 import { pushBackendSyncImmediate } from '../utils/backendSync';
+import {
+  supabaseUpsertJoinRequest,
+  supabaseDeleteJoinRequest,
+  supabaseUpsertUser,
+  isSupabaseConfigured,
+} from '../services/supabaseService';
 
 interface LeagueExplorerAndJoinProps {
   currentUser: AppUser;
@@ -142,6 +148,11 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
       body: JSON.stringify(newRequest),
     }).catch(() => {});
 
+    if (isSupabaseConfigured()) {
+      supabaseUpsertJoinRequest(newRequest);
+      supabaseUpsertUser(updatedUser);
+    }
+
     pushBackendSyncImmediate({
       joinRequests: updatedRequests,
       users: allUsers.map((u) => (u.id === currentUser.id ? updatedUser : u)),
@@ -176,6 +187,11 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
     try {
       localStorage.setItem('teamgol_current_user', JSON.stringify(updatedUser));
     } catch {}
+
+    if (isSupabaseConfigured()) {
+      supabaseDeleteJoinRequest(activeRequest.id);
+      supabaseUpsertUser(updatedUser);
+    }
 
     pushBackendSyncImmediate({
       joinRequests: updatedRequests,

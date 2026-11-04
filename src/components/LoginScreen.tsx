@@ -49,7 +49,7 @@ import {
   saveStandingsForLeague,
 } from '../utils/storage';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
-import { supabaseUpsertUser, supabaseUpsertPlayer } from '../utils/supabaseService';
+import { supabaseUpsertUser, supabaseUpsertPlayer, supabaseUpsertTeam } from '../utils/supabaseService';
 import { pushBackendSync } from '../utils/backendSync';
 
 interface LoginScreenProps {
@@ -673,6 +673,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
     if (onTeamCreated) {
       onTeamCreated(createdTeam);
+    }
+
+    if (isSupabaseConfigured()) {
+      supabaseUpsertTeam(createdTeam);
+      supabaseUpsertUser(ownerUser);
     }
 
     pushBackendSync({

@@ -1,4 +1,20 @@
-import { Player, TeamInfo, Match, StandingsRow, Post, AppUser } from '../types';
+import { Player, TeamInfo, Match, StandingsRow, Post, AppUser, Language } from '../types';
+
+export const STORAGE_KEYS = {
+  TEAM: 'teamgol_team',
+  ALL_TEAMS: 'teamgol_all_teams',
+  PLAYERS: 'teamgol_players',
+  PLAYERS_BY_TEAM: 'teamgol_players_by_team',
+  MATCHES: 'teamgol_matches',
+  MATCHES_BY_TEAM: 'teamgol_matches_by_team',
+  STANDINGS: 'teamgol_standings',
+  STANDINGS_BY_LEAGUE: 'teamgol_standings_by_league',
+  POSTS: 'teamgol_posts',
+  USERS: 'teamgol_users',
+  CURRENT_USER: 'teamgol_current_user',
+  LANGUAGE: 'teamgol_language',
+  DEVICE_SESSION_SAVED: 'teamgol_device_session_saved',
+} as const;
 
 export const INITIAL_TEAM: TeamInfo | null = null;
 export const INITIAL_TEAMS: TeamInfo[] = [];
@@ -304,5 +320,3 @@ export const saveStateItem = <T>(key: string, value: T) => {
     console.warn(`Error persisting ${key} to storage`, err);
   }
 };
-
-export { STORAGE_KEYS };

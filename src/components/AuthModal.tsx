@@ -31,6 +31,7 @@ import {
 import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
+import { supabaseUpsertUser, isSupabaseConfigured } from '../services/supabaseService';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -281,6 +282,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
     if (setUsers) {
       setUsers((prev) => [...prev, newUser]);
+    }
+
+    if (isSupabaseConfigured()) {
+      supabaseUpsertUser(newUser);
     }
 
     // Set active session to new user

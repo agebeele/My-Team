@@ -17,6 +17,7 @@ import {
   Plus,
   ArrowRight,
   Database,
+  RefreshCw,
 } from 'lucide-react';
 import { AppUser, Language, TeamInfo, UserRole, TeamInvitation, TeamJoinRequest } from '../types';
 import { getT } from '../utils/translations';
@@ -49,6 +50,8 @@ interface NavbarProps {
   joinRequests?: TeamJoinRequest[];
   onAcceptJoinRequest?: (req: TeamJoinRequest) => void;
   onRejectJoinRequest?: (reqId: string) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -71,6 +74,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   joinRequests = [],
   onAcceptJoinRequest,
   onRejectJoinRequest,
+  onRefresh,
+  isRefreshing = false,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
@@ -412,6 +417,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
+            {/* Refresh and Realtime Sync Button without logging out */}
+            {onRefresh && (
+              <button
+                id="btn-refresh-data"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className={`relative w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-white transition-colors flex items-center justify-center shadow-xs cursor-pointer ${
+                  isRefreshing ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
+                title="Refrescar y sincronizar datos en tiempo real"
+              >
+                <RefreshCw className={`w-4 h-4 text-[#1877F2] ${isRefreshing ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+
             {/* Notification Bell with In-App Invitations Popover */}
             <div className="relative">
               <button
@@ -663,17 +683,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <span>Ver mi perfil y estadísticas</span>
                     </button>
 
-                    {currentUser.role !== 'league_admin' && (
+                    {onRefresh && (
                       <button
-                        id="btn-menu-switch-team"
+                        id="btn-menu-refresh"
                         onClick={() => {
                           setShowRoleMenu(false);
-                          setShowTeamSwitcherModal(true);
+                          onRefresh();
                         }}
+                        disabled={isRefreshing}
                         className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#1877F2] hover:bg-[#E7F3FF] dark:hover:bg-[#1877F2]/10 transition-colors cursor-pointer"
                       >
-                        <Shield className="w-4 h-4 text-[#1877F2]" />
-                        <span>Cambiar de Equipo ({allTeams.length} registrados)</span>
+                        <RefreshCw className={`w-4 h-4 text-[#1877F2] ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <span>{isRefreshing ? 'Actualizando datos...' : 'Refrescar información'}</span>
                       </button>
                     )}
 
