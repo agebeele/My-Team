@@ -254,7 +254,6 @@ export default function App() {
 
     const syncFromSupabase = async () => {
       try {
-        // 1. Agregamos la consulta a 'team_invitations' filtrando por el correo del usuario actual
         const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations] = await Promise.all([
           supabaseFetchPlayers(team.id),
           supabaseFetchMatches(team.id),
@@ -262,7 +261,6 @@ export default function App() {
           supabaseFetchUsers(),
           supabaseFetchTeams(),
           supabaseFetchJoinRequests(),
-          // Consulta directa de invitaciones para la PC2 o dispositivo receptor
           currentUser?.email 
             ? supabase.from('team_invitations').select('*').eq('email', currentUser.email.toLowerCase())
             : Promise.resolve({ data: null }),
@@ -270,10 +268,8 @@ export default function App() {
 
         if (!isMounted) return;
 
-        // Si existen invitaciones recibidas para el usuario actual en la nube
         if (cloudInvitations && cloudInvitations.data && cloudInvitations.data.length > 0) {
-          console.log('✉️ Invitaciones de equipo recibidas desde la nube:', cloudInvitations.data);
-          // Opcional: puedes guardar las invitaciones en el estado o notificar al usuario
+          console.log('Invitaciones recibidas:', cloudInvitations.data);
         }
 
         if (cloudTeams && cloudTeams.length > 0) {
@@ -296,7 +292,6 @@ export default function App() {
           setUsers(cloudUsers);
         }
 
-        // Synthesize pending join requests from users and cloudRequests so no request is lost
         const pendingFromUsers: TeamJoinRequest[] = (cloudUsers || [])
           .filter((u) => u.teamJoinStatus === 'pending' && (
             u.requestedTeamId === team.id ||
@@ -354,19 +349,84 @@ export default function App() {
       });
     });
 
-    // Escuchar en tiempo real nuevas invitaciones de equipo (PC1 -> PC2)
-    const unsubInvitations = subscribeToSupabaseTable('team_invitations', () => {
-      if (currentUser?.email) {
-        supabase
-          .from('team_invitations')
-          .select('*')
-          .eq('email', currentUser.email.toLowerCase())
-          .then(({ data }) => {
-            if (isMounted && data && data.length > 0) {
-              console.log('⚡ Nueva invitación recibida en tiempo real:', data);
-            }
-          });
-      }
+    const unsubPosts = subscribeToSupabaseTable('posts', () => {
+      supabaseFetchPosts(team.id).then((fresh) => {
+        if (isMounted && fresh) setPosts(fresh);
+      });
+    });
+
+    const unsubPlayers = subscribeToSupabaseTable('players', () => {
+      supabaseFetchPlayers(team.id).then((fresh) => {
+        if (isMounted && fresh && fresh.length > 0) setPlayers(fresh);
+      });
+    });
+
+    const unsubMatches = subscribeToSupabaseTable('matches', () => {
+      supabaseFetchMatches(team.id).then((fresh) => {
+        if (isMounted && fresh) setMatches(fresh);
+      });
+    });
+
+    const unsubUsers = subscribeToSupabaseTable('app_users', () => {
+      supabaseFetchUsers().then((fresh) => {
+        if (isMounted && fresh && fresh.length > 0) {
+          setUsers(fresh);
+          const freshPending: TeamJoinRequest[] = fresh
+            .filter((u) => u.teamJoinStatus === 'pending' && (
+              u.requestedTeamId === team.id ||
+              (u.requestedTeamName && u.requestedTeamName.toLowerCase().trim() === team.name.toLowerCase().trim())
+            ))
+            .map((u) => ({
+              id: `req_user_${u.id}`,
+              userId: u.id,
+              userName: u.name,
+              playerName: u.name,
+              userEmail: u.email,
+              playerEmail: u.email,
+              userAvatar: u.avatarUrl,
+              playerAvatar: u.avatarUrl,
+              position: u.position || 'MED',
+              playerPosition: u.position || 'MED',
+              number: u.jerseyNumber || 10,
+              playerNumber: u.jerseyNumber || 10,
+              phone: u.phone,
+              teamId: u.requestedTeamId || team.id,
+              teamName: u.requestedTeamName || team.name,
+              status: 'pending' as const,
+              createdAt: new Date().toISOString(),
+              requestedAt: new Date().toISOString(),
+            }));
+
+          if (freshPending.length > 0) {
+            setJoinRequests((prev) => {
+              const existingEmails = new Set(prev.map((r) => (r.playerEmail || '').toLowerCase()));
+              const existingUserIds = new Set(prev.map((r) => r.userId));
+              const additions = freshPending.filter(
+                (fp) => !existingEmails.has(fp.playerEmail.toLowerCase()) && !existingUserIds.has(fp.userId)
+              );
+              if (additions.length > 0) {
+                const updated = [...prev, ...additions];
+                try {
+                  localStorage.setItem('teamgol_join_requests', JSON.stringify(updated));
+                } catch {}
+                return updated;
+              }
+              return prev;
+            });
+          }
+        }
+      });
+    });
+
+    const unsubJoinRequests = subscribeToSupabaseTable('join_requests', () => {
+      supabaseFetchJoinRequests().then((fresh) => {
+        if (isMounted && fresh) {
+          setJoinRequests(fresh);
+          try {
+            localStorage.setItem('teamgol_join_requests', JSON.stringify(fresh));
+          } catch {}
+        }
+      });
     });
 
     return () => {
@@ -377,9 +437,8 @@ export default function App() {
       unsubMatches();
       unsubUsers();
       unsubJoinRequests();
-      unsubInvitations(); // <-- Cancelar suscripción al desmontar
     };
-  }, [team.id, supabaseVersion, currentUser?.email]); // <-- Agrega currentUser?.email a las dependencias
+  }, [team.id, supabaseVersion, currentUser?.email]);
 
     const unsubPosts = subscribeToSupabaseTable('posts', () => {
       supabaseFetchPosts(team.id).then((fresh) => {
