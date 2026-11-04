@@ -120,4 +120,9 @@ export const isSupabaseConfigured = (): boolean => {
   return Boolean(url && anonKey && url.startsWith('http') && anonKey.length > 10);
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// --- CLIENTE SEGURO EXPORTADO (Evita Uncaught ReferenceError) ---
+const initialCreds = getSupabaseCredentials();
+const initialUrl = initialCreds.url && initialCreds.url.startsWith('http') ? initialCreds.url : 'https://placeholder.supabase.co';
+const initialKey = initialCreds.anonKey || 'placeholder-key';
+
+export const supabase = createClient(initialUrl, initialKey);
