@@ -33,6 +33,38 @@ export const INITIAL_STANDINGS_COPA_MUNDO: StandingsRow[] = [];
 // Alineación por defecto vacía para evitar fallos de importación
 export const DEFAULT_LINEUP: any[] = [];
 
+// Helper para leer JSON de forma ultra segura (evita "Cannot read properties of null")
+export const safeGetItem = <T>(key: string, defaultValue: T): T => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw || raw === 'undefined' || raw === 'null') return defaultValue;
+    const parsed = JSON.parse(raw);
+    return parsed ?? defaultValue;
+  } catch (err) {
+    console.warn(`[Storage] Error parseando ${key}, usando valor por defecto`, err);
+    return defaultValue;
+  }
+};
+
+// Guardado seguro evitando que el límite de 5MB tumbe la aplicación
+const safeSetItem = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err: any) {
+    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
+      try {
+        localStorage.removeItem(STORAGE_KEYS.POSTS);
+        localStorage.removeItem(STORAGE_KEYS.ALL_TEAMS);
+        localStorage.removeItem(STORAGE_KEYS.USERS);
+        localStorage.removeItem(STORAGE_KEYS.PLAYERS_BY_TEAM);
+        localStorage.setItem(key, value);
+      } catch {
+        console.warn(`[Storage] Omitiendo caché local para '${key}' debido al límite de 5MB.`);
+      }
+    }
+  }
+};
+
 // Retrieve players for a specific team
 export const getPlayersForTeam = (teamId: string): Player[] => {
   try {
