@@ -485,33 +485,21 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   const [editFormError, setEditFormError] = useState<string | null>(null);
 
   // Email Invitation state
-  const [inviteEmailInput, setInviteEmailInput] = useState('');
-  const [invitePlayerNameInput, setInvitePlayerNameInput] = useState('');
-  const [activeEmailInvitation, setActiveEmailInvitation] = useState<TeamInvitation | null>(null);
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [copiedInvite, setCopiedInvite] = useState(false);
-  const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
-    try {
-      const stored = localStorage.getItem('teamgol_sent_invitations');
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // ignore
-    }
-    return [
-      {
-        id: 'inv_init_1',
-        email: 'luis.garcia@futbol7.mx',
-        playerName: 'Luis García',
-        teamId: team.id,
-        teamName: team.name,
-        teamLogo: team.logoUrl,
-        stadium: team.stadium,
-        sentAt: 'Ayer',
-        role: 'player',
-        status: 'sent',
-      },
-    ];
-  });
+const [inviteEmailInput, setInviteEmailInput] = useState('');
+const [invitePlayerNameInput, setInvitePlayerNameInput] = useState('');
+const [activeEmailInvitation, setActiveEmailInvitation] = useState<TeamInvitation | null>(null);
+const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+const [copiedInvite, setCopiedInvite] = useState(false);
+
+const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
+  try {
+    const stored = localStorage.getItem('teamgol_sent_invitations');
+    if (stored) return JSON.parse(stored);
+  } catch {
+    // ignore
+  }
+  return []; // Iniciar vacío para evitar arrastrar datos de prueba entre equipos
+});
 
   const getInviteUrlForEmail = (email?: string, name?: string) => {
     const params = new URLSearchParams();
@@ -674,7 +662,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     const newUser: AppUser = {
       id: `u_${newId}`,
       name: `${cleanName} (Jugador)`,
-      email: `${cleanName.toLowerCase().replace(/\s+/g, '.')}@teamgol.com`,
+      email: `${cleanName.toLowerCase().replace(/\s+/g, '.')}@dreamteam.com`,
       role: 'player',
       avatarUrl: defaultAvatar,
       playerId: newId,
@@ -844,8 +832,13 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Filtered players list for management
+// Filtered players list for management (Filtrado estricto por equipo actual + búsqueda)
   const filteredPlayers = players.filter((p) => {
+    // 1. Filtrar primero para que solo incluya a los jugadores del equipo actual
+    const belongsToCurrentTeam = !p.teamId || p.teamId === team.id;
+    if (!belongsToCurrentTeam) return false;
+
+    // 2. Aplicar el filtro de la barra de búsqueda
     const query = playerSearchQuery.toLowerCase();
     return (
       p.name.toLowerCase().includes(query) ||
@@ -2149,6 +2142,37 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
             </div>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+<<<<<<< HEAD
+  {users
+    .filter((u) => {
+      // 1. Coincidir por el ID del equipo actual
+      if (u.teamId && team?.id && u.teamId === team.id) return true;
+      // 2. Coincidir si es el correo del dueño/admin actual
+      if (currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase()) return true;
+      return false;
+    })
+    .map((user) => (
+      <div
+        key={user.id}
+        className="flex items-center justify-between p-3 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]/60 gap-3"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <img
+            src={user.avatarUrl}
+            alt={user.name}
+            referrerPolicy="no-referrer"
+            className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4]"
+          />
+          <div className="min-w-0">
+            <span className="text-xs font-bold text-[#050505] block truncate">
+              {user.name}
+            </span>
+            <span className="text-[10px] text-[#65676B] truncate block">
+              {user.email}
+            </span>
+          </div>
+        </div>
+=======
               {users.map((user) => {
                 const inSquad = isUserInSquad(user);
                 return (
@@ -2188,7 +2212,22 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                         </span>
                       </div>
                     </div>
+>>>>>>> c1c180ac3f45b72d1d29df39e6dc25374f9914d2
 
+<<<<<<< HEAD
+        {/* Selector de Rol */}
+        <select
+          value={user.role}
+          onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
+          className="px-2.5 py-1.5 rounded-lg bg-white border border-[#CED0D4] text-xs font-bold text-[#050505] focus:outline-none focus:border-[#1877F2] shadow-xs cursor-pointer"
+        >
+          <option value="owner">Dueño de Equipo</option>
+          <option value="player">Jugador</option>
+        </select>
+      </div>
+    ))}
+</div>
+=======
                     <div className="flex items-center gap-2 shrink-0">
                       {user.role === 'player' && !inSquad && (
                         <button
@@ -2217,6 +2256,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                 );
               })}
             </div>
+>>>>>>> c1c180ac3f45b72d1d29df39e6dc25374f9914d2
           </div>
         </div>
       </div>
