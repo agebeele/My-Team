@@ -49,16 +49,34 @@ export const getPlayersForTeam = (teamId: string): Player[] => {
   }
 };
 
-// Save squad for a specific team
+// Save squad for a specific team con manejo de cuota y limpieza de imágenes pesadas
 export const savePlayersForTeam = (teamId: string, players: Player[]) => {
+  if (!teamId) return;
+
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.PLAYERS_BY_TEAM);
     const map = raw ? JSON.parse(raw) : {};
     map[teamId] = players;
-    localStorage.setItem(STORAGE_KEYS.PLAYERS_BY_TEAM, JSON.stringify(map));
-    localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
-  } catch (err) {
-    console.warn('Error saving players for team', err);
+
+    safeSetItem(STORAGE_KEYS.PLAYERS_BY_TEAM, JSON.stringify(map));
+    safeSetItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
+  } catch (err: any) {
+    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
+      console.warn('[Storage] Liberando caché pesada al guardar plantilla de jugadores...');
+      
+      // Limpiamos publicaciones e historial global para liberar espacio
+      localStorage.removeItem(STORAGE_KEYS.POSTS);
+      localStorage.removeItem(STORAGE_KEYS.ALL_TEAMS);
+
+      // Reintentamos guardar únicamente los jugadores del equipo actual
+      try {
+        localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
+      } catch (retryErr) {
+        console.error('[Storage] No se pudo guardar la lista reducida de jugadores', retryErr);
+      }
+    } else {
+      console.warn('Error saving players for team', err);
+    }
   }
 };
 
