@@ -251,6 +251,7 @@ export default function App() {
     if (!isSupabaseConfigured()) return;
 
     let isMounted = true;
+    let unsubInvitations: (() => void) | undefined;
 
     const syncFromSupabase = async () => {
       try {
@@ -429,6 +430,20 @@ export default function App() {
       });
     });
 
+    unsubInvitations = subscribeToSupabaseTable('team_invitations', () => {
+      if (currentUser?.email) {
+        supabase
+          .from('team_invitations')
+          .select('*')
+          .eq('email', currentUser.email.toLowerCase())
+          .then(({ data }) => {
+            if (isMounted && data && data.length > 0) {
+              console.log('Nueva invitación recibida:', data);
+            }
+          });
+      }
+    });
+
     return () => {
       isMounted = false;
       unsubTeams();
@@ -437,6 +452,7 @@ export default function App() {
       unsubMatches();
       unsubUsers();
       unsubJoinRequests();
+      if (typeof unsubInvitations === 'function') unsubInvitations();
     };
   }, [team.id, supabaseVersion, currentUser?.email]);
 
