@@ -236,13 +236,31 @@ export default function App() {
     }
   };
 
-  // Initialize shared Supabase configuration from central backend
+  // Initialize shared Supabase configuration from central backend safely
   useEffect(() => {
-    initSupabaseFromServer().then((creds) => {
-      if (creds) {
-        setSupabaseVersion((v) => v + 1);
+    let isMounted = true;
+
+    initSupabaseFromServer()
+      .then((creds) => {
+        if (isMounted && creds) {
+          setSupabaseVersion((v) => v + 1);
+        }
+      })
+      .catch((err) => {
+        console.warn('Supabase init skipped or server unavailable:', err);
+      });
+
+    // Fallback timer: garantiza que el splash screen desaparezca si la red es lenta
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        setShowSplash(false);
       }
-    });
+    }, 2500);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   // Real-time synchronization with Supabase when configured
