@@ -2036,88 +2036,8 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
 
         {/* Right: User Accounts & Roles (Dueño vs Jugador) */}
         <div className="lg:col-span-6 space-y-4">
-          {/* Pending Join Requests Section */}
-          {pendingRequests.length > 0 && (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 p-5 rounded-2xl shadow-sm space-y-3 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                    {pendingRequests.length}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-amber-950 flex items-center gap-1.5">
-                      <Users className="w-4 h-4 text-amber-600" />
-                      <span>Solicitudes Pendientes para Entrar al Equipo</span>
-                    </h4>
-                    <p className="text-[11px] text-amber-800">
-                      Jugadores esperando ser aceptados en el plantel oficial
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {pendingRequests.map((req) => (
-                  <div
-                    key={req.id}
-                    className="p-3 rounded-xl bg-white border border-amber-300 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={req.playerAvatar || req.userAvatar || DEFAULT_FACEBOOK_AVATAR}
-                        alt={req.playerName}
-                        className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-amber-400"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = DEFAULT_FACEBOOK_AVATAR;
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-xs text-[#050505]">
-                            {req.playerName}
-                          </span>
-                          {req.number && (
-                            <span className="text-[10px] bg-black text-white px-1.5 py-0.2 rounded font-mono font-bold">
-                              #{req.number}
-                            </span>
-                          )}
-                          {req.position && (
-                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
-                              {req.position}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-[#65676B] block truncate">
-                          {req.playerEmail}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => onAcceptJoinRequest && onAcceptJoinRequest(req)}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Aceptar al Plantel</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onRejectJoinRequest && onRejectJoinRequest(req.id)}
-                        className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#65676B] text-xs font-bold transition-all cursor-pointer"
-                      >
-                        Rechazar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div className="bg-white p-5 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-black text-[#050505] flex items-center gap-2">
                   <Crown className="w-4 h-4 text-[#1877F2]" />
@@ -2127,94 +2047,74 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                   Asigna permisos de Dueño de Equipo o Jugador
                 </p>
               </div>
-
-              {users.some((u) => u.role === 'player' && !isUserInSquad(u)) && (
-                <button
-                  type="button"
-                  onClick={handleSyncAllRegisteredUsers}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors self-start sm:self-auto"
-                  title="Incorpora a todos los jugadores registrados que aún no están en el plantel"
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>Incorporar Todos al Plantel</span>
-                </button>
-              )}
             </div>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-  {users
-    .filter((u) => {
-      if (u.teamId && team?.id && u.teamId === team.id) return true;
-      if (currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase()) return true;
-      return false;
-    })
-    .map((user) => (
-      <div
-        key={user.id}
-        className="flex items-center justify-between p-3 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]/60 gap-3"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <img
-            src={user.avatarUrl}
-            alt={user.name}
-            referrerPolicy="no-referrer"
-            className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4]"
-          />
-          <div className="min-w-0">
-            <span className="text-xs font-bold text-[#050505] block truncate">
-              {user.name}
-            </span>
-            <span className="text-[10px] text-[#65676B] truncate block">
-              {user.email}
-            </span>
-          </div>
-        </div>
+              {users
+                .filter((u) => {
+                  // 1. Filtrar por el ID del equipo actual
+                  if (u.teamId && team?.id && u.teamId === team.id) return true;
+                  // 2. O si es el correo del dueño/admin actual
+                  if (currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase()) return true;
+                  return false;
+                })
+                .map((user) => {
+                  const inSquad = players.some(
+                    (p) => p.id === user.playerId || (p.name && user.name && p.name.toLowerCase() === user.name.toLowerCase())
+                  );
 
-        <select
-          value={user.role}
-          onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-          className="px-2.5 py-1.5 rounded-lg bg-white border border-[#CED0D4] text-xs font-bold text-[#050505] focus:outline-none focus:border-[#1877F2] shadow-xs cursor-pointer"
-        >
-          <option value="owner">Dueño de Equipo</option>
-          <option value="player">Jugador</option>
-        </select>
-      </div>
-    ))}
-</div>
-</div>
+                  return (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-3 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]/60 gap-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={user.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
+                          alt={user.name}
+                          referrerPolicy="no-referrer"
+                          className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4]"
+                        />
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-[#050505] block truncate">
+                            {user.name}
+                          </span>
+                          <span className="text-[10px] text-[#65676B] truncate block">
+                            {user.email}
+                          </span>
+                        </div>
+                      </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {user.role === 'player' && !inSquad && (
-                        <button
-                          type="button"
-                          onClick={() => handleIntegrateUserToSquad(user)}
-                          className="px-2.5 py-1.5 rounded-lg bg-[#1877F2] hover:bg-[#0866FF] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
-                          title="Incorporar este jugador directamente a la plantilla, convocatorias y alineaciones"
+                      <div className="flex items-center gap-2 shrink-0">
+                        {user.role === 'player' && !inSquad && (
+                          <button
+                            type="button"
+                            onClick={() => handleIntegrateUserToSquad(user)}
+                            className="px-2.5 py-1.5 rounded-lg bg-[#1877F2] hover:bg-[#0866FF] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                            title="Incorporar este jugador directamente a la plantilla, convocatorias y alineaciones"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span className="hidden sm:inline">Incorporar al Plantel</span>
+                            <span className="sm:hidden">Plantel</span>
+                          </button>
+                        )}
+
+                        {/* Selector de Rol */}
+                        <select
+                          value={user.role}
+                          onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
+                          className="px-2.5 py-1.5 rounded-lg bg-white border border-[#CED0D4] text-xs font-bold text-[#050505] focus:outline-none focus:border-[#1877F2] shadow-xs cursor-pointer"
                         >
-                          <Plus className="w-3 h-3" />
-                          <span className="hidden sm:inline">Incorporar al Plantel</span>
-                          <span className="sm:hidden">Plantel</span>
-                        </button>
-                      )}
-
-                      {/* Role Selector (Owner vs Player only) */}
-                      <select
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                        className="px-2.5 py-1.5 rounded-lg bg-white border border-[#CED0D4] text-xs font-bold text-[#050505] focus:outline-none focus:border-[#1877F2] shadow-xs cursor-pointer"
-                      >
-                        <option value="owner">Dueño de Equipo</option>
-                        <option value="player">Jugador</option>
-                      </select>
+                          <option value="owner">Dueño de Equipo</option>
+                          <option value="player">Jugador</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
-
           </div>
         </div>
-      </div>
 
       {/* MODAL: Confirmation to delete player */}
       {playerToDelete && (
