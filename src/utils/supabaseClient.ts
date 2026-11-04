@@ -119,3 +119,5 @@ export const isSupabaseConfigured = (): boolean => {
   const { url, anonKey } = getSupabaseCredentials();
   return Boolean(url && anonKey && url.startsWith('http') && anonKey.length > 10);
 };
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
