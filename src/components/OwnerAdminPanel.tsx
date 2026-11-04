@@ -2142,9 +2142,9 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
             </div>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-<<<<<<< HEAD
+
   {users
-    .filter((u) => {
+    .filter((u) => { 
       // 1. Coincidir por el ID del equipo actual
       if (u.teamId && team?.id && u.teamId === team.id) return true;
       // 2. Coincidir si es el correo del dueño/admin actual
@@ -2172,7 +2172,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
             </span>
           </div>
         </div>
-=======
+
               {users.map((user) => {
                 const inSquad = isUserInSquad(user);
                 return (
@@ -2212,9 +2212,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                         </span>
                       </div>
                     </div>
->>>>>>> c1c180ac3f45b72d1d29df39e6dc25374f9914d2
 
-<<<<<<< HEAD
         {/* Selector de Rol */}
         <select
           value={user.role}
@@ -2227,7 +2225,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
       </div>
     ))}
 </div>
-=======
+
                     <div className="flex items-center gap-2 shrink-0">
                       {user.role === 'player' && !inSquad && (
                         <button
@@ -2256,7 +2254,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                 );
               })}
             </div>
->>>>>>> c1c180ac3f45b72d1d29df39e6dc25374f9914d2
+
           </div>
         </div>
       </div>
