@@ -98,8 +98,8 @@ export default function App() {
   // App Navigation & Language state
   const [activeTab, setActiveTab] = useState<string>('calendar');
   const [language, setLanguage] = useState<Language>('es');
-  // If the device session was saved previously, load it; otherwise null so it goes directly to Login
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(initial.currentUser || null);
+    // If the device session was saved previously, load it; otherwise null so it goes directly to Login
+    const [currentUser, setCurrentUser] = useState<AppUser | null>(initial.currentUser || null);
 
   // Selected sub-elements
   const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>(undefined);
