@@ -470,7 +470,7 @@ export default function App() {
       unsubUsers();
       unsubJoinRequests();
     };
-  }, [team.id, supabaseVersion]);
+  }, [team.id, supabaseVersion, currentUser?.email]);
 
   // Wrapper mutators that sync changes to SQLite backend and Supabase in real-time
   const handleSetPosts: React.Dispatch<React.SetStateAction<Post[]>> = (action) => {
