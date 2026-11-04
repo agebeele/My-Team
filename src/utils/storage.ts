@@ -24,16 +24,15 @@ export const INITIAL_MATCHES: Match[] = [];
 export const INITIAL_USERS: AppUser[] = [];
 export const INITIAL_STANDINGS: StandingsRow[] = [];
 
-// Constantes de ligas vacías
+// Constantes de ligas
 export const INITIAL_STANDINGS_LIGA_MEXICANA: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_ESP: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_FRA: StandingsRow[] = [];
 export const INITIAL_STANDINGS_COPA_MUNDO: StandingsRow[] = [];
 
-// Alineación por defecto vacía para evitar fallos de importación
 export const DEFAULT_LINEUP: any[] = [];
 
-// Helper de lectura ultra seguro (evita excepciones con objetos nulos o JSON malformados)
+// --- HELPERS SEGUROS (CUOTA 5MB + LECTURA NULL) ---
 export const safeGetItem = <T>(key: string, defaultValue: T): T => {
   try {
     const raw = localStorage.getItem(key);
@@ -46,7 +45,6 @@ export const safeGetItem = <T>(key: string, defaultValue: T): T => {
   }
 };
 
-// Helper de guardado seguro con limpieza automática si se rebasa la cuota de 5 MB
 const safeSetItem = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
@@ -63,6 +61,30 @@ const safeSetItem = (key: string, value: string) => {
       }
     }
   }
+};
+
+// --- DATOS INICIALES Y SESIONES ---
+export const loadInitialData = () => {
+  return loadFromStorage();
+};
+
+export const saveDeviceSession = (user: AppUser | null) => {
+  if (user) {
+    safeSetItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+    safeSetItem(STORAGE_KEYS.DEVICE_SESSION_SAVED, 'true');
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    localStorage.removeItem(STORAGE_KEYS.DEVICE_SESSION_SAVED);
+  }
+};
+
+export const isDeviceSessionSaved = (): boolean => {
+  return localStorage.getItem(STORAGE_KEYS.DEVICE_SESSION_SAVED) === 'true';
+};
+
+export const clearDeviceSession = () => {
+  localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+  localStorage.removeItem(STORAGE_KEYS.DEVICE_SESSION_SAVED);
 };
 
 // --- FUNCIONES DE JUGADORES ---
@@ -181,8 +203,7 @@ export const saveToStorage = (state: {
       safeSetItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
     }
     if (state.currentUser) {
-      safeSetItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
-      safeSetItem(STORAGE_KEYS.DEVICE_SESSION_SAVED, 'true');
+      saveDeviceSession(state.currentUser);
     }
     if (state.language) {
       safeSetItem(STORAGE_KEYS.LANGUAGE, state.language);
