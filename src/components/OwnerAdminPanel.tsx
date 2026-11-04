@@ -2115,6 +2115,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
             </div>
           </div>
         </div>
+      </div> 
 
       {/* MODAL: Confirmation to delete player */}
       {playerToDelete && (
