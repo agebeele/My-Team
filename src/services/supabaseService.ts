@@ -531,38 +531,68 @@ export const supabaseUpsertUser = async (user: AppUser): Promise<boolean> => {
 // ==========================================
 // 7. JOIN REQUESTS SERVICE
 // ==========================================
-export const supabaseFetchJoinRequests = async (): Promise<TeamJoinRequest[] | null> => {
+export const supabaseFetchJoinRequests = async (teamId: string) => {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from('join_requests') // 👈 DEBE DECIR 'join_requests'
+      .select('*')
+      .eq('team_id', teamId);
+
+    if (error) {
+      console.error('Error fetching join requests:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('Failed to fetch join requests:', err);
+    return [];
+  }
+};
+
+export const supabaseSaveJoinRequest = async (request: any) => {
   const client = getSupabaseClient();
   if (!client) return null;
 
   try {
-    const { data, error } = await client.from('join_requests').select('*');
+    const { data, error } = await client
+      .from('join_requests') // 👈 DEBE DECIR 'join_requests'
+      .upsert([request])
+      .select();
+
     if (error) {
-      console.warn('[Supabase] fetchJoinRequests error:', error.message);
+      console.error('Error saving join request:', error);
       return null;
     }
-    if (!data) return [];
-    return data.map(mapJoinRequestFromDb);
-  } catch (err: any) {
-    console.warn('[Supabase] fetchJoinRequests exception:', err?.message || err);
+
+    return data?.[0] || null;
+  } catch (err) {
+    console.error('Failed to save join request:', err);
     return null;
   }
 };
 
-export const supabaseUpsertJoinRequest = async (req: TeamJoinRequest): Promise<boolean> => {
+export const supabaseUpdateJoinRequestStatus = async (requestId: string, status: 'approved' | 'rejected') => {
   const client = getSupabaseClient();
   if (!client) return false;
 
   try {
-    const row = mapJoinRequestToDb(req);
-    const { error } = await client.from('join_requests').upsert(row, { onConflict: 'id' });
+    const { error } = await client
+      .from('join_requests') // 👈 DEBE DECIR 'join_requests'
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', requestId);
+
     if (error) {
-      console.error('[Supabase] Error al guardar join_request:', error.message);
+      console.error('Error updating join request status:', error);
       return false;
     }
+
     return true;
-  } catch (err: any) {
-    console.error('[Supabase] Excepción al guardar join_request:', err?.message || err);
+  } catch (err) {
+    console.error('Failed to update join request status:', err);
     return false;
   }
 };
