@@ -70,6 +70,7 @@ export const mapPlayerFromDb = (row: any): Player => ({
   isCalledUp: row.is_called_up ?? true,
   isStarter: row.is_starter ?? false,
   mvpHistory: Array.isArray(row.mvp_history) ? row.mvp_history : [],
+  teamId: row.team_id || undefined,
 });
 
 export const mapMatchToDb = (teamId: string, match: Match) => ({
@@ -189,6 +190,12 @@ export const mapUserToDb = (user: AppUser) => ({
   player_id: user.playerId || null,
   team_id: user.teamId || null,
   provider: user.provider || 'email',
+  team_join_status: user.teamJoinStatus || 'none',
+  requested_team_id: user.requestedTeamId || null,
+  requested_team_name: user.requestedTeamName || null,
+  position: user.position || null,
+  jersey_number: user.jerseyNumber !== undefined && user.jerseyNumber !== null ? Number(user.jerseyNumber) : null,
+  phone: user.phone || null,
 });
 
 export const mapUserFromDb = (row: any): AppUser => ({
@@ -202,6 +209,12 @@ export const mapUserFromDb = (row: any): AppUser => ({
   playerId: row.player_id || undefined,
   teamId: row.team_id || undefined,
   provider: row.provider || 'email',
+  teamJoinStatus: row.team_join_status || undefined,
+  requestedTeamId: row.requested_team_id || undefined,
+  requestedTeamName: row.requested_team_name || undefined,
+  position: row.position || undefined,
+  jerseyNumber: row.jersey_number !== null && row.jersey_number !== undefined ? Number(row.jersey_number) : undefined,
+  phone: row.phone || undefined,
 });
 
 export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
@@ -217,6 +230,7 @@ export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
     : req.number !== undefined && req.number !== null
     ? Number(req.number)
     : null,
+  player_avatar: req.playerAvatar || req.userAvatar || null,
   status: req.status || 'pending',
   created_at: req.createdAt || req.requestedAt || new Date().toISOString(),
 });
@@ -230,6 +244,8 @@ export const mapJoinRequestFromDb = (row: any): TeamJoinRequest => ({
   playerName: row.player_name || 'Jugador',
   userEmail: row.player_email || '',
   playerEmail: row.player_email || '',
+  userAvatar: row.player_avatar || undefined,
+  playerAvatar: row.player_avatar || undefined,
   position: row.player_position || 'MED',
   playerPosition: row.player_position || 'MED',
   number: row.player_number !== null && row.player_number !== undefined ? row.player_number : '',

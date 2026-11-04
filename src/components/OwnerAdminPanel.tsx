@@ -54,6 +54,7 @@ import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { pushBackendSync } from '../utils/backendSync';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
+import { supabaseUpsertPlayer, supabaseUpsertUser } from '../services/supabaseService';
 
 interface OwnerAdminPanelProps {
   onOpenSupabaseModal?: () => void;
@@ -308,6 +309,177 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
     setAdminProfileSuccess('¡Perfil de administrador actualizado correctamente!');
     setTimeout(() => setAdminProfileSuccess(null), 4000);
+  };
+
+  // Combine explicit joinRequests for this team + any user with pending join status for this team
+  const pendingRequests: TeamJoinRequest[] = React.useMemo(() => {
+    const list = [...joinRequests.filter((r) => 
+      (r.teamId === team.id || (r.teamName && r.teamName.toLowerCase().trim() === team.name.toLowerCase().trim())) && 
+      r.status === 'pending'
+    )];
+
+    // Check if any user in users has teamJoinStatus === 'pending' and isn't in list yet
+    const existingUserIds = new Set(list.map((r) => r.userId));
+    const existingEmails = new Set(list.map((r) => (r.playerEmail || '').toLowerCase()));
+
+    users.forEach((u) => {
+      if (
+        u.teamJoinStatus === 'pending' &&
+        (u.requestedTeamId === team.id || (u.requestedTeamName && u.requestedTeamName.toLowerCase().trim() === team.name.toLowerCase().trim())) &&
+        !existingUserIds.has(u.id) &&
+        !existingEmails.has(u.email.toLowerCase())
+      ) {
+        list.push({
+          id: `req_user_${u.id}`,
+          userId: u.id,
+          userName: u.name,
+          playerName: u.name,
+          userEmail: u.email,
+          playerEmail: u.email,
+          userAvatar: u.avatarUrl,
+          playerAvatar: u.avatarUrl,
+          position: u.position || 'MED',
+          playerPosition: u.position || 'MED',
+          number: u.jerseyNumber || 10,
+          playerNumber: u.jerseyNumber || 10,
+          phone: u.phone,
+          teamId: u.requestedTeamId || team.id,
+          teamName: u.requestedTeamName || team.name,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          requestedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    return list;
+  }, [joinRequests, team.id, team.name, users]);
+
+  // Check if a user is already part of the active squad
+  const isUserInSquad = (user: AppUser): boolean => {
+    const uName = user.name.toLowerCase().replace(/\s*\(jugador\)\s*/i, '').trim();
+    return players.some((p) => {
+      const pName = p.name.toLowerCase().trim();
+      return (
+        p.id === user.playerId ||
+        pName === uName ||
+        pName === user.name.toLowerCase().trim() ||
+        (user.email && p.phone && p.phone.toLowerCase() === user.email.toLowerCase())
+      );
+    });
+  };
+
+  // Quick incorporate a registered user account directly into the active squad
+  const handleIntegrateUserToSquad = (targetUser: AppUser) => {
+    const cleanPlayerName = targetUser.name.replace(/\s*\(jugador\)\s*/i, '').trim();
+    const newPlayerId = targetUser.playerId || `p_${Date.now()}`;
+    const dorsal = targetUser.jerseyNumber || Math.floor(Math.random() * 80) + 10;
+    const pos = targetUser.position || 'MED';
+
+    const newPlayer: Player = {
+      id: newPlayerId,
+      name: cleanPlayerName,
+      number: dorsal,
+      position: pos,
+      avatarUrl: targetUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR,
+      goals: 0,
+      assists: 0,
+      matches: 0,
+      yellowCards: 0,
+      redCards: 0,
+      phone: targetUser.phone || targetUser.email,
+      isCalledUp: true,
+      isStarter: false,
+      mvpHistory: [],
+      teamId: team.id,
+    };
+
+    if (typeof setPlayers === 'function') {
+      setPlayers((prev) => [...prev.filter((p) => p.id !== newPlayerId && p.name.toLowerCase() !== cleanPlayerName.toLowerCase()), newPlayer]);
+    }
+
+    const updatedUser: AppUser = {
+      ...targetUser,
+      teamId: team.id,
+      playerId: newPlayerId,
+      teamJoinStatus: 'accepted',
+    };
+
+    if (typeof setUsers === 'function') {
+      setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? updatedUser : u)));
+    }
+
+    if (isSupabaseConfigured()) {
+      supabaseUpsertPlayer(team.id, newPlayer);
+      supabaseUpsertUser(updatedUser);
+    }
+
+    setNotificationStatus(`¡${cleanPlayerName} (#${dorsal}) ha sido incorporado al plantel oficial! Ya está disponible en convocatoria y alineación.`);
+    setTimeout(() => setNotificationStatus(null), 5000);
+  };
+
+  // Synchronize all registered player accounts into the squad in one click
+  const handleSyncAllRegisteredUsers = () => {
+    const unintegratedUsers = users.filter((u) => u.role === 'player' && !isUserInSquad(u));
+    if (unintegratedUsers.length === 0) {
+      setNotificationStatus('Todos los jugadores registrados ya forman parte del plantel.');
+      setTimeout(() => setNotificationStatus(null), 4000);
+      return;
+    }
+
+    const createdPlayers: Player[] = [];
+    const updatedUsersList: AppUser[] = [...users];
+
+    unintegratedUsers.forEach((u, idx) => {
+      const cleanPlayerName = u.name.replace(/\s*\(jugador\)\s*/i, '').trim();
+      const newPlayerId = u.playerId || `p_${Date.now()}_${idx}`;
+      const dorsal = u.jerseyNumber || Math.floor(Math.random() * 80) + 10;
+      const pos = u.position || 'MED';
+
+      const pl: Player = {
+        id: newPlayerId,
+        name: cleanPlayerName,
+        number: dorsal,
+        position: pos,
+        avatarUrl: u.avatarUrl || DEFAULT_FACEBOOK_AVATAR,
+        goals: 0,
+        assists: 0,
+        matches: 0,
+        yellowCards: 0,
+        redCards: 0,
+        phone: u.phone || u.email,
+        isCalledUp: true,
+        isStarter: false,
+        mvpHistory: [],
+        teamId: team.id,
+      };
+      createdPlayers.push(pl);
+
+      const uIdx = updatedUsersList.findIndex((item) => item.id === u.id);
+      if (uIdx >= 0) {
+        updatedUsersList[uIdx] = {
+          ...updatedUsersList[uIdx],
+          teamId: team.id,
+          playerId: newPlayerId,
+          teamJoinStatus: 'accepted',
+        };
+      }
+    });
+
+    if (typeof setPlayers === 'function') {
+      setPlayers((prev) => [...prev, ...createdPlayers]);
+    }
+    if (typeof setUsers === 'function') {
+      setUsers(updatedUsersList);
+    }
+
+    if (isSupabaseConfigured()) {
+      createdPlayers.forEach((p) => supabaseUpsertPlayer(team.id, p));
+      updatedUsersList.forEach((u) => supabaseUpsertUser(u));
+    }
+
+    setNotificationStatus(`¡${createdPlayers.length} jugadores registrados fueron incorporados con éxito al plantel oficial!`);
+    setTimeout(() => setNotificationStatus(null), 5000);
   };
 
   const [editFormError, setEditFormError] = useState<string | null>(null);
@@ -1871,8 +2043,88 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
         {/* Right: User Accounts & Roles (Dueño vs Jugador) */}
         <div className="lg:col-span-6 space-y-4">
+          {/* Pending Join Requests Section */}
+          {pendingRequests.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-400 p-5 rounded-2xl shadow-sm space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                    {pendingRequests.length}
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-amber-950 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-amber-600" />
+                      <span>Solicitudes Pendientes para Entrar al Equipo</span>
+                    </h4>
+                    <p className="text-[11px] text-amber-800">
+                      Jugadores esperando ser aceptados en el plantel oficial
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {pendingRequests.map((req) => (
+                  <div
+                    key={req.id}
+                    className="p-3 rounded-xl bg-white border border-amber-300 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={req.playerAvatar || req.userAvatar || DEFAULT_FACEBOOK_AVATAR}
+                        alt={req.playerName}
+                        className="w-10 h-10 rounded-full object-cover shrink-0 ring-2 ring-amber-400"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_FACEBOOK_AVATAR;
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-xs text-[#050505]">
+                            {req.playerName}
+                          </span>
+                          {req.number && (
+                            <span className="text-[10px] bg-black text-white px-1.5 py-0.2 rounded font-mono font-bold">
+                              #{req.number}
+                            </span>
+                          )}
+                          {req.position && (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
+                              {req.position}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-[#65676B] block truncate">
+                          {req.playerEmail}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => onAcceptJoinRequest && onAcceptJoinRequest(req)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Aceptar al Plantel</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRejectJoinRequest && onRejectJoinRequest(req.id)}
+                        className="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-[#65676B] text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white p-5 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-black text-[#050505] flex items-center gap-2">
                   <Crown className="w-4 h-4 text-[#1877F2]" />
@@ -1882,42 +2134,88 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
                   Asigna permisos de Dueño de Equipo o Jugador
                 </p>
               </div>
+
+              {users.some((u) => u.role === 'player' && !isUserInSquad(u)) && (
+                <button
+                  type="button"
+                  onClick={handleSyncAllRegisteredUsers}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-colors self-start sm:self-auto"
+                  title="Incorpora a todos los jugadores registrados que aún no están en el plantel"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Incorporar Todos al Plantel</span>
+                </button>
+              )}
             </div>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-              {users.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]/60 gap-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={user.avatarUrl}
-                      alt={user.name}
-                      referrerPolicy="no-referrer"
-                      className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4]"
-                    />
-                    <div className="min-w-0">
-                      <span className="text-xs font-bold text-[#050505] block truncate">
-                        {user.name}
-                      </span>
-                      <span className="text-[10px] text-[#65676B] truncate block">
-                        {user.email}
-                      </span>
+              {users.map((user) => {
+                const inSquad = isUserInSquad(user);
+                return (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]/60 gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={user.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
+                        alt={user.name}
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4]"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = DEFAULT_FACEBOOK_AVATAR;
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-[#050505] block truncate">
+                            {user.name}
+                          </span>
+                          {user.role === 'player' && (
+                            inSquad ? (
+                              <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[9px] font-bold">
+                                ✓ En Plantel
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[9px] font-bold">
+                                Fuera de plantilla
+                              </span>
+                            )
+                          )}
+                        </div>
+                        <span className="text-[10px] text-[#65676B] truncate block">
+                          {user.email}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {user.role === 'player' && !inSquad && (
+                        <button
+                          type="button"
+                          onClick={() => handleIntegrateUserToSquad(user)}
+                          className="px-2.5 py-1.5 rounded-lg bg-[#1877F2] hover:bg-[#0866FF] text-white text-[11px] font-bold flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                          title="Incorporar este jugador directamente a la plantilla, convocatorias y alineaciones"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span className="hidden sm:inline">Incorporar al Plantel</span>
+                          <span className="sm:hidden">Plantel</span>
+                        </button>
+                      )}
+
+                      {/* Role Selector (Owner vs Player only) */}
+                      <select
+                        value={user.role}
+                        onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
+                        className="px-2.5 py-1.5 rounded-lg bg-white border border-[#CED0D4] text-xs font-bold text-[#050505] focus:outline-none focus:border-[#1877F2] shadow-xs cursor-pointer"
+                      >
+                        <option value="owner">Dueño de Equipo</option>
+                        <option value="player">Jugador</option>
+                      </select>
                     </div>
                   </div>
-
-                  {/* Role Selector (Owner vs Player only) */}
-                  <select
-                    value={user.role}
-                    onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                    className="px-2.5 py-1.5 rounded-lg bg-white border border-[#CED0D4] text-xs font-bold text-[#050505] focus:outline-none focus:border-[#1877F2] shadow-xs cursor-pointer"
-                  >
-                    <option value="owner">Dueño de Equipo</option>
-                    <option value="player">Jugador</option>
-                  </select>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

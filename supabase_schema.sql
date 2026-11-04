@@ -151,9 +151,19 @@ CREATE TABLE IF NOT EXISTS join_requests (
   player_name TEXT NOT NULL,
   player_position TEXT DEFAULT 'MED',
   player_number INTEGER,
+  player_avatar TEXT,
   status TEXT DEFAULT 'pending',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migraciones para app_users y join_requests
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_join_status TEXT DEFAULT 'none';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_id TEXT;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_name TEXT;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS position TEXT;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS jersey_number INTEGER;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS player_avatar TEXT;
 
 -- ========================================================
 -- POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY)

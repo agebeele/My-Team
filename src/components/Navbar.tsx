@@ -104,8 +104,12 @@ export const Navbar: React.FC<NavbarProps> = ({
     (inv) => inv.email.toLowerCase() === currentUser?.email.toLowerCase() && inv.status === 'sent'
   );
 
-  const pendingTeamRequests = currentUser?.role === 'owner'
-    ? joinRequests.filter((r) => r.teamId === team.id && r.status === 'pending')
+  const isTeamManager = currentUser?.role === 'owner' || currentUser?.role === 'admin' || currentUser?.role === 'coach';
+  const pendingTeamRequests = isTeamManager
+    ? joinRequests.filter((r) => 
+        (r.teamId === team.id || (r.teamName && team.name && r.teamName.toLowerCase().trim() === team.name.toLowerCase().trim())) && 
+        r.status === 'pending'
+      )
     : [];
 
   const totalUnreadCount = unreadAlertsCount + myPendingInvitations.length + pendingTeamRequests.length;

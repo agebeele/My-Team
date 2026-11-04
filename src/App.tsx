@@ -187,14 +187,48 @@ export default function App() {
         }
         if (cloudPlayers && cloudPlayers.length > 0) setPlayers(cloudPlayers);
         if (cloudMatches && cloudMatches.length > 0) setMatches(cloudMatches);
-        if (cloudPosts && cloudPosts.length > 0) setPosts(cloudPosts);
-        if (cloudUsers && cloudUsers.length > 0) setUsers(cloudUsers);
-        if (cloudRequests) {
-          setJoinRequests(cloudRequests);
-          try {
-            localStorage.setItem('teamgol_join_requests', JSON.stringify(cloudRequests));
-          } catch {}
+        if (cloudUsers && cloudUsers.length > 0) {
+          setUsers(cloudUsers);
         }
+
+        const pendingFromUsers: TeamJoinRequest[] = (cloudUsers || [])
+          .filter((u) => u.teamJoinStatus === 'pending' && (
+            u.requestedTeamId === team.id ||
+            (u.requestedTeamName && u.requestedTeamName.toLowerCase().trim() === team.name.toLowerCase().trim())
+          ))
+          .map((u) => ({
+            id: `req_user_${u.id}`,
+            userId: u.id,
+            userName: u.name,
+            playerName: u.name,
+            userEmail: u.email,
+            playerEmail: u.email,
+            userAvatar: u.avatarUrl,
+            playerAvatar: u.avatarUrl,
+            position: u.position || 'MED',
+            playerPosition: u.position || 'MED',
+            number: u.jerseyNumber || 10,
+            playerNumber: u.jerseyNumber || 10,
+            phone: u.phone,
+            teamId: u.requestedTeamId || team.id,
+            teamName: u.requestedTeamName || team.name,
+            status: 'pending' as const,
+            createdAt: new Date().toISOString(),
+          }));
+
+        setJoinRequests((prev) => {
+          const baseList = cloudRequests !== null && cloudRequests !== undefined ? cloudRequests : prev;
+          const existingEmails = new Set(baseList.map((r) => (r.playerEmail || '').toLowerCase()));
+          const existingUserIds = new Set(baseList.map((r) => r.userId));
+          const needed = pendingFromUsers.filter(
+            (ur) => !existingEmails.has(ur.playerEmail.toLowerCase()) && !existingUserIds.has(ur.userId)
+          );
+          const combined = [...baseList, ...needed];
+          try {
+            localStorage.setItem('teamgol_join_requests', JSON.stringify(combined));
+          } catch {}
+          return combined;
+        });
       }
     } catch (err) {
       console.warn('Error during manual refresh:', err);
@@ -250,12 +284,47 @@ export default function App() {
         if (cloudUsers && cloudUsers.length > 0) {
           setUsers(cloudUsers);
         }
-        if (cloudRequests) {
-          setJoinRequests(cloudRequests);
+
+        // Synthesize pending join requests from users and cloudRequests so no request is lost
+        const pendingFromUsers: TeamJoinRequest[] = (cloudUsers || [])
+          .filter((u) => u.teamJoinStatus === 'pending' && (
+            u.requestedTeamId === team.id ||
+            (u.requestedTeamName && u.requestedTeamName.toLowerCase().trim() === team.name.toLowerCase().trim())
+          ))
+          .map((u) => ({
+            id: `req_user_${u.id}`,
+            userId: u.id,
+            userName: u.name,
+            playerName: u.name,
+            userEmail: u.email,
+            playerEmail: u.email,
+            userAvatar: u.avatarUrl,
+            playerAvatar: u.avatarUrl,
+            position: u.position || 'MED',
+            playerPosition: u.position || 'MED',
+            number: u.jerseyNumber || 10,
+            playerNumber: u.jerseyNumber || 10,
+            phone: u.phone,
+            teamId: u.requestedTeamId || team.id,
+            teamName: u.requestedTeamName || team.name,
+            status: 'pending' as const,
+            createdAt: new Date().toISOString(),
+            requestedAt: new Date().toISOString(),
+          }));
+
+        setJoinRequests((prev) => {
+          const baseList = cloudRequests !== null && cloudRequests !== undefined ? cloudRequests : prev;
+          const existingEmails = new Set(baseList.map((r) => (r.playerEmail || '').toLowerCase()));
+          const existingUserIds = new Set(baseList.map((r) => r.userId));
+          const needed = pendingFromUsers.filter(
+            (ur) => !existingEmails.has(ur.playerEmail.toLowerCase()) && !existingUserIds.has(ur.userId)
+          );
+          const combined = [...baseList, ...needed];
           try {
-            localStorage.setItem('teamgol_join_requests', JSON.stringify(cloudRequests));
+            localStorage.setItem('teamgol_join_requests', JSON.stringify(combined));
           } catch {}
-        }
+          return combined;
+        });
       } catch (err) {
         console.warn('Error syncing from Supabase:', err);
       }
@@ -294,7 +363,52 @@ export default function App() {
 
     const unsubUsers = subscribeToSupabaseTable('app_users', () => {
       supabaseFetchUsers().then((fresh) => {
-        if (isMounted && fresh && fresh.length > 0) setUsers(fresh);
+        if (isMounted && fresh && fresh.length > 0) {
+          setUsers(fresh);
+          const freshPending: TeamJoinRequest[] = fresh
+            .filter((u) => u.teamJoinStatus === 'pending' && (
+              u.requestedTeamId === team.id ||
+              (u.requestedTeamName && u.requestedTeamName.toLowerCase().trim() === team.name.toLowerCase().trim())
+            ))
+            .map((u) => ({
+              id: `req_user_${u.id}`,
+              userId: u.id,
+              userName: u.name,
+              playerName: u.name,
+              userEmail: u.email,
+              playerEmail: u.email,
+              userAvatar: u.avatarUrl,
+              playerAvatar: u.avatarUrl,
+              position: u.position || 'MED',
+              playerPosition: u.position || 'MED',
+              number: u.jerseyNumber || 10,
+              playerNumber: u.jerseyNumber || 10,
+              phone: u.phone,
+              teamId: u.requestedTeamId || team.id,
+              teamName: u.requestedTeamName || team.name,
+              status: 'pending' as const,
+              createdAt: new Date().toISOString(),
+              requestedAt: new Date().toISOString(),
+            }));
+
+          if (freshPending.length > 0) {
+            setJoinRequests((prev) => {
+              const existingEmails = new Set(prev.map((r) => (r.playerEmail || '').toLowerCase()));
+              const existingUserIds = new Set(prev.map((r) => r.userId));
+              const additions = freshPending.filter(
+                (fp) => !existingEmails.has(fp.playerEmail.toLowerCase()) && !existingUserIds.has(fp.userId)
+              );
+              if (additions.length > 0) {
+                const updated = [...prev, ...additions];
+                try {
+                  localStorage.setItem('teamgol_join_requests', JSON.stringify(updated));
+                } catch {}
+                return updated;
+              }
+              return prev;
+            });
+          }
+        }
       });
     });
 
