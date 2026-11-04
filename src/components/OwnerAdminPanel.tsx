@@ -2442,14 +2442,6 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
           }}
         />
       )}
-
-      {/* Official Email Invitation Modal Preview */}
-      <EmailInvitationModal
-        isOpen={isEmailModalOpen}
-        onClose={() => setIsEmailModalOpen(false)}
-        invitation={activeEmailInvitation}
-        team={team}
-      />
     </div>
   );
 };
