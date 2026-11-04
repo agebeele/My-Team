@@ -470,7 +470,7 @@ export default function App() {
       unsubUsers();
       unsubJoinRequests();
       if (typeof unsubInvitations === 'function') unsubInvitations();
-    };
+    }
   }, [team.id, supabaseVersion, currentUser?.email]);
 
   // Wrapper mutators that sync changes to SQLite backend and Supabase in real-time
