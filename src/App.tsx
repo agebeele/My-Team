@@ -49,7 +49,7 @@ import { AppSplashAnimation } from './components/AppSplashAnimation';
 import { WelcomeModal } from './components/WelcomeModal';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
 import { LeagueExplorerAndJoin } from './components/LeagueExplorerAndJoin';
-import { isSupabaseConfigured, initSupabaseFromServer } from './utils/supabaseClient';
+import { isSupabaseConfigured, initSupabaseFromServer, supabase } from './utils/supabaseClient';
 import {
   supabaseFetchPlayers,
   supabaseFetchMatches,
@@ -98,8 +98,7 @@ export default function App() {
   // App Navigation & Language state
   const [activeTab, setActiveTab] = useState<string>('calendar');
   const [language, setLanguage] = useState<Language>('es');
-    // If the device session was saved previously, load it; otherwise null so it goes directly to Login
-    const [currentUser, setCurrentUser] = useState<AppUser | null>(initial.currentUser || null);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(initial.currentUser || null);
 
   // Selected sub-elements
   const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>(undefined);
@@ -456,98 +455,6 @@ export default function App() {
     };
   }, [team.id, supabaseVersion, currentUser?.email]);
 
-    const unsubPosts = subscribeToSupabaseTable('posts', () => {
-      supabaseFetchPosts(team.id).then((fresh) => {
-        if (isMounted && fresh) setPosts(fresh);
-      });
-    });
-
-    const unsubPlayers = subscribeToSupabaseTable('players', () => {
-      supabaseFetchPlayers(team.id).then((fresh) => {
-        if (isMounted && fresh && fresh.length > 0) setPlayers(fresh);
-      });
-    });
-
-    const unsubMatches = subscribeToSupabaseTable('matches', () => {
-      supabaseFetchMatches(team.id).then((fresh) => {
-        if (isMounted && fresh) setMatches(fresh);
-      });
-    });
-
-    const unsubUsers = subscribeToSupabaseTable('app_users', () => {
-      supabaseFetchUsers().then((fresh) => {
-        if (isMounted && fresh && fresh.length > 0) {
-          setUsers(fresh);
-          const freshPending: TeamJoinRequest[] = fresh
-            .filter((u) => u.teamJoinStatus === 'pending' && (
-              u.requestedTeamId === team.id ||
-              (u.requestedTeamName && u.requestedTeamName.toLowerCase().trim() === team.name.toLowerCase().trim())
-            ))
-            .map((u) => ({
-              id: `req_user_${u.id}`,
-              userId: u.id,
-              userName: u.name,
-              playerName: u.name,
-              userEmail: u.email,
-              playerEmail: u.email,
-              userAvatar: u.avatarUrl,
-              playerAvatar: u.avatarUrl,
-              position: u.position || 'MED',
-              playerPosition: u.position || 'MED',
-              number: u.jerseyNumber || 10,
-              playerNumber: u.jerseyNumber || 10,
-              phone: u.phone,
-              teamId: u.requestedTeamId || team.id,
-              teamName: u.requestedTeamName || team.name,
-              status: 'pending' as const,
-              createdAt: new Date().toISOString(),
-              requestedAt: new Date().toISOString(),
-            }));
-
-          if (freshPending.length > 0) {
-            setJoinRequests((prev) => {
-              const existingEmails = new Set(prev.map((r) => (r.playerEmail || '').toLowerCase()));
-              const existingUserIds = new Set(prev.map((r) => r.userId));
-              const additions = freshPending.filter(
-                (fp) => !existingEmails.has(fp.playerEmail.toLowerCase()) && !existingUserIds.has(fp.userId)
-              );
-              if (additions.length > 0) {
-                const updated = [...prev, ...additions];
-                try {
-                  localStorage.setItem('teamgol_join_requests', JSON.stringify(updated));
-                } catch {}
-                return updated;
-              }
-              return prev;
-            });
-          }
-        }
-      });
-    });
-
-    const unsubJoinRequests = subscribeToSupabaseTable('join_requests', () => {
-      supabaseFetchJoinRequests().then((fresh) => {
-        if (isMounted && fresh) {
-          setJoinRequests(fresh);
-          try {
-            localStorage.setItem('teamgol_join_requests', JSON.stringify(fresh));
-          } catch {}
-        }
-      });
-    });
-
-    return () => {
-      isMounted = false;
-      unsubTeams();
-      unsubPosts();
-      unsubPlayers();
-      unsubMatches();
-      unsubUsers();
-      unsubJoinRequests();
-      if (typeof unsubInvitations === 'function') unsubInvitations();
-    }
-  }, [team.id, supabaseVersion, currentUser?.email]);
-
   // Wrapper mutators that sync changes to SQLite backend and Supabase in real-time
   const handleSetPosts: React.Dispatch<React.SetStateAction<Post[]>> = (action) => {
     setPosts((prev) => {
@@ -746,7 +653,6 @@ export default function App() {
     document.documentElement.classList.remove('dark');
     localStorage.removeItem('app_theme');
   }, []);
-
 
   // Detect invite link in URL: ?joinTeam=...&teamName=...&teamLogo=...
   useEffect(() => {
