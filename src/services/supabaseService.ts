@@ -217,6 +217,22 @@ export const mapUserFromDb = (row: any): AppUser => ({
   phone: row.phone || undefined,
 });
 
+export interface TeamJoinRequest {
+  id: string;
+  teamId: string;
+  teamName?: string;
+  userId: string;
+  userName?: string;
+  userEmail?: string;
+  playerEmail?: string;
+  playerName?: string;
+  playerPosition?: string;
+  playerNumber?: number;
+  status?: 'pending' | 'approved' | 'rejected';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
   id: req.id,
   team_id: req.teamId,
@@ -234,6 +250,24 @@ export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
   status: req.status || 'pending',
   created_at: req.createdAt || req.requestedAt || new Date().toISOString(),
 });
+
+export const supabaseUpsertJoinRequest = async (req: TeamJoinRequest): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const row = mapJoinRequestToDb(req);
+    const { error } = await client.from('join_requests').upsert(row, { onConflict: 'id' });
+    if (error) {
+      console.error('[Supabase] Error al guardar join_request:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('[Supabase] Excepción al guardar join_request:', err?.message || err);
+    return false;
+  }
+};
 
 export const mapJoinRequestFromDb = (row: any): TeamJoinRequest => ({
   id: row.id,
