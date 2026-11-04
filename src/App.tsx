@@ -469,6 +469,7 @@ export default function App() {
       unsubMatches();
       unsubUsers();
       unsubJoinRequests();
+      if (typeof unsubInvitations === 'function') unsubInvitations();
     };
   }, [team.id, supabaseVersion, currentUser?.email]);
 
