@@ -17,11 +17,13 @@ export const AppSplashAnimation: React.FC<AppSplashAnimationProps> = ({
   const [fadingOut, setFadingOut] = useState(false);
 
   useEffect(() => {
-  const timer = setTimeout(() => {
-    onComplete();
-  }, 2000);
-  return () => clearTimeout(timer);
-}, [onComplete]);
+    const timer = setTimeout(() => {
+      setFadingOut(true);
+      setTimeout(() => {
+        setVisible(false);
+        onComplete();
+      }, 300);
+    }, minDurationMs);
 
     return () => clearTimeout(timer);
   }, [minDurationMs, onComplete]);
