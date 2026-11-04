@@ -520,7 +520,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
     });
   };
 
-  const handleSendEmailInvite = (e: React.FormEvent) => {
+  const handleSendEmailInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     const email = inviteEmailInput.trim().toLowerCase();
     if (!email || !email.includes('@')) {
@@ -562,12 +562,33 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
       status: 'sent',
     };
 
+    // 1. Guardado en estado local y respaldado en localStorage
     const updated = [newInvitation, ...sentInvitations];
     setSentInvitations(updated);
     try {
       localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
     } catch {
       // ignore
+    }
+
+    // 2. Persistencia en la nube de Supabase (Sincronización PC1 -> PC2)
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.from('team_invitations').upsert([{
+          id: newInvitation.id,
+          email: newInvitation.email,
+          player_name: newInvitation.playerName,
+          team_id: newInvitation.teamId,
+          team_name: newInvitation.teamName,
+          team_logo: newInvitation.teamLogo,
+          stadium: newInvitation.stadium,
+          role: newInvitation.role,
+          status: newInvitation.status,
+          sent_at: new Date().toISOString()
+        }]);
+      } catch (err) {
+        console.error('Error al sincronizar invitación en Supabase:', err);
+      }
     }
 
     setActiveEmailInvitation(newInvitation);

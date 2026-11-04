@@ -254,16 +254,27 @@ export default function App() {
 
     const syncFromSupabase = async () => {
       try {
-        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests] = await Promise.all([
+        // 1. Agregamos la consulta a 'team_invitations' filtrando por el correo del usuario actual
+        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations] = await Promise.all([
           supabaseFetchPlayers(team.id),
           supabaseFetchMatches(team.id),
           supabaseFetchPosts(team.id),
           supabaseFetchUsers(),
           supabaseFetchTeams(),
           supabaseFetchJoinRequests(),
+          // Consulta directa de invitaciones para la PC2 o dispositivo receptor
+          currentUser?.email 
+            ? supabase.from('team_invitations').select('*').eq('email', currentUser.email.toLowerCase())
+            : Promise.resolve({ data: null }),
         ]);
 
         if (!isMounted) return;
+
+        // Si existen invitaciones recibidas para el usuario actual en la nube
+        if (cloudInvitations && cloudInvitations.data && cloudInvitations.data.length > 0) {
+          console.log('✉️ Invitaciones de equipo recibidas desde la nube:', cloudInvitations.data);
+          // Opcional: puedes guardar las invitaciones en el estado o notificar al usuario
+        }
 
         if (cloudTeams && cloudTeams.length > 0) {
           setAllTeams(cloudTeams);
@@ -342,6 +353,33 @@ export default function App() {
         }
       });
     });
+
+    // Escuchar en tiempo real nuevas invitaciones de equipo (PC1 -> PC2)
+    const unsubInvitations = subscribeToSupabaseTable('team_invitations', () => {
+      if (currentUser?.email) {
+        supabase
+          .from('team_invitations')
+          .select('*')
+          .eq('email', currentUser.email.toLowerCase())
+          .then(({ data }) => {
+            if (isMounted && data && data.length > 0) {
+              console.log('⚡ Nueva invitación recibida en tiempo real:', data);
+            }
+          });
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubTeams();
+      unsubPosts();
+      unsubPlayers();
+      unsubMatches();
+      unsubUsers();
+      unsubJoinRequests();
+      unsubInvitations(); // <-- Cancelar suscripción al desmontar
+    };
+  }, [team.id, supabaseVersion, currentUser?.email]); // <-- Agrega currentUser?.email a las dependencias
 
     const unsubPosts = subscribeToSupabaseTable('posts', () => {
       supabaseFetchPosts(team.id).then((fresh) => {
