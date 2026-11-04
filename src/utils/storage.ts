@@ -24,14 +24,16 @@ export const INITIAL_MATCHES: Match[] = [];
 export const INITIAL_USERS: AppUser[] = [];
 export const INITIAL_STANDINGS: StandingsRow[] = [];
 
+// Constantes de ligas vacías
 export const INITIAL_STANDINGS_LIGA_MEXICANA: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_ESP: StandingsRow[] = [];
 export const INITIAL_STANDINGS_LIGA_FRA: StandingsRow[] = [];
 export const INITIAL_STANDINGS_COPA_MUNDO: StandingsRow[] = [];
 
+// Alineación por defecto vacía para evitar fallos de importación
 export const DEFAULT_LINEUP: any[] = [];
 
-// 1. Helper para lectura segura
+// Helper de lectura ultra seguro (evita excepciones con objetos nulos o JSON malformados)
 export const safeGetItem = <T>(key: string, defaultValue: T): T => {
   try {
     const raw = localStorage.getItem(key);
@@ -44,7 +46,7 @@ export const safeGetItem = <T>(key: string, defaultValue: T): T => {
   }
 };
 
-// 2. Helper ÚNICO de guardado seguro (Manejo de cuota sin duplicar)
+// Helper de guardado seguro con limpieza automática si se rebasa la cuota de 5 MB
 const safeSetItem = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
@@ -63,6 +65,7 @@ const safeSetItem = (key: string, value: string) => {
   }
 };
 
+// --- FUNCIONES DE JUGADORES ---
 export const getPlayersForTeam = (teamId: string): Player[] => {
   if (!teamId) return [];
   try {
@@ -70,7 +73,8 @@ export const getPlayersForTeam = (teamId: string): Player[] => {
     if (map && typeof map === 'object' && Array.isArray(map[teamId])) {
       return map[teamId];
     }
-    return [];
+    const fallback = safeGetItem<Player[]>(STORAGE_KEYS.PLAYERS, []);
+    return Array.isArray(fallback) ? fallback : [];
   } catch {
     return [];
   }
@@ -88,18 +92,61 @@ export const savePlayersForTeam = (teamId: string, players: Player[]) => {
   }
 };
 
+// --- FUNCIONES DE PARTIDOS ---
+export const getMatchesForTeam = (teamId: string): Match[] => {
+  if (!teamId) return [];
+  try {
+    const map = safeGetItem<Record<string, Match[]>>(STORAGE_KEYS.MATCHES_BY_TEAM, {});
+    if (map && typeof map === 'object' && Array.isArray(map[teamId])) {
+      return map[teamId];
+    }
+    const fallback = safeGetItem<Match[]>(STORAGE_KEYS.MATCHES, []);
+    return Array.isArray(fallback) ? fallback : [];
+  } catch {
+    return [];
+  }
+};
+
 export const saveMatchesForTeam = (teamId: string, matches: Match[]) => {
   if (!teamId) return;
-  safeSetItem(`${STORAGE_KEYS.MATCHES}_${teamId}`, JSON.stringify(matches));
-  safeSetItem(STORAGE_KEYS.MATCHES, JSON.stringify(matches));
+  try {
+    const rawMap = safeGetItem<Record<string, Match[]>>(STORAGE_KEYS.MATCHES_BY_TEAM, {});
+    rawMap[teamId] = matches;
+    safeSetItem(STORAGE_KEYS.MATCHES_BY_TEAM, JSON.stringify(rawMap));
+    safeSetItem(STORAGE_KEYS.MATCHES, JSON.stringify(matches));
+  } catch (err) {
+    console.warn('Error saving matches for team', err);
+  }
+};
+
+// --- FUNCIONES DE TABLA DE POSICIONES (STANDINGS) ---
+export const getStandingsForLeague = (leagueName: string): StandingsRow[] => {
+  if (!leagueName) return [];
+  try {
+    const map = safeGetItem<Record<string, StandingsRow[]>>(STORAGE_KEYS.STANDINGS_BY_LEAGUE, {});
+    if (map && typeof map === 'object' && Array.isArray(map[leagueName])) {
+      return map[leagueName];
+    }
+    const fallback = safeGetItem<StandingsRow[]>(STORAGE_KEYS.STANDINGS, []);
+    return Array.isArray(fallback) ? fallback : [];
+  } catch {
+    return [];
+  }
 };
 
 export const saveStandingsForLeague = (leagueName: string, standings: StandingsRow[]) => {
   if (!leagueName) return;
-  safeSetItem(`${STORAGE_KEYS.STANDINGS}_${leagueName}`, JSON.stringify(standings));
-  safeSetItem(STORAGE_KEYS.STANDINGS, JSON.stringify(standings));
+  try {
+    const rawMap = safeGetItem<Record<string, StandingsRow[]>>(STORAGE_KEYS.STANDINGS_BY_LEAGUE, {});
+    rawMap[leagueName] = standings;
+    safeSetItem(STORAGE_KEYS.STANDINGS_BY_LEAGUE, JSON.stringify(rawMap));
+    safeSetItem(STORAGE_KEYS.STANDINGS, JSON.stringify(standings));
+  } catch (err) {
+    console.warn('Error saving standings for league', err);
+  }
 };
 
+// --- MÉTODOS DE ESTADO GENERAL ---
 export const saveToStorage = (state: {
   team?: TeamInfo;
   allTeams?: TeamInfo[];
@@ -124,13 +171,24 @@ export const saveToStorage = (state: {
         saveStandingsForLeague(state.team.leagueName, state.standings);
       }
     }
+    if (state.allTeams) {
+      safeSetItem(STORAGE_KEYS.ALL_TEAMS, JSON.stringify(state.allTeams));
+    }
+    if (state.posts) {
+      safeSetItem(STORAGE_KEYS.POSTS, JSON.stringify(state.posts));
+    }
+    if (state.users) {
+      safeSetItem(STORAGE_KEYS.USERS, JSON.stringify(state.users));
+    }
     if (state.currentUser) {
       safeSetItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(state.currentUser));
       safeSetItem(STORAGE_KEYS.DEVICE_SESSION_SAVED, 'true');
     }
-    if (state.language) safeSetItem(STORAGE_KEYS.LANGUAGE, state.language);
+    if (state.language) {
+      safeSetItem(STORAGE_KEYS.LANGUAGE, state.language);
+    }
   } catch (err) {
-    // Captura silenciosa
+    console.warn('[Storage] Error saving state to storage', err);
   }
 };
 
@@ -152,8 +210,15 @@ export const loadFromStorage = () => {
     const language = (localStorage.getItem(STORAGE_KEYS.LANGUAGE) as Language) || 'es';
 
     let players: Player[] = [];
+    let matches: Match[] = [];
+    let standings: StandingsRow[] = [];
+
     if (team && typeof team === 'object' && team.id) {
       players = getPlayersForTeam(team.id);
+      matches = getMatchesForTeam(team.id);
+      if (team.leagueName) {
+        standings = getStandingsForLeague(team.leagueName);
+      }
     }
 
     return {
@@ -163,6 +228,8 @@ export const loadFromStorage = () => {
       allTeams,
       posts,
       players,
+      matches,
+      standings,
       language
     };
   } catch (err) {
