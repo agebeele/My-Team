@@ -53,7 +53,7 @@ import { EmailInvitationModal } from './EmailInvitationModal';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { pushBackendSync } from '../utils/backendSync';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
-import { isSupabaseConfigured } from '../utils/supabaseClient';
+import { isSupabaseConfigured, getSupabaseClient } from '../utils/supabaseClient';
 import { supabaseUpsertPlayer, supabaseUpsertUser } from '../services/supabaseService';
 
 interface OwnerAdminPanelProps {
@@ -574,18 +574,21 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
     // 2. Persistencia en la nube de Supabase (Sincronización PC1 -> PC2)
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('team_invitations').upsert([{
-          id: newInvitation.id,
-          email: newInvitation.email,
-          player_name: newInvitation.playerName,
-          team_id: newInvitation.teamId,
-          team_name: newInvitation.teamName,
-          team_logo: newInvitation.teamLogo,
-          stadium: newInvitation.stadium,
-          role: newInvitation.role,
-          status: newInvitation.status,
-          sent_at: new Date().toISOString()
-        }]);
+        const client = getSupabaseClient();
+        if (client) {
+          await client.from('team_invitations').upsert([{
+            id: newInvitation.id,
+            email: newInvitation.email,
+            player_name: newInvitation.playerName,
+            team_id: newInvitation.teamId,
+            team_name: newInvitation.teamName,
+            team_logo: newInvitation.teamLogo,
+            stadium: newInvitation.stadium,
+            role: newInvitation.role,
+            status: newInvitation.status,
+            sent_at: new Date().toISOString()
+          }]);
+        }
       } catch (err) {
         console.error('Error al sincronizar invitación en Supabase:', err);
       }
@@ -2057,32 +2060,38 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
 
         {/* Right: User Accounts & Roles (Dueño vs Jugador) */}
         <div className="lg:col-span-6 space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-black text-[#050505] flex items-center gap-2">
-                  <Crown className="w-4 h-4 text-[#1877F2]" />
-                  Usuarios y Roles del Club ({users.length})
-                </h3>
-                <p className="text-xs text-[#65676B] font-medium">
-                  Asigna permisos de Dueño de Equipo o Jugador
-                </p>
-              </div>
-            </div>
+          {(() => {
+            const teamUsers = users.filter((u) => {
+              // 1. Pertenencia directa al equipo actual por teamId
+              if (u.teamId && team?.id && u.teamId === team.id) return true;
+              // 2. Solicitud activa o asignación a este equipo
+              if (u.requestedTeamId && team?.id && u.requestedTeamId === team.id) return true;
+              // 3. Jugador que ya forma parte de la plantilla de este equipo
+              if (players.some((p) => (p.teamId === team.id || !p.teamId) && (p.id === u.playerId || (p.name && u.name && p.name.toLowerCase().trim() === u.name.toLowerCase().trim())))) return true;
+              // 4. Dueño / Administrador actualmente en sesión gestionando este club
+              if (currentUser?.id === u.id || (currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase())) return true;
+              return false;
+            });
 
-            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-              {users
-                .filter((u) => {
-                  // 1. Filtrar por el ID del equipo actual
-                  if (u.teamId && team?.id && u.teamId === team.id) return true;
-                  // 2. O si es el correo del dueño/admin actual
-                  if (currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase()) return true;
-                  return false;
-                })
-                .map((user) => {
-                  const inSquad = players.some(
-                    (p) => p.id === user.playerId || (p.name && user.name && p.name.toLowerCase() === user.name.toLowerCase())
-                  );
+            return (
+              <div className="bg-white p-5 rounded-2xl border border-[#CED0D4] shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-black text-[#050505] flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-[#1877F2]" />
+                      Usuarios y Roles del Club ({teamUsers.length})
+                    </h3>
+                    <p className="text-xs text-[#65676B] font-medium">
+                      Asigna permisos de Dueño de Equipo o Jugador para {team.name}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {teamUsers.map((user) => {
+                    const inSquad = players.some(
+                      (p) => p.id === user.playerId || (p.name && user.name && p.name.toLowerCase().trim() === user.name.toLowerCase().trim())
+                    );
 
                   return (
                     <div
@@ -2133,9 +2142,11 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                     </div>
                   );
                 })}
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })()}
+      </div>
       </div> 
 
       {/* MODAL: Confirmation to delete player */}

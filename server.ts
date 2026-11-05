@@ -25,7 +25,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-});
 
 const PORT = 3000;
 

@@ -142,7 +142,7 @@ export const saveMatchesForTeam = (teamId: string, matches: Match[]) => {
 };
 
 // --- FUNCIONES DE TABLA DE POSICIONES (STANDINGS) ---
-export const getStandingsForLeague = (leagueName: string): StandingsRow[] => {
+export const getStandingsForLeague = (leagueName: string, _team?: any): StandingsRow[] => {
   if (!leagueName) return [];
   try {
     const map = safeGetItem<Record<string, StandingsRow[]>>(STORAGE_KEYS.STANDINGS_BY_LEAGUE, {});

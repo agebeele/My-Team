@@ -146,7 +146,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
         await navigator.share({
           files: [file],
           title: `Historia de ${currentUser.name} - ${team.name}`,
-          text: `${customCaption}\n\n⚽ @${currentUser.username || 'teamgol'} en ${team.name}`,
+          text: `${customCaption}\n\n⚽ @${currentUser.username || 'dreamteam'} en ${team.name}`,
         });
         confetti({ particleCount: 40, spread: 60 });
         showToast('¡Listo para compartir en tus historias!');
@@ -187,7 +187,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `historia_9x16_${currentUser.username || 'teamgol'}_${selectedType}.png`;
+      a.download = `historia_9x16_${currentUser.username || 'dreamteam'}_${selectedType}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

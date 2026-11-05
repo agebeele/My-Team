@@ -180,7 +180,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setLoginIdentifier(samplePlayer.email || samplePlayer.username || '');
       setLoginPassword(samplePlayer.password || '123');
     } else {
-      setLoginIdentifier('andres.trevino@teamgol.com');
+      setLoginIdentifier('andres.trevino@dreamteam.com');
       setLoginPassword('123');
     }
     setLoginError(null);

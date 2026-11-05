@@ -217,22 +217,6 @@ export const mapUserFromDb = (row: any): AppUser => ({
   phone: row.phone || undefined,
 });
 
-export interface TeamJoinRequest {
-  id: string;
-  teamId: string;
-  teamName?: string;
-  userId: string;
-  userName?: string;
-  userEmail?: string;
-  playerEmail?: string;
-  playerName?: string;
-  playerPosition?: string;
-  playerNumber?: number;
-  status?: 'pending' | 'approved' | 'rejected';
-  createdAt?: string;
-  updatedAt?: string;
-}
-
 export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
   id: req.id,
   team_id: req.teamId,
@@ -565,22 +549,23 @@ export const supabaseUpsertUser = async (user: AppUser): Promise<boolean> => {
 // ==========================================
 // 7. JOIN REQUESTS SERVICE
 // ==========================================
-export const supabaseFetchJoinRequests = async (teamId: string) => {
+export const supabaseFetchJoinRequests = async (teamId?: string): Promise<TeamJoinRequest[]> => {
   const client = getSupabaseClient();
   if (!client) return [];
 
   try {
-    const { data, error } = await client
-      .from('join_requests') // 👈 DEBE DECIR 'join_requests'
-      .select('*')
-      .eq('team_id', teamId);
+    let query = client.from('join_requests').select('*');
+    if (teamId) {
+      query = query.eq('team_id', teamId);
+    }
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching join requests:', error);
       return [];
     }
 
-    return data || [];
+    return (data || []).map(mapJoinRequestFromDb);
   } catch (err) {
     console.error('Failed to fetch join requests:', err);
     return [];
@@ -592,9 +577,10 @@ export const supabaseSaveJoinRequest = async (request: any) => {
   if (!client) return null;
 
   try {
+    const payload = request.teamId !== undefined ? mapJoinRequestToDb(request) : request;
     const { data, error } = await client
-      .from('join_requests') // 👈 DEBE DECIR 'join_requests'
-      .upsert([request])
+      .from('join_requests')
+      .upsert([payload])
       .select();
 
     if (error) {
@@ -609,7 +595,7 @@ export const supabaseSaveJoinRequest = async (request: any) => {
   }
 };
 
-export const supabaseUpdateJoinRequestStatus = async (requestId: string, status: 'approved' | 'rejected') => {
+export const supabaseUpdateJoinRequestStatus = async (requestId: string, status: 'approved' | 'rejected' | 'accepted') => {
   const client = getSupabaseClient();
   if (!client) return false;
 
