@@ -22,10 +22,33 @@ CREATE TABLE IF NOT EXISTS teams (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. TABLA DE JUGADORES (PLAYERS)
+-- 2. TABLA DE USUARIOS DE LA APLICACIÓN (APP_USERS)
+CREATE TABLE IF NOT EXISTS app_users (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  username TEXT,
+  password TEXT,
+  role TEXT DEFAULT 'player',
+  avatar_url TEXT,
+  player_id TEXT,
+  team_id TEXT,
+  team_ids JSONB DEFAULT '[]'::JSONB,
+  provider TEXT DEFAULT 'email',
+  team_join_status TEXT DEFAULT 'none',
+  requested_team_id TEXT,
+  requested_team_name TEXT,
+  position TEXT,
+  jersey_number INTEGER,
+  phone TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. TABLA DE JUGADORES (PLAYERS)
 CREATE TABLE IF NOT EXISTS players (
   id TEXT PRIMARY KEY,
   team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  user_id TEXT REFERENCES app_users(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   nickname TEXT,
   number TEXT,
@@ -43,34 +66,23 @@ CREATE TABLE IF NOT EXISTS players (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. TABLA DE USUARIOS DE LA APLICACIÓN (APP_USERS)
-CREATE TABLE IF NOT EXISTS app_users (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT NOT NULL UNIQUE,
-  username TEXT,
-  password TEXT,
-  role TEXT DEFAULT 'player',
-  avatar_url TEXT,
-  player_id TEXT,
-  team_id TEXT,
-  provider TEXT DEFAULT 'email',
-  team_join_status TEXT DEFAULT 'none',
-  requested_team_id TEXT,
-  requested_team_name TEXT,
-  position TEXT,
-  jersey_number INTEGER,
-  phone TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Migraciones idempotentes para multi-equipo en players y app_users
+ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES app_users(id) ON DELETE SET NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_team_user ON players (team_id, user_id) WHERE user_id IS NOT NULL;
 
--- Migraciones idempotentes para app_users
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_ids JSONB DEFAULT '[]'::JSONB;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_join_status TEXT DEFAULT 'none';
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_id TEXT;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_name TEXT;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS position TEXT;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS jersey_number INTEGER;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone TEXT;
+
+-- Backfill automático de team_ids para usuarios que ya tenían team_id asignado
+UPDATE app_users
+SET team_ids = jsonb_build_array(team_id)
+WHERE team_id IS NOT NULL
+  AND (team_ids IS NULL OR team_ids = '[]'::JSONB);
 
 -- 4. TABLA DE PARTIDOS (MATCHES)
 CREATE TABLE IF NOT EXISTS matches (

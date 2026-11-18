@@ -372,7 +372,13 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   // Quick incorporate a registered user account directly into the active squad
   const handleIntegrateUserToSquad = (targetUser: AppUser) => {
     const cleanPlayerName = targetUser.name.replace(/\s*\(jugador\)\s*/i, '').trim();
-    const newPlayerId = targetUser.playerId || `p_${Date.now()}`;
+    const existingTeamPlayer = players.find(
+      (p) =>
+        p.linkedUserId === targetUser.id ||
+        p.id === targetUser.playerId ||
+        p.name.toLowerCase().trim() === cleanPlayerName.toLowerCase()
+    );
+    const newPlayerId = existingTeamPlayer?.id || `p_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const dorsal = targetUser.jerseyNumber || Math.floor(Math.random() * 80) + 10;
     const pos = targetUser.position || 'MED';
 
@@ -382,15 +388,16 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
       number: dorsal,
       position: pos,
       avatarUrl: targetUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR,
-      goals: 0,
-      assists: 0,
-      matches: 0,
-      yellowCards: 0,
-      redCards: 0,
+      goals: existingTeamPlayer?.goals || 0,
+      assists: existingTeamPlayer?.assists || 0,
+      matches: existingTeamPlayer?.matches || 0,
+      yellowCards: existingTeamPlayer?.yellowCards || 0,
+      redCards: existingTeamPlayer?.redCards || 0,
       phone: targetUser.phone || targetUser.email,
-      isCalledUp: true,
-      isStarter: false,
-      mvpHistory: [],
+      isCalledUp: existingTeamPlayer?.isCalledUp ?? true,
+      isStarter: existingTeamPlayer?.isStarter ?? false,
+      mvpHistory: existingTeamPlayer?.mvpHistory || [],
+      linkedUserId: targetUser.id,
       teamId: team.id,
     };
 
@@ -398,9 +405,18 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
       setPlayers((prev) => [...prev.filter((p) => p.id !== newPlayerId && p.name.toLowerCase() !== cleanPlayerName.toLowerCase()), newPlayer]);
     }
 
+    const mergedTeamIds = Array.from(
+      new Set([
+        ...(Array.isArray(targetUser.teamIds) ? targetUser.teamIds.filter(Boolean) : []),
+        ...(targetUser.teamId ? [targetUser.teamId] : []),
+        team.id,
+      ])
+    );
+
     const updatedUser: AppUser = {
       ...targetUser,
       teamId: team.id,
+      teamIds: mergedTeamIds,
       playerId: newPlayerId,
       teamJoinStatus: 'accepted',
     };
@@ -410,8 +426,9 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     }
 
     if (isSupabaseConfigured()) {
-      supabaseUpsertPlayer(team.id, newPlayer);
-      supabaseUpsertUser(updatedUser);
+      supabaseUpsertUser(updatedUser).then(() => {
+        supabaseUpsertPlayer(team.id, newPlayer);
+      });
     }
 
     setNotificationStatus(`¡${cleanPlayerName} (#${dorsal}) ha sido incorporado al plantel oficial! Ya está disponible en convocatoria y alineación.`);
@@ -432,7 +449,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
 
     unintegratedUsers.forEach((u, idx) => {
       const cleanPlayerName = u.name.replace(/\s*\(jugador\)\s*/i, '').trim();
-      const newPlayerId = u.playerId || `p_${Date.now()}_${idx}`;
+      const newPlayerId = `p_${Date.now()}_${idx}`;
       const dorsal = u.jerseyNumber || Math.floor(Math.random() * 80) + 10;
       const pos = u.position || 'MED';
 
@@ -451,15 +468,24 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
         isCalledUp: true,
         isStarter: false,
         mvpHistory: [],
+        linkedUserId: u.id,
         teamId: team.id,
       };
       createdPlayers.push(pl);
 
       const uIdx = updatedUsersList.findIndex((item) => item.id === u.id);
       if (uIdx >= 0) {
+        const mergedIds = Array.from(
+          new Set([
+            ...(Array.isArray(updatedUsersList[uIdx].teamIds) ? updatedUsersList[uIdx].teamIds!.filter(Boolean) : []),
+            ...(updatedUsersList[uIdx].teamId ? [updatedUsersList[uIdx].teamId!] : []),
+            team.id,
+          ])
+        );
         updatedUsersList[uIdx] = {
           ...updatedUsersList[uIdx],
           teamId: team.id,
+          teamIds: mergedIds,
           playerId: newPlayerId,
           teamJoinStatus: 'accepted',
         };
@@ -474,8 +500,9 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     }
 
     if (isSupabaseConfigured()) {
-      createdPlayers.forEach((p) => supabaseUpsertPlayer(team.id, p));
-      updatedUsersList.forEach((u) => supabaseUpsertUser(u));
+      Promise.all(updatedUsersList.map((u) => supabaseUpsertUser(u))).then(() => {
+        createdPlayers.forEach((p) => supabaseUpsertPlayer(team.id, p));
+      });
     }
 
     setNotificationStatus(`¡${createdPlayers.length} jugadores registrados fueron incorporados con éxito al plantel oficial!`);
@@ -2062,12 +2089,13 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
         <div className="lg:col-span-6 space-y-4">
           {(() => {
             const teamUsers = users.filter((u) => {
-              // 1. Pertenencia directa al equipo actual por teamId
+              // 1. Pertenencia directa o multi-equipo al club actual
               if (u.teamId && team?.id && u.teamId === team.id) return true;
+              if (Array.isArray(u.teamIds) && team?.id && u.teamIds.includes(team.id)) return true;
               // 2. Solicitud activa o asignación a este equipo
               if (u.requestedTeamId && team?.id && u.requestedTeamId === team.id) return true;
               // 3. Jugador que ya forma parte de la plantilla de este equipo
-              if (players.some((p) => (p.teamId === team.id || !p.teamId) && (p.id === u.playerId || (p.name && u.name && p.name.toLowerCase().trim() === u.name.toLowerCase().trim())))) return true;
+              if (players.some((p) => (p.teamId === team.id || !p.teamId) && (p.linkedUserId === u.id || p.id === u.playerId || (p.name && u.name && p.name.toLowerCase().trim() === u.name.toLowerCase().trim())))) return true;
               // 4. Dueño / Administrador actualmente en sesión gestionando este club
               if (currentUser?.id === u.id || (currentUser?.email && u.email?.toLowerCase() === currentUser.email.toLowerCase())) return true;
               return false;

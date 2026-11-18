@@ -260,7 +260,8 @@ export interface AppUser {
   role: UserRole;
   avatarUrl: string;
   playerId?: string;
-  teamId?: string; // Affiliated team ID
+  teamId?: string; // Active affiliated team ID
+  teamIds?: string[]; // All affiliated team IDs for multi-team support
   provider: 'google' | 'apple' | 'email' | 'guest';
   username?: string;
   password?: string;

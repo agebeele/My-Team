@@ -39,7 +39,9 @@ interface NavbarProps {
   allUsers?: AppUser[];
   team: TeamInfo;
   allTeams?: TeamInfo[];
+  userTeams?: TeamInfo[];
   onSwitchTeam?: (team: TeamInfo) => void;
+  onJoinAnotherTeam?: () => void;
   language: Language;
   setLanguage?: (lang: Language) => void;
   unreadAlertsCount?: number;
@@ -51,6 +53,8 @@ interface NavbarProps {
   joinRequests?: TeamJoinRequest[];
   onAcceptJoinRequest?: (req: TeamJoinRequest) => void;
   onRejectJoinRequest?: (reqId: string) => void;
+  teamInvitations?: TeamInvitation[];
+  onAcceptTeamInvitation?: (inv: TeamInvitation) => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
 }
@@ -65,7 +69,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   team,
   allTeams = INITIAL_TEAMS,
+  userTeams,
   onSwitchTeam,
+  onJoinAnotherTeam,
   language,
   unreadAlertsCount = 0,
   onOpenNotifications = () => {},
@@ -75,11 +81,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   joinRequests = [],
   onAcceptJoinRequest,
   onRejectJoinRequest,
+  teamInvitations = [],
+  onAcceptTeamInvitation,
   onRefresh,
   isRefreshing = false,
 }) => {
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
+  const [showTeamSwitcherDropdown, setShowTeamSwitcherDropdown] = useState(false);
   const [showTeamSwitcherModal, setShowTeamSwitcherModal] = useState(false);
   const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
     try {
@@ -133,9 +142,29 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  const myPendingInvitations = sentInvitations.filter(
-    (inv) => inv.email.toLowerCase() === currentUser?.email.toLowerCase() && inv.status === 'sent'
+  const mergedInvitationsMap = new Map<string, TeamInvitation>();
+  sentInvitations.forEach((inv) => mergedInvitationsMap.set(inv.id, inv));
+  teamInvitations.forEach((inv) => mergedInvitationsMap.set(inv.id, inv));
+
+  const myPendingInvitations = Array.from(mergedInvitationsMap.values()).filter(
+    (inv) =>
+      inv.email.toLowerCase() === currentUser?.email.toLowerCase() &&
+      inv.status !== 'accepted'
   );
+
+  // Compute teams this user belongs to (active ficha or owner/DT)
+  const myTeams: TeamInfo[] = React.useMemo(() => {
+    if (userTeams && userTeams.length > 0) return userTeams;
+    const idSet = new Set<string>([
+      ...(Array.isArray(currentUser?.teamIds) ? currentUser.teamIds.filter(Boolean) : []),
+      ...(currentUser?.teamId ? [currentUser.teamId] : []),
+    ]);
+    const list = allTeams.filter((t) => idSet.has(t.id));
+    if (team?.id && idSet.has(team.id) && !list.some((t) => t.id === team.id)) {
+      list.unshift(team);
+    }
+    return list;
+  }, [userTeams, currentUser?.teamIds, currentUser?.teamId, allTeams, team]);
 
   const isTeamManager = currentUser?.role === 'owner' || currentUser?.role === 'admin' || currentUser?.role === 'coach';
   const pendingTeamRequests = isTeamManager
@@ -175,9 +204,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       localStorage.setItem('teamgol_sent_invitations', JSON.stringify(updated));
     } catch {}
 
-    const targetTeam = allTeams.find((t) => t.id === inv.teamId || t.name === inv.teamName);
-    if (targetTeam && onSwitchTeam) {
-      onSwitchTeam(targetTeam);
+    if (onAcceptTeamInvitation) {
+      onAcceptTeamInvitation(inv);
+    } else {
+      const targetTeam = allTeams.find((t) => t.id === inv.teamId || t.name === inv.teamName);
+      if (targetTeam && onSwitchTeam) {
+        onSwitchTeam(targetTeam);
+      }
     }
     setShowNotificationsMenu(false);
   };
@@ -264,44 +297,162 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               </>
             ) : (
-              /* Standard Club Crest & Details */
-              <>
-                <div className="relative shrink-0">
-                  <img
-                    src={team.logoUrl}
-                    alt={team.name}
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
-                    className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-[#1877F2]/40 shadow-xs"
-                  />
-                  <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px] font-black shadow-xs">
-                    7
-                  </span>
-                </div>
-
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                    <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
-                      <span>{team.shortName}</span>
-                    </h1>
-                    {hasLiveMatch && (
-                      <button
-                        onClick={() => handleTabChange('live_match')}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-wider animate-pulse cursor-pointer shadow-xs hover:bg-rose-100 transition-colors"
-                        title="Hay un partido de Fútbol 7 en juego"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                        <span>EN VIVO</span>
-                      </button>
-                    )}
+              /* Club Crest & Details with Multi-Team Switcher Dropdown */
+              <div className="relative flex items-center gap-2 sm:gap-2.5 min-w-0">
+                <button
+                  id="btn-header-team-switcher"
+                  type="button"
+                  onClick={() => {
+                    setShowTeamSwitcherDropdown((prev) => !prev);
+                    setShowRoleMenu(false);
+                    setShowNotificationsMenu(false);
+                  }}
+                  className="flex items-center gap-2 sm:gap-2.5 p-1 pr-2 rounded-2xl hover:bg-[#F0F2F5] dark:hover:bg-[#3A3B3C] transition-colors cursor-pointer min-w-0 text-left group"
+                  title="Cambiar de equipo o unirte a otro club"
+                >
+                  <div className="relative shrink-0">
+                    <img
+                      src={team.logoUrl}
+                      alt={team.name}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                      className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-[#1877F2]/40 shadow-xs bg-white"
+                    />
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1877F2] text-white flex items-center justify-center text-[9px] font-black shadow-xs">
+                      {myTeams.length > 1 ? myTeams.length : 7}
+                    </span>
                   </div>
-                  <p className="text-[11px] sm:text-xs text-[#65676B] dark:text-gray-400 truncate max-w-[150px] sm:max-w-xs font-medium">
-                    {team.leagueName || 'Liga Premier Fútbol 7'}
-                  </p>
-                </div>
-              </>
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white truncate max-w-[125px] sm:max-w-[180px]">
+                        {team.shortName || team.name}
+                      </h1>
+                      <ChevronDown
+                        className={`w-4 h-4 text-[#65676B] group-hover:text-[#1877F2] transition-transform shrink-0 ${
+                          showTeamSwitcherDropdown ? 'rotate-180 text-[#1877F2]' : ''
+                        }`}
+                      />
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-[#65676B] dark:text-gray-400 truncate max-w-[140px] sm:max-w-xs font-medium">
+                      {team.leagueName || 'Liga Premier Fútbol 7'}
+                    </p>
+                  </div>
+                </button>
+
+                {hasLiveMatch && (
+                  <button
+                    onClick={() => handleTabChange('live_match')}
+                    className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-wider animate-pulse cursor-pointer shadow-xs hover:bg-rose-100 transition-colors shrink-0"
+                    title="Hay un partido de Fútbol 7 en juego"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                    <span>EN VIVO</span>
+                  </button>
+                )}
+
+                {/* Header Multi-Team Switcher Dropdown */}
+                {showTeamSwitcherDropdown && (
+                  <div
+                    id="menu-header-team-switcher"
+                    className="absolute left-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-white dark:bg-[#242526] border border-[#CED0D4] dark:border-white/10 shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                  >
+                    <div className="flex items-center justify-between px-2 pb-2 border-b border-[#CED0D4]/70 dark:border-white/10">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-[#65676B] dark:text-gray-400">
+                        Mis Equipos ({myTeams.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowTeamSwitcherDropdown(false)}
+                        className="p-1 rounded-lg hover:bg-[#F0F2F5] dark:hover:bg-white/10 text-[#65676B] cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="py-2 space-y-1.5 max-h-64 overflow-y-auto">
+                      {myTeams.length === 0 ? (
+                        <div className="px-3 py-3 rounded-xl bg-[#F0F2F5] dark:bg-white/5 text-center space-y-1">
+                          <p className="text-xs font-bold text-[#050505] dark:text-white">
+                            Aún no perteneces a un club
+                          </p>
+                          <p className="text-[11px] text-[#65676B] dark:text-gray-400">
+                            Explora las ligas y solicita unirte a un equipo.
+                          </p>
+                        </div>
+                      ) : (
+                        myTeams.map((t) => {
+                          const isActive = t.id === team.id;
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => {
+                                if (onSwitchTeam) {
+                                  onSwitchTeam(t);
+                                }
+                                setShowTeamSwitcherDropdown(false);
+                              }}
+                              className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-xl text-left transition-all cursor-pointer ${
+                                isActive
+                                  ? 'bg-[#E7F3FF] dark:bg-[#1877F2]/20 border border-[#1877F2]/40'
+                                  : 'hover:bg-[#F0F2F5] dark:hover:bg-white/5 border border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <img
+                                  src={t.logoUrl}
+                                  alt={t.name}
+                                  referrerPolicy="no-referrer"
+                                  className="w-9 h-9 rounded-lg object-cover border border-[#CED0D4] bg-white shrink-0"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-black text-[#050505] dark:text-white truncate">
+                                    {t.name}
+                                  </p>
+                                  <p className="text-[10px] text-[#65676B] dark:text-gray-400 truncate">
+                                    {t.leagueName}
+                                  </p>
+                                </div>
+                              </div>
+                              {isActive && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1877F2] text-white text-[10px] font-black shrink-0">
+                                  <Check className="w-3 h-3" />
+                                  <span>Activo</span>
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-[#CED0D4]/70 dark:border-white/10">
+                      <button
+                        id="btn-join-another-team"
+                        type="button"
+                        onClick={() => {
+                          setShowTeamSwitcherDropdown(false);
+                          if (onJoinAnotherTeam) {
+                            onJoinAnotherTeam();
+                          } else {
+                            handleTabChange('leagues');
+                          }
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Unirse a otro equipo</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -343,7 +494,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   👤 Mi Perfil
                 </button>
               </>
-            ) : !currentUser.teamId && currentUser.role === 'player' ? (
+            ) : !currentUser.teamId && (!currentUser.teamIds || currentUser.teamIds.length === 0) && currentUser.role === 'player' ? (
               <>
                 <button
                   id="nav-btn-leagues"
@@ -515,6 +666,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => {
                   setShowNotificationsMenu(!showNotificationsMenu);
                   setShowRoleMenu(false);
+                  setShowTeamSwitcherDropdown(false);
                 }}
                 className="relative w-9 h-9 rounded-full bg-[#E4E6EB] dark:bg-[#3A3B3C] hover:bg-[#D8DADF] dark:hover:bg-[#4E4F50] text-[#050505] dark:text-white transition-colors flex items-center justify-center shadow-xs cursor-pointer"
                 title="Notificaciones e invitaciones oficiales"
@@ -775,7 +927,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative">
               <button
                 id="btn-profile-dropdown"
-                onClick={() => setShowRoleMenu(!showRoleMenu)}
+                onClick={() => {
+                  setShowRoleMenu(!showRoleMenu);
+                  setShowTeamSwitcherDropdown(false);
+                  setShowNotificationsMenu(false);
+                }}
                 className="flex items-center gap-2 p-1 rounded-full hover:bg-[#E4E6EB] dark:hover:bg-[#3A3B3C] transition-all cursor-pointer"
               >
                 <img

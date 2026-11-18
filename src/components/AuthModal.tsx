@@ -273,6 +273,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       avatarUrl: newPlayer.avatarUrl,
       playerId: newPlayerId,
       teamId: undefined,
+      teamIds: [],
       teamJoinStatus: 'none',
       position: newPlayerForm.position,
       jerseyNumber: num,

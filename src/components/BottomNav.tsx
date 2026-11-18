@@ -51,7 +51,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const role = userRole || currentUser?.role || 'player';
   const isOwner = role === 'owner';
   const isLeagueAdmin = role === 'league_admin';
-  const isUnassignedPlayer = role === 'player' && !currentUser?.teamId;
+  const isUnassignedPlayer =
+    role === 'player' &&
+    !currentUser?.teamId &&
+    (!currentUser?.teamIds || currentUser.teamIds.length === 0);
 
   // Primary tabs visible in mobile bottom dock
   const primaryTabs = isLeagueAdmin
@@ -111,6 +114,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       icon: User,
       badge: null,
       color: 'blue',
+    },
+    {
+      id: 'leagues',
+      label: 'Unirse a Otro Equipo',
+      description: 'Explora ligas y postúlate a otros clubes',
+      icon: Trophy,
+      badge: 'Multi',
+      color: 'emerald',
     },
   ];
 

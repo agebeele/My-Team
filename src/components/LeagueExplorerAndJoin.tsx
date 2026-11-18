@@ -34,6 +34,7 @@ interface LeagueExplorerAndJoinProps {
   joinRequests: TeamJoinRequest[];
   setJoinRequests: React.Dispatch<React.SetStateAction<TeamJoinRequest[]>>;
   onViewLeagueWall?: () => void;
+  onSwitchToTeam?: (team: TeamInfo) => void;
   language: Language;
 }
 
@@ -54,6 +55,7 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
   joinRequests,
   setJoinRequests,
   onViewLeagueWall,
+  onSwitchToTeam,
   language,
 }) => {
   const [selectedLeague, setSelectedLeague] = useState<string>(
@@ -62,9 +64,20 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [actionSuccessToast, setActionSuccessToast] = useState<string | null>(null);
 
-  // Find active join request for this user
-  const activeRequest = joinRequests.find(
-    (r) => r.userId === currentUser.id && r.status === 'pending'
+  // Memberships & pending requests per teamId (supports belonging to multiple teams simultaneously)
+  const memberTeamIds = new Set<string>([
+    ...(Array.isArray(currentUser.teamIds) ? currentUser.teamIds.filter(Boolean) : []),
+    ...(currentUser.teamId ? [currentUser.teamId] : []),
+  ]);
+
+  const myPendingRequests = joinRequests.filter(
+    (r) =>
+      r.status === 'pending' &&
+      (r.userId === currentUser.id ||
+        (r.playerEmail && currentUser.email && r.playerEmail.toLowerCase() === currentUser.email.toLowerCase()))
+  );
+  const pendingByTeamId = new Map<string, TeamJoinRequest>(
+    myPendingRequests.map((r) => [r.teamId, r])
   );
 
   // Filter teams for selected league
@@ -84,10 +97,21 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
     );
   });
 
-  // Handle request to join a team
+  // Handle request to join a team (allowed even if user already belongs to other clubs)
   const handleRequestJoin = async (targetTeam: TeamInfo) => {
+    if (memberTeamIds.has(targetTeam.id)) {
+      setActionSuccessToast(`Ya eres miembro activo de ${targetTeam.name}.`);
+      setTimeout(() => setActionSuccessToast(null), 4000);
+      return;
+    }
+    if (pendingByTeamId.has(targetTeam.id)) {
+      setActionSuccessToast(`Ya tienes una solicitud pendiente en ${targetTeam.name}.`);
+      setTimeout(() => setActionSuccessToast(null), 4000);
+      return;
+    }
+
     const newRequest: TeamJoinRequest = {
-      id: `req_${Date.now()}`,
+      id: `req_${Date.now()}_${targetTeam.id}`,
       userId: currentUser.id,
       userName: currentUser.name,
       playerName: currentUser.name,
@@ -111,12 +135,17 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
       mensaje: 'Desea unirse al plantel',
     };
 
-    const updatedRequests = [newRequest, ...joinRequests.filter((r) => r.userId !== currentUser.id)];
+    const updatedRequests = [
+      newRequest,
+      ...joinRequests.filter(
+        (r) => !(r.userId === currentUser.id && r.teamId === targetTeam.id)
+      ),
+    ];
     setJoinRequests(updatedRequests);
 
     const updatedUser: AppUser = {
       ...currentUser,
-      teamJoinStatus: 'pending',
+      teamJoinStatus: memberTeamIds.size > 0 ? (currentUser.teamJoinStatus || 'accepted') : 'pending',
       requestedTeamId: targetTeam.id,
       requestedTeamName: targetTeam.name,
       requestedLeague: targetTeam.leagueName,
@@ -131,7 +160,7 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
       localStorage.setItem('teamgol_current_user', JSON.stringify(updatedUser));
     } catch {}
 
-    // Send to backend SQLite via both endpoints (generic and specific notificaciones)
+    // Send to backend SQLite via both endpoints
     fetch('/api/notificaciones/solicitar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -164,19 +193,26 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
     setTimeout(() => setActionSuccessToast(null), 6000);
   };
 
-  // Handle cancel pending join request
-  const handleCancelRequest = async () => {
-    if (!activeRequest) return;
-
-    const updatedRequests = joinRequests.filter((r) => r.id !== activeRequest.id);
+  // Handle cancel a specific pending join request
+  const handleCancelRequest = async (reqToCancel: TeamJoinRequest) => {
+    const updatedRequests = joinRequests.filter((r) => r.id !== reqToCancel.id);
     setJoinRequests(updatedRequests);
+
+    const remainingPending = updatedRequests.find(
+      (r) => r.userId === currentUser.id && r.status === 'pending'
+    );
 
     const updatedUser: AppUser = {
       ...currentUser,
-      teamJoinStatus: 'none',
-      requestedTeamId: undefined,
-      requestedTeamName: undefined,
-      requestedLeague: undefined,
+      teamJoinStatus:
+        memberTeamIds.size > 0
+          ? 'accepted'
+          : remainingPending
+          ? 'pending'
+          : 'none',
+      requestedTeamId: remainingPending?.teamId,
+      requestedTeamName: remainingPending?.teamName,
+      requestedLeague: remainingPending?.teamLeague,
     };
     setCurrentUser(updatedUser);
 
@@ -189,7 +225,7 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
     } catch {}
 
     if (isSupabaseConfigured()) {
-      supabaseDeleteJoinRequest(activeRequest.id);
+      supabaseDeleteJoinRequest(reqToCancel.id);
       supabaseUpsertUser(updatedUser);
     }
 
@@ -198,7 +234,7 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
       users: allUsers.map((u) => (u.id === currentUser.id ? updatedUser : u)),
     });
 
-    setActionSuccessToast('Solicitud cancelada. Ahora puedes elegir otro equipo.');
+    setActionSuccessToast(`Solicitud a ${reqToCancel.teamName} cancelada.`);
     setTimeout(() => setActionSuccessToast(null), 4000);
   };
 
@@ -252,7 +288,10 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
                 )}
               </div>
               <p className="text-xs sm:text-sm text-[#65676B] dark:text-gray-400 mt-0.5">
-                {currentUser.email} • Pendiente de asignación a un club oficial
+                {currentUser.email} •{' '}
+                {memberTeamIds.size > 0
+                  ? `Miembro activo en ${memberTeamIds.size} ${memberTeamIds.size === 1 ? 'club' : 'clubes'}`
+                  : 'Pendiente de asignación a un club oficial'}
               </p>
             </div>
           </div>
@@ -270,48 +309,63 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
         </div>
 
         {/* Status Callout Banner */}
-        {activeRequest ? (
-          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 text-amber-950 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-start gap-3">
-              <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-spin" />
-              <div className="text-xs sm:text-sm leading-relaxed">
-                <span className="font-bold block text-amber-900 dark:text-amber-100">
-                  Solicitud en Revisión para unirte a: {activeRequest.teamName}
-                </span>
-                <span>
-                  Tu ficha de jugador fue enviada al Director Técnico de <strong>{activeRequest.teamName}</strong> ({activeRequest.teamLeague || 'Fútbol 7'}).
-                  En cuanto el DT acepte tu solicitud, se desbloquearán automáticamente todos los módulos de tu equipo (partidos, alineación oficial, estadísticas y convocatorias).
-                </span>
+        {myPendingRequests.length > 0 && (
+          <div className="space-y-2.5">
+            {myPendingRequests.map((req) => (
+              <div
+                key={req.id}
+                className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700/50 text-amber-950 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+              >
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 animate-spin" />
+                  <div className="text-xs sm:text-sm leading-relaxed">
+                    <span className="font-bold block text-amber-900 dark:text-amber-100">
+                      Solicitud en Revisión para unirte a: {req.teamName}
+                    </span>
+                    <span>
+                      Tu ficha de jugador fue enviada al Director Técnico de <strong>{req.teamName}</strong> ({req.teamLeague || 'Fútbol 7'}).
+                      En cuanto el DT acepte tu solicitud, se añadirá este club a tu selector de equipos sin perder tus clubes actuales.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleCancelRequest(req)}
+                  className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-black/40 border border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100 font-bold text-xs shrink-0 cursor-pointer transition-all self-start sm:self-center"
+                >
+                  Cancelar Solicitud
+                </button>
               </div>
-            </div>
-            <button
-              onClick={handleCancelRequest}
-              className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-black/40 border border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100 font-bold text-xs shrink-0 cursor-pointer transition-all self-start sm:self-center"
-            >
-              Cancelar Solicitud
-            </button>
+            ))}
           </div>
-        ) : currentUser.teamJoinStatus === 'rejected' ? (
+        )}
+
+        {currentUser.teamJoinStatus === 'rejected' && myPendingRequests.length === 0 && (
           <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-700/50 text-rose-950 dark:text-rose-200 flex items-start gap-3 shadow-xs">
             <XCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="text-xs sm:text-sm leading-relaxed">
               <span className="font-bold block text-rose-900 dark:text-rose-100">
-                Solicitud anterior rechazada
+                Solicitud rechazada
               </span>
               <span>
-                El cuerpo técnico del club anterior no pudo incorporar nuevos jugadores en este momento. Selecciona a continuación otro equipo de cualquiera de las 5 ligas disponibles y pulsa <strong>"Solicitar unirse"</strong>.
+                El cuerpo técnico del club solicitado no pudo incorporar nuevos jugadores en este momento. Puedes elegir otro equipo de cualquiera de las 5 ligas disponibles y pulsar <strong>"Solicitar unirse"</strong>.
               </span>
             </div>
           </div>
-        ) : (
+        )}
+
+        {myPendingRequests.length === 0 && currentUser.teamJoinStatus !== 'rejected' && (
           <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 text-blue-950 dark:text-blue-200 flex items-start gap-3 shadow-xs">
             <Sparkles className="w-5 h-5 text-[#1877F2] shrink-0 mt-0.5" />
             <div className="text-xs sm:text-sm leading-relaxed">
               <span className="font-bold block text-[#1877F2] dark:text-[#60A5FA]">
-                Paso 1: Elige tu Liga y Solicita Unirte a tu Club
+                {memberTeamIds.size > 0
+                  ? 'Explora y Únete a Clubes Adicionales (Multi-Equipo)'
+                  : 'Paso 1: Elige tu Liga y Solicita Unirte a tu Club'}
               </span>
               <span>
-                Explora las 5 ligas oficiales a continuación. Encuentra el equipo donde juegas y pulsa <strong>"Solicitar unirse"</strong>. El Director Técnico recibirá una notificación inmediata para aceptar tu ingreso.
+                {memberTeamIds.size > 0
+                  ? 'Puedes enviar solicitudes a otros equipos aunque ya pertenezcas a un club. Tus fichas anteriores se conservarán independientes y podrás cambiar de equipo desde el menú superior.'
+                  : 'Explora las 5 ligas oficiales a continuación. Encuentra el equipo donde juegas y pulsa "Solicitar unirse". El Director Técnico recibirá una notificación inmediata para aceptar tu ingreso.'}
               </span>
             </div>
           </div>
@@ -407,16 +461,17 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredTeams.map((t) => {
-              const isThisTeamPending =
-                activeRequest && activeRequest.teamId === t.id;
-              const hasOtherPending =
-                activeRequest && activeRequest.teamId !== t.id;
+              const isAlreadyMember = memberTeamIds.has(t.id);
+              const pendingReqForTeam = pendingByTeamId.get(t.id);
+              const isThisTeamPending = Boolean(pendingReqForTeam);
 
               return (
                 <div
                   key={t.id}
                   className={`bg-white dark:bg-[#242526] rounded-2xl border p-4.5 flex flex-col justify-between gap-4 transition-all shadow-xs hover:shadow-md ${
-                    isThisTeamPending
+                    isAlreadyMember
+                      ? 'border-emerald-400 ring-2 ring-emerald-400/25'
+                      : isThisTeamPending
                       ? 'border-amber-400 ring-2 ring-amber-400/30'
                       : 'border-[#CED0D4] dark:border-white/10'
                   }`}
@@ -458,19 +513,36 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
                       <span>Fútbol 7 Oficial</span>
                     </div>
 
-                    {isThisTeamPending ? (
-                      <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-white font-black text-xs flex items-center gap-1.5 shadow-xs">
-                        <Clock className="w-3.5 h-3.5 animate-spin" />
-                        <span>Solicitud Enviada</span>
-                      </span>
-                    ) : hasOtherPending ? (
-                      <button
-                        onClick={() => handleRequestJoin(t)}
-                        className="px-3 py-1.5 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-[#1877F2] hover:text-white text-[#65676B] dark:text-gray-300 font-bold text-xs transition-all cursor-pointer"
-                        title="Cambiar tu solicitud a este equipo"
-                      >
-                        Cambiar a este equipo
-                      </button>
+                    {isAlreadyMember ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-300 font-black text-[11px] flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Miembro</span>
+                        </span>
+                        {onSwitchToTeam && (
+                          <button
+                            type="button"
+                            onClick={() => onSwitchToTeam(t)}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all cursor-pointer shadow-xs"
+                          >
+                            Ir al club
+                          </button>
+                        )}
+                      </div>
+                    ) : isThisTeamPending && pendingReqForTeam ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-3 py-1.5 rounded-xl bg-amber-500 text-white font-black text-xs flex items-center gap-1.5 shadow-xs">
+                          <Clock className="w-3.5 h-3.5 animate-spin" />
+                          <span>Enviada</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelRequest(pendingReqForTeam)}
+                          className="px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-rose-50 text-[#65676B] hover:text-rose-700 font-bold text-[11px] transition-colors cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     ) : (
                       <button
                         onClick={() => handleRequestJoin(t)}

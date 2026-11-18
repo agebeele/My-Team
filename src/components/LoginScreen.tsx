@@ -362,8 +362,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    if (matchedUser.teamId) {
-      const userTeam = teamList.find((t) => t.id === matchedUser.teamId);
+    const activeOrFirstTeamId =
+      matchedUser.teamId ||
+      (Array.isArray(matchedUser.teamIds) && matchedUser.teamIds.length > 0 ? matchedUser.teamIds[0] : undefined);
+    const normalizedTeamIds = Array.from(
+      new Set([
+        ...(Array.isArray(matchedUser.teamIds) ? matchedUser.teamIds.filter(Boolean) : []),
+        ...(activeOrFirstTeamId ? [activeOrFirstTeamId] : []),
+      ])
+    );
+    const normalizedMatchedUser: AppUser = {
+      ...matchedUser,
+      teamId: activeOrFirstTeamId,
+      teamIds: normalizedTeamIds,
+    };
+
+    if (activeOrFirstTeamId) {
+      const userTeam = teamList.find((t) => t.id === activeOrFirstTeamId);
       if (userTeam) {
         if (setTeam) setTeam(userTeam);
         const activeMatches = (matches || []).filter((m) => !m.teamId || m.teamId === userTeam.id);
@@ -392,9 +407,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       }
     }
 
-    setLoginSuccess(`¡Bienvenido, ${(matchedUser.name || 'Usuario').split(' ')[0]}!`);
+    setLoginSuccess(`¡Bienvenido, ${(normalizedMatchedUser.name || 'Usuario').split(' ')[0]}!`);
     setTimeout(() => {
-      onLoginSuccess(matchedUser, rememberDevice);
+      onLoginSuccess(normalizedMatchedUser, rememberDevice);
     }, 500);
   };
 
@@ -501,6 +516,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       avatarUrl: newPlayer.avatarUrl,
       playerId: newPlayerId,
       teamId: undefined,
+      teamIds: [],
       teamJoinStatus: 'none',
       position: newPlayerForm.position,
       jerseyNumber: dorsal,
@@ -519,6 +535,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           const matchedInv = invList[matchIndex];
           if (matchedInv.teamId) {
             newUser.teamId = matchedInv.teamId;
+            newUser.teamIds = [matchedInv.teamId];
             newUser.teamJoinStatus = 'accepted';
             const matchedTeam = teamList.find((t) => t.id === matchedInv.teamId);
             if (matchedTeam && setTeam) setTeam(matchedTeam);
@@ -625,6 +642,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       avatarUrl: DEFAULT_FACEBOOK_AVATAR,
       playerId: ownerPlayerId,
       teamId: newTeamId,
+      teamIds: [newTeamId],
       provider: 'email',
     };
 

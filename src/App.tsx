@@ -54,6 +54,7 @@ import confetti from 'canvas-confetti';
 import { isSupabaseConfigured, initSupabaseFromServer, supabase } from './utils/supabaseClient';
 import {
   supabaseFetchPlayers,
+  supabaseFetchPlayersByUser,
   supabaseFetchMatches,
   supabaseFetchPosts,
   supabaseFetchUsers,
@@ -69,6 +70,8 @@ import {
   supabaseFetchJoinRequests,
   supabaseUpsertJoinRequest,
   supabaseDeleteJoinRequest,
+  supabaseFetchTeamInvitations,
+  supabaseUpsertTeamInvitation,
   subscribeToSupabaseTable,
 } from './services/supabaseService';
 import { fetchBackendSync, pushBackendSync, pushBackendSyncImmediate } from './utils/backendSync';
@@ -101,6 +104,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('calendar');
   const [language, setLanguage] = useState<Language>('es');
   const [currentUser, setCurrentUser] = useState<AppUser | null>(initial.currentUser || null);
+  const [teamInvitations, setTeamInvitations] = useState<TeamInvitation[]>(() => {
+    try {
+      const stored = localStorage.getItem('teamgol_sent_invitations');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [userPlayerCards, setUserPlayerCards] = useState<Player[]>([]);
 
   // Selected sub-elements
   const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>(undefined);
@@ -146,7 +158,7 @@ export default function App() {
   const playersRef = useRef<Player[]>(players);
   playersRef.current = players;
 
-  // Sync player acceptance/rejection immediately: notifies player and unlocks all team options
+  // Sync player acceptance/rejection immediately (supports both first team & additional clubs)
   const checkAndApplyPlayerJoinDecision = async (
     latestUsers?: AppUser[],
     latestRequests?: TeamJoinRequest[],
@@ -167,17 +179,43 @@ export default function App() {
         (r.userEmail && me.email && r.userEmail.toLowerCase() === me.email.toLowerCase())
     );
 
-    const acceptedReq = matchingReqs.find((r) => r.status === 'accepted');
-    const rejectedReq = matchingReqs.find((r) => r.status === 'rejected');
+    const acceptedReqs = matchingReqs.filter((r) => r.status === 'accepted');
+    const rejectedReqs = matchingReqs.filter((r) => r.status === 'rejected');
 
-    // 1. Player was ACCEPTED into a team
-    const resolvedTeamId = freshMe?.teamId || (acceptedReq ? acceptedReq.teamId : undefined);
-    if (resolvedTeamId && (!me.teamId || me.teamJoinStatus !== 'accepted')) {
-      const targetTeam = teamsPool.find((t) => t.id === resolvedTeamId);
+    const myExistingTeamIds = new Set<string>([
+      ...(Array.isArray(me.teamIds) ? me.teamIds.filter(Boolean) : []),
+      ...(me.teamId ? [me.teamId] : []),
+    ]);
+
+    const freshTeamIds = Array.from(
+      new Set([
+        ...(Array.isArray(freshMe?.teamIds) ? freshMe.teamIds.filter(Boolean) : []),
+        ...(freshMe?.teamId ? [freshMe.teamId] : []),
+      ])
+    );
+
+    // Find if a brand-new club was just added via freshMe.teamIds or an accepted join_request
+    const newlyAcceptedTeamIdFromUser = freshTeamIds.find((tid) => !myExistingTeamIds.has(tid));
+    const newlyAcceptedReq = acceptedReqs.find((r) => r.teamId && !myExistingTeamIds.has(r.teamId));
+    const firstAcceptedTeamId = !me.teamId
+      ? freshMe?.teamId || acceptedReqs[0]?.teamId
+      : undefined;
+
+    const targetAcceptedTeamId =
+      newlyAcceptedTeamIdFromUser || newlyAcceptedReq?.teamId || firstAcceptedTeamId;
+
+    // 1. Player was ACCEPTED into a first or additional team
+    if (targetAcceptedTeamId) {
+      const targetTeam = teamsPool.find((t) => t.id === targetAcceptedTeamId);
+      const mergedTeamIds = Array.from(
+        new Set([...Array.from(myExistingTeamIds), ...freshTeamIds, targetAcceptedTeamId])
+      );
+
       const updatedMe: AppUser = {
         ...me,
         ...(freshMe || {}),
-        teamId: resolvedTeamId,
+        teamId: targetAcceptedTeamId,
+        teamIds: mergedTeamIds,
         teamJoinStatus: 'accepted',
         playerId: freshMe?.playerId || me.playerId,
       };
@@ -190,40 +228,40 @@ export default function App() {
         try {
           localStorage.setItem('teamgol_team_data', JSON.stringify(targetTeam));
         } catch {}
+        setStandings(getStandingsForLeague(targetTeam.leagueName, targetTeam));
       }
 
       if (updatedMe.playerId) {
         setSelectedPlayerId(updatedMe.playerId);
       }
 
-      // Immediately load team's squad, matches and posts so all player options work right away
+      // Immediately load accepted team's squad, matches and posts so all player options work right away
       if (isSupabaseConfigured()) {
         try {
           const [teamPlayers, teamMatches, teamPosts] = await Promise.all([
-            supabaseFetchPlayers(resolvedTeamId),
-            supabaseFetchMatches(resolvedTeamId),
-            supabaseFetchPosts(resolvedTeamId),
+            supabaseFetchPlayers(targetAcceptedTeamId),
+            supabaseFetchMatches(targetAcceptedTeamId),
+            supabaseFetchPosts(targetAcceptedTeamId),
           ]);
           if (teamPlayers && teamPlayers.length > 0) {
             setPlayers(teamPlayers);
-            savePlayersForTeam(resolvedTeamId, teamPlayers);
-            if (!updatedMe.playerId) {
-              const matchedPl = teamPlayers.find(
-                (p) =>
-                  p.linkedUserId === me.id ||
-                  (p.name && me.name && p.name.toLowerCase().trim() === me.name.toLowerCase().trim())
-              );
-              if (matchedPl) {
-                setSelectedPlayerId(matchedPl.id);
-                const withPlayer = { ...updatedMe, playerId: matchedPl.id };
-                setCurrentUser(withPlayer);
-                saveDeviceSession(withPlayer);
-              }
+            savePlayersForTeam(targetAcceptedTeamId, teamPlayers);
+            const matchedPl = teamPlayers.find(
+              (p) =>
+                p.linkedUserId === me.id ||
+                p.id === updatedMe.playerId ||
+                (p.name && me.name && p.name.toLowerCase().trim() === me.name.toLowerCase().trim())
+            );
+            if (matchedPl) {
+              setSelectedPlayerId(matchedPl.id);
+              const withPlayer = { ...updatedMe, playerId: matchedPl.id };
+              setCurrentUser(withPlayer);
+              saveDeviceSession(withPlayer);
             }
           }
           if (teamMatches) {
             setMatches(teamMatches);
-            saveMatchesForTeam(resolvedTeamId, teamMatches);
+            saveMatchesForTeam(targetAcceptedTeamId, teamMatches);
           }
           if (teamPosts) {
             setPosts(teamPosts);
@@ -232,16 +270,16 @@ export default function App() {
           console.warn('Error loading accepted team data from Supabase:', err);
         }
       } else {
-        const localPlayers = getPlayersForTeam(resolvedTeamId);
+        const localPlayers = getPlayersForTeam(targetAcceptedTeamId);
         if (localPlayers.length > 0) setPlayers(localPlayers);
-        const localMatches = getMatchesForTeam(resolvedTeamId);
+        const localMatches = getMatchesForTeam(targetAcceptedTeamId);
         if (localMatches.length > 0) setMatches(localMatches);
       }
 
       setActiveTab('calendar');
 
-      const teamLabel = targetTeam?.name || acceptedReq?.teamName || 'tu nuevo club';
-      const bannerKey = `accepted_${resolvedTeamId}`;
+      const teamLabel = targetTeam?.name || newlyAcceptedReq?.teamName || 'tu nuevo club';
+      const bannerKey = `accepted_${targetAcceptedTeamId}`;
       try {
         const storageKey = `dreamteam_shown_decision_${me.id}`;
         if (localStorage.getItem(storageKey) !== bannerKey) {
@@ -253,33 +291,42 @@ export default function App() {
       setJoinDecisionAlert({
         type: 'accepted',
         teamName: teamLabel,
-        message: `¡Fuiste aceptado en ${teamLabel}! Tu perfil ha sido actualizado y ya tienes acceso completo a partidos, convocatorias, alineaciones, votación MVP y estadísticas.`,
+        message: `¡Fuiste aceptado en ${teamLabel}! Tu ficha fue añadida y ya puedes cambiar entre tus clubes desde el encabezado.`,
       });
       return;
     }
 
-    // 2. Player was REJECTED
-    const isNowRejected =
-      !me.teamId &&
-      ((freshMe && freshMe.teamJoinStatus === 'rejected' && me.teamJoinStatus !== 'rejected') ||
-        (rejectedReq && me.teamJoinStatus !== 'rejected'));
+    // 2. Player was REJECTED from a requested club (preserve any existing teamIds!)
+    let latestShownKey = '';
+    try {
+      latestShownKey = localStorage.getItem(`dreamteam_shown_decision_${me.id}`) || '';
+    } catch {}
 
-    if (isNowRejected) {
+    const unnotifiedRejection = rejectedReqs.find(
+      (r) => `rejected_${r.id}` !== latestShownKey
+    );
+    const rejectedViaUser =
+      freshMe &&
+      freshMe.teamJoinStatus === 'rejected' &&
+      me.teamJoinStatus !== 'rejected' &&
+      !myExistingTeamIds.size;
+
+    if (unnotifiedRejection || rejectedViaUser) {
       const updatedMe: AppUser = {
         ...me,
         ...(freshMe || {}),
-        teamJoinStatus: 'rejected',
+        // Preserve active club & memberships if user already belongs to other clubs
+        teamId: me.teamId || freshMe?.teamId,
+        teamIds: Array.from(myExistingTeamIds),
+        teamJoinStatus: myExistingTeamIds.size > 0 ? 'accepted' : 'rejected',
       };
       setCurrentUser(updatedMe);
       saveDeviceSession(updatedMe);
 
-      const teamLabel = rejectedReq?.teamName || freshMe?.requestedTeamName || 'el club';
-      const bannerKey = `rejected_${rejectedReq?.id || teamLabel}`;
+      const teamLabel = unnotifiedRejection?.teamName || freshMe?.requestedTeamName || 'el club';
+      const bannerKey = `rejected_${unnotifiedRejection?.id || teamLabel}`;
       try {
-        const storageKey = `dreamteam_shown_decision_${me.id}`;
-        if (localStorage.getItem(storageKey) !== bannerKey) {
-          localStorage.setItem(storageKey, bannerKey);
-        }
+        localStorage.setItem(`dreamteam_shown_decision_${me.id}`, bannerKey);
       } catch {}
 
       setJoinDecisionAlert({
@@ -335,14 +382,27 @@ export default function App() {
 
       // 2. Refresh from Supabase if configured
       if (isSupabaseConfigured()) {
-        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests] = await Promise.all([
+        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations, myPlayerCards] = await Promise.all([
           supabaseFetchPlayers(team.id),
           supabaseFetchMatches(team.id),
           supabaseFetchPosts(team.id),
           supabaseFetchUsers(),
           supabaseFetchTeams(),
           supabaseFetchJoinRequests(),
+          currentUser?.email
+            ? supabaseFetchTeamInvitations(currentUser.email)
+            : Promise.resolve([] as TeamInvitation[]),
+          currentUser?.id
+            ? supabaseFetchPlayersByUser(currentUser.id)
+            : Promise.resolve([] as Player[]),
         ]);
+
+        if (cloudInvitations && cloudInvitations.length > 0) {
+          setTeamInvitations(cloudInvitations);
+        }
+        if (myPlayerCards && myPlayerCards.length > 0) {
+          setUserPlayerCards(myPlayerCards);
+        }
 
         if (cloudTeams && cloudTeams.length > 0) {
           latestTeams = cloudTeams;
@@ -443,22 +503,40 @@ export default function App() {
 
     const syncFromSupabase = async () => {
       try {
-        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations] = await Promise.all([
+        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations, myPlayerCards] = await Promise.all([
           supabaseFetchPlayers(team.id),
           supabaseFetchMatches(team.id),
           supabaseFetchPosts(team.id),
           supabaseFetchUsers(),
           supabaseFetchTeams(),
           supabaseFetchJoinRequests(),
-          currentUser?.email 
-            ? supabase.from('team_invitations').select('*').eq('email', currentUser.email.toLowerCase())
-            : Promise.resolve({ data: null }),
+          currentUser?.email
+            ? supabaseFetchTeamInvitations(currentUser.email)
+            : Promise.resolve([] as TeamInvitation[]),
+          currentUser?.id
+            ? supabaseFetchPlayersByUser(currentUser.id)
+            : Promise.resolve([] as Player[]),
         ]);
 
         if (!isMounted) return;
 
-        if (cloudInvitations && cloudInvitations.data && cloudInvitations.data.length > 0) {
-          console.log('Invitaciones recibidas:', cloudInvitations.data);
+        if (cloudInvitations && cloudInvitations.length > 0) {
+          setTeamInvitations(cloudInvitations);
+        }
+        if (myPlayerCards && myPlayerCards.length > 0) {
+          setUserPlayerCards(myPlayerCards);
+          const cardTeamIds = myPlayerCards.map((p) => p.teamId).filter(Boolean) as string[];
+          const meNow = currentUserRef.current;
+          if (meNow && cardTeamIds.length > 0) {
+            const currentSet = new Set([...(meNow.teamIds || []), ...(meNow.teamId ? [meNow.teamId] : [])]);
+            const hasNew = cardTeamIds.some((id) => !currentSet.has(id));
+            if (hasNew) {
+              const merged = Array.from(new Set([...Array.from(currentSet), ...cardTeamIds]));
+              const updated = { ...meNow, teamIds: merged, teamId: meNow.teamId || merged[0] };
+              setCurrentUser(updated);
+              saveDeviceSession(updated);
+            }
+          }
         }
 
         if (cloudTeams && cloudTeams.length > 0) {
@@ -628,15 +706,11 @@ export default function App() {
 
     unsubInvitations = subscribeToSupabaseTable('team_invitations', () => {
       if (currentUser?.email) {
-        supabase
-          .from('team_invitations')
-          .select('*')
-          .eq('email', currentUser.email.toLowerCase())
-          .then(({ data }) => {
-            if (isMounted && data && data.length > 0) {
-              console.log('Nueva invitación recibida:', data);
-            }
-          });
+        supabaseFetchTeamInvitations(currentUser.email).then((invs) => {
+          if (isMounted) {
+            setTeamInvitations(invs);
+          }
+        });
       }
     });
 
@@ -878,8 +952,8 @@ export default function App() {
     }
   }, [team.name, team.id, team.logoUrl]);
 
-  // Handler to switch active team cleanly with distinct data segregation
-  const handleSwitchTeam = (newTeam: TeamInfo) => {
+  // Handler to switch active team cleanly with distinct data segregation & instant reload
+  const handleSwitchTeam = async (newTeam: TeamInfo, options?: { skipUserUpdate?: boolean }) => {
     if (!newTeam) return;
 
     // 1. Save data for current team before leaving
@@ -889,7 +963,7 @@ export default function App() {
       saveStandingsForLeague(team.leagueName, standings);
     }
 
-    // 2. Load target team's data
+    // 2. Load target team's local data immediately
     const targetPlayers = getPlayersForTeam(newTeam.id);
     const targetMatches = getMatchesForTeam(newTeam.id);
     const targetStandings = getStandingsForLeague(newTeam.leagueName, newTeam);
@@ -903,6 +977,80 @@ export default function App() {
       localStorage.setItem('teamgol_team_data', JSON.stringify(newTeam));
     } catch {
       // ignore
+    }
+
+    // 3. Update active team on currentUser while preserving all teamIds
+    const activeUser = currentUserRef.current;
+    if (activeUser && !options?.skipUserUpdate) {
+      const mergedTeamIds = Array.from(
+        new Set([
+          ...(Array.isArray(activeUser.teamIds) ? activeUser.teamIds.filter(Boolean) : []),
+          ...(activeUser.teamId ? [activeUser.teamId] : []),
+          newTeam.id,
+        ])
+      );
+      const matchedCard = targetPlayers.find(
+        (p) =>
+          p.linkedUserId === activeUser.id ||
+          (p.name && activeUser.name && p.name.toLowerCase().trim() === activeUser.name.toLowerCase().trim())
+      );
+      if (matchedCard) {
+        setSelectedPlayerId(matchedCard.id);
+      }
+      const updatedUser: AppUser = {
+        ...activeUser,
+        teamId: newTeam.id,
+        teamIds: mergedTeamIds,
+        playerId: matchedCard?.id || activeUser.playerId,
+      };
+      setCurrentUser(updatedUser);
+      saveDeviceSession(updatedUser);
+      setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+      if (isSupabaseConfigured()) {
+        supabaseUpsertUser(updatedUser);
+      }
+    }
+
+    // 4. Immediately reload fresh squad, matches, and posts from Supabase if configured
+    if (isSupabaseConfigured() && !options?.skipUserUpdate) {
+      try {
+        const [cloudPlayers, cloudMatches, cloudPosts] = await Promise.all([
+          supabaseFetchPlayers(newTeam.id),
+          supabaseFetchMatches(newTeam.id),
+          supabaseFetchPosts(newTeam.id),
+        ]);
+        if (cloudPlayers) {
+          setPlayers(cloudPlayers);
+          savePlayersForTeam(newTeam.id, cloudPlayers);
+          if (activeUser) {
+            const matchedPl = cloudPlayers.find(
+              (p) =>
+                p.linkedUserId === activeUser.id ||
+                (p.name && activeUser.name && p.name.toLowerCase().trim() === activeUser.name.toLowerCase().trim())
+            );
+            if (matchedPl) {
+              setSelectedPlayerId(matchedPl.id);
+              const withPl = {
+                ...activeUser,
+                teamId: newTeam.id,
+                teamIds: Array.from(new Set([...(activeUser.teamIds || []), newTeam.id])),
+                playerId: matchedPl.id,
+              };
+              setCurrentUser(withPl);
+              saveDeviceSession(withPl);
+            }
+          }
+        }
+        if (cloudMatches) {
+          setMatches(cloudMatches);
+          saveMatchesForTeam(newTeam.id, cloudMatches);
+        }
+        if (cloudPosts) {
+          setPosts(cloudPosts);
+        }
+      } catch (err) {
+        console.warn('Error reloading team data on switch:', err);
+      }
     }
   };
 
@@ -938,15 +1086,18 @@ export default function App() {
     }
   }, [currentUser?.role, activeTab]);
 
-  // Restrict navigation for unassigned player (without team) to leagues explorer and league wall
+  // Restrict navigation for unassigned player (without any team) to leagues explorer and league wall
   useEffect(() => {
-    if (currentUser?.role === 'player' && !currentUser?.teamId) {
+    const hasAnyTeam = Boolean(
+      currentUser?.teamId || (Array.isArray(currentUser?.teamIds) && currentUser.teamIds.length > 0)
+    );
+    if (currentUser?.role === 'player' && !hasAnyTeam) {
       const allowed = ['leagues', 'wall'];
       if (!allowed.includes(activeTab)) {
         setActiveTab('leagues');
       }
     }
-  }, [currentUser?.role, currentUser?.teamId, activeTab]);
+  }, [currentUser?.role, currentUser?.teamId, currentUser?.teamIds, activeTab]);
 
   const currentPlayer =
     players.find((p) => p.id === selectedPlayerId) ||
@@ -991,39 +1142,60 @@ export default function App() {
       localStorage.setItem('teamgol_join_requests', JSON.stringify(updatedRequests));
     } catch {}
 
-    // 2. Add player to the squad
-    const newPlayerId = `p_${Date.now()}`;
+    // 2. Create (or reuse) an independent Player card for this (team_id, user_id)
+    const targetTeamPlayers =
+      req.teamId === team.id ? players : getPlayersForTeam(req.teamId);
+    const existingCard = targetTeamPlayers.find(
+      (p) => p.linkedUserId === req.userId && (!p.teamId || p.teamId === req.teamId)
+    );
+    const newPlayerId = existingCard?.id || `p_${Date.now()}`;
     const newPlayer: Player = {
       id: newPlayerId,
       name: req.playerName,
-      number: req.playerNumber || Math.floor(Math.random() * 80) + 10,
-      position: req.playerPosition || 'MED',
-      avatarUrl: req.playerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      goals: 0,
-      assists: 0,
-      matches: 0,
-      yellowCards: 0,
-      redCards: 0,
+      number: req.playerNumber || existingCard?.number || Math.floor(Math.random() * 80) + 10,
+      position: req.playerPosition || existingCard?.position || 'MED',
+      avatarUrl: req.playerAvatar || existingCard?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      goals: existingCard?.goals || 0,
+      assists: existingCard?.assists || 0,
+      matches: existingCard?.matches || 0,
+      yellowCards: existingCard?.yellowCards || 0,
+      redCards: existingCard?.redCards || 0,
       isCalledUp: true,
-      isStarter: false,
-      mvpHistory: [],
+      isStarter: existingCard?.isStarter || false,
+      mvpHistory: existingCard?.mvpHistory || [],
       linkedUserId: req.userId,
       invitationStatus: 'confirmed',
       teamId: req.teamId,
     };
-    const updatedPlayers = [...players, newPlayer];
-    setPlayers(updatedPlayers);
-    savePlayersForTeam(req.teamId, updatedPlayers);
 
-    // 3. Update users list
+    const updatedTargetPlayers = [
+      ...targetTeamPlayers.filter((p) => p.id !== newPlayerId),
+      newPlayer,
+    ];
+    if (req.teamId === team.id) {
+      setPlayers(updatedTargetPlayers);
+    }
+    savePlayersForTeam(req.teamId, updatedTargetPlayers);
+
+    // 3. Add req.teamId to app_users.team_ids without removing previous memberships, and set as active teamId
+    let matchedUpdatedUser: AppUser | undefined;
     const updatedUsers = users.map((u) => {
       if (u.id === req.userId || (req.playerEmail && u.email.toLowerCase() === req.playerEmail.toLowerCase())) {
-        return {
+        const mergedTeamIds = Array.from(
+          new Set([
+            ...(Array.isArray(u.teamIds) ? u.teamIds.filter(Boolean) : []),
+            ...(u.teamId ? [u.teamId] : []),
+            req.teamId,
+          ])
+        );
+        matchedUpdatedUser = {
           ...u,
           teamId: req.teamId,
+          teamIds: mergedTeamIds,
           teamJoinStatus: 'accepted' as const,
           playerId: newPlayerId,
         };
+        return matchedUpdatedUser;
       }
       return u;
     });
@@ -1042,22 +1214,101 @@ export default function App() {
 
     pushBackendSyncImmediate({
       joinRequests: updatedRequests,
-      players: updatedPlayers,
+      players: req.teamId === team.id ? updatedTargetPlayers : players,
       users: updatedUsers,
     });
 
-    // 5. Update Supabase in real-time
+    // 5. Update Supabase in real-time (upsert user BEFORE player so FK players.user_id satisfies)
     if (isSupabaseConfigured()) {
       const acceptedReq: TeamJoinRequest = { ...req, status: 'accepted', respondedAt: nowIso };
-      supabaseUpsertJoinRequest(acceptedReq);
-      supabaseUpsertPlayer(req.teamId, newPlayer);
-      const matchedUser = updatedUsers.find(
-        (u) => u.id === req.userId || (req.playerEmail && u.email.toLowerCase() === req.playerEmail.toLowerCase())
-      );
-      if (matchedUser) {
-        supabaseUpsertUser(matchedUser);
+      if (matchedUpdatedUser) {
+        await supabaseUpsertUser(matchedUpdatedUser);
       }
+      await supabaseUpsertPlayer(req.teamId, newPlayer);
+      await supabaseUpsertJoinRequest(acceptedReq);
     }
+  };
+
+  // Accept an official team invitation while preserving previous multi-team memberships
+  const handleAcceptTeamInvitation = async (inv: TeamInvitation) => {
+    const me = currentUserRef.current;
+    if (!me) return;
+
+    const targetTeam = allTeamsRef.current.find(
+      (t) => (inv.teamId && t.id === inv.teamId) || t.name.toLowerCase() === inv.teamName.toLowerCase()
+    );
+    const targetTeamId = inv.teamId || targetTeam?.id;
+    if (!targetTeamId) return;
+
+    const existingTeamPlayers =
+      targetTeamId === team.id ? players : getPlayersForTeam(targetTeamId);
+    const existingCard = existingTeamPlayers.find(
+      (p) => p.linkedUserId === me.id && (!p.teamId || p.teamId === targetTeamId)
+    );
+    const newPlayerId = existingCard?.id || `p_${Date.now()}`;
+    const newPlayer: Player = {
+      id: newPlayerId,
+      name: me.name,
+      number: existingCard?.number || me.jerseyNumber || 10,
+      position: existingCard?.position || me.position || 'MED',
+      avatarUrl: existingCard?.avatarUrl || me.avatarUrl,
+      goals: existingCard?.goals || 0,
+      assists: existingCard?.assists || 0,
+      matches: existingCard?.matches || 0,
+      yellowCards: existingCard?.yellowCards || 0,
+      redCards: existingCard?.redCards || 0,
+      isCalledUp: true,
+      isStarter: existingCard?.isStarter || false,
+      mvpHistory: existingCard?.mvpHistory || [],
+      linkedUserId: me.id,
+      invitationStatus: 'confirmed',
+      teamId: targetTeamId,
+    };
+
+    const updatedSquad = [...existingTeamPlayers.filter((p) => p.id !== newPlayerId), newPlayer];
+    savePlayersForTeam(targetTeamId, updatedSquad);
+    if (targetTeamId === team.id) {
+      setPlayers(updatedSquad);
+    }
+
+    const mergedTeamIds = Array.from(
+      new Set([
+        ...(Array.isArray(me.teamIds) ? me.teamIds.filter(Boolean) : []),
+        ...(me.teamId ? [me.teamId] : []),
+        targetTeamId,
+      ])
+    );
+
+    const updatedMe: AppUser = {
+      ...me,
+      teamId: targetTeamId,
+      teamIds: mergedTeamIds,
+      teamJoinStatus: 'accepted',
+      playerId: newPlayerId,
+    };
+
+    setCurrentUser(updatedMe);
+    saveDeviceSession(updatedMe);
+    setSelectedPlayerId(newPlayerId);
+    setUsers((prev) => prev.map((u) => (u.id === me.id ? updatedMe : u)));
+
+    const updatedInvs = teamInvitations.map((i) =>
+      i.id === inv.id ? { ...i, status: 'accepted' as const } : i
+    );
+    setTeamInvitations(updatedInvs);
+
+    if (isSupabaseConfigured()) {
+      await supabaseUpsertUser(updatedMe);
+      await supabaseUpsertPlayer(targetTeamId, newPlayer);
+      await supabaseUpsertTeamInvitation({ ...inv, status: 'accepted' });
+    }
+
+    if (targetTeam) {
+      await handleSwitchTeam(targetTeam);
+    }
+    setActiveTab('calendar');
+    setJoinSuccessAlert(`¡Te has unido a ${targetTeam?.name || inv.teamName}! Puedes alternar entre tus equipos desde el encabezado.`);
+    setTimeout(() => setJoinSuccessAlert(null), 6000);
   };
 
   const handleRejectJoinRequest = async (requestId: string) => {
@@ -1152,15 +1403,21 @@ export default function App() {
           invitedTeamName={invitedTeamName}
           onLoginSuccess={(user, rememberDevice) => {
             setCurrentUser(user);
+            currentUserRef.current = user;
+            const hasAnyTeam = Boolean(
+              user.teamId || (Array.isArray(user.teamIds) && user.teamIds.length > 0)
+            );
             if (user.role === 'league_admin') {
               setActiveTab('wall');
-            } else if (user.role === 'player' && !user.teamId) {
+            } else if (user.role === 'player' && !hasAnyTeam) {
               setActiveTab('leagues');
             } else {
               const isAdmin =
                 user.email.toLowerCase() === 'agbl141201@gmail.com' ||
                 user.username?.toLowerCase() === 'admin';
-              const userTeamId = isAdmin ? 'team_01' : user.teamId || null;
+              const userTeamId = isAdmin
+                ? 'team_01'
+                : user.teamId || (user.teamIds && user.teamIds[0]) || null;
 
               if (isAdmin) {
                 // FC Bayern Munich must strictly be loaded for agbl141201@gmail.com
@@ -1194,6 +1451,17 @@ export default function App() {
     );
   }
 
+  // Compute all clubs where currentUser has an active player card, membership in teamIds, or owner role
+  const currentUserTeamIds = new Set<string>([
+    ...(Array.isArray(currentUser.teamIds) ? currentUser.teamIds.filter(Boolean) : []),
+    ...(currentUser.teamId ? [currentUser.teamId] : []),
+    ...userPlayerCards.map((p) => p.teamId).filter(Boolean) as string[],
+  ]);
+  const userTeamsList = allTeams.filter((t) => currentUserTeamIds.has(t.id));
+  if (team?.id && currentUserTeamIds.has(team.id) && !userTeamsList.some((t) => t.id === team.id)) {
+    userTeamsList.unshift(team);
+  }
+
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-[#050505] flex flex-col selection:bg-[#1877F2] selection:text-white">
       {showSplash && (
@@ -1206,7 +1474,9 @@ export default function App() {
       <Navbar
         team={team}
         allTeams={allTeams}
-        onSwitchTeam={handleSwitchTeam}
+        userTeams={userTeamsList}
+        onSwitchTeam={(t) => handleSwitchTeam(t)}
+        onJoinAnotherTeam={() => setActiveTab('leagues')}
         currentUser={currentUser}
         setCurrentUser={(u) => {
           setCurrentUser(u);
@@ -1214,9 +1484,11 @@ export default function App() {
         }}
         onLogout={() => {
           clearDeviceSession();
+          currentUserRef.current = null;
           setCurrentUser(null);
+          setUserPlayerCards([]);
           setJoinDecisionAlert(null);
-          handleSwitchTeam(INITIAL_TEAM);
+          handleSwitchTeam(INITIAL_TEAM, { skipUserUpdate: true });
         }}
         allUsers={users}
         activeTab={activeTab}
@@ -1229,6 +1501,8 @@ export default function App() {
         joinRequests={joinRequests}
         onAcceptJoinRequest={handleAcceptJoinRequest}
         onRejectJoinRequest={handleRejectJoinRequest}
+        teamInvitations={teamInvitations}
+        onAcceptTeamInvitation={handleAcceptTeamInvitation}
         onRefresh={handleManualRefresh}
         isRefreshing={isRefreshing}
       />
@@ -1288,8 +1562,8 @@ export default function App() {
 
       {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10">
-        {/* Unassigned Player View: only League Explorer and League Wall until admitted */}
-        {currentUser?.role === 'player' && !currentUser?.teamId ? (
+        {/* Unassigned Player View: only League Explorer and League Wall until admitted to at least one club */}
+        {currentUser?.role === 'player' && currentUserTeamIds.size === 0 ? (
           activeTab === 'wall' ? (
             <SocialWall
               posts={posts}
@@ -1311,6 +1585,10 @@ export default function App() {
               joinRequests={joinRequests}
               setJoinRequests={setJoinRequests}
               onViewLeagueWall={() => setActiveTab('wall')}
+              onSwitchToTeam={(t) => {
+                handleSwitchTeam(t);
+                setActiveTab('calendar');
+              }}
               language={language}
             />
           )
@@ -1330,6 +1608,10 @@ export default function App() {
                 joinRequests={joinRequests}
                 setJoinRequests={setJoinRequests}
                 onViewLeagueWall={() => setActiveTab('wall')}
+                onSwitchToTeam={(t) => {
+                  handleSwitchTeam(t);
+                  setActiveTab('calendar');
+                }}
                 language={language}
               />
             )}

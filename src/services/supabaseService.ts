@@ -1,5 +1,5 @@
 import { getSupabaseClient, isSupabaseConfigured } from '../utils/supabaseClient';
-import { Player, Match, Post, TeamInfo, StandingsRow, AppUser, TeamJoinRequest } from '../types';
+import { Player, Match, Post, TeamInfo, StandingsRow, AppUser, TeamJoinRequest, TeamInvitation } from '../types';
 
 // ==========================================
 // 1. CAMELCASE <-> SNAKE_CASE MAPPERS
@@ -38,6 +38,7 @@ export const mapTeamFromDb = (row: any): TeamInfo => ({
 export const mapPlayerToDb = (teamId: string, player: Player) => ({
   id: player.id,
   team_id: teamId,
+  user_id: player.linkedUserId || null,
   name: player.name,
   nickname: player.nickname || null,
   number: player.number !== undefined && player.number !== null ? String(player.number) : null,
@@ -70,6 +71,7 @@ export const mapPlayerFromDb = (row: any): Player => ({
   isCalledUp: row.is_called_up ?? true,
   isStarter: row.is_starter ?? false,
   mvpHistory: Array.isArray(row.mvp_history) ? row.mvp_history : [],
+  linkedUserId: row.user_id || undefined,
   teamId: row.team_id || undefined,
 });
 
@@ -179,43 +181,59 @@ export const mapPostFromDb = (row: any): Post => ({
   comments: Array.isArray(row.comments) ? row.comments : [],
 });
 
-export const mapUserToDb = (user: AppUser) => ({
-  id: user.id,
-  name: user.name,
-  email: user.email.toLowerCase().trim(),
-  username: user.username || null,
-  password: user.password || null,
-  role: user.role || 'player',
-  avatar_url: user.avatarUrl || null,
-  player_id: user.playerId || null,
-  team_id: user.teamId || null,
-  provider: user.provider || 'email',
-  team_join_status: user.teamJoinStatus || 'none',
-  requested_team_id: user.requestedTeamId || null,
-  requested_team_name: user.requestedTeamName || null,
-  position: user.position || null,
-  jersey_number: user.jerseyNumber !== undefined && user.jerseyNumber !== null ? Number(user.jerseyNumber) : null,
-  phone: user.phone || null,
-});
+export const mapUserToDb = (user: AppUser) => {
+  const mergedTeamIds = Array.from(
+    new Set([
+      ...(Array.isArray(user.teamIds) ? user.teamIds.filter(Boolean) : []),
+      ...(user.teamId ? [user.teamId] : []),
+    ])
+  );
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email.toLowerCase().trim(),
+    username: user.username || null,
+    password: user.password || null,
+    role: user.role || 'player',
+    avatar_url: user.avatarUrl || null,
+    player_id: user.playerId || null,
+    team_id: user.teamId || null,
+    team_ids: mergedTeamIds,
+    provider: user.provider || 'email',
+    team_join_status: user.teamJoinStatus || 'none',
+    requested_team_id: user.requestedTeamId || null,
+    requested_team_name: user.requestedTeamName || null,
+    position: user.position || null,
+    jersey_number: user.jerseyNumber !== undefined && user.jerseyNumber !== null ? Number(user.jerseyNumber) : null,
+    phone: user.phone || null,
+  };
+};
 
-export const mapUserFromDb = (row: any): AppUser => ({
-  id: row.id,
-  name: row.name,
-  email: row.email,
-  username: row.username || undefined,
-  password: row.password || undefined,
-  role: row.role || 'player',
-  avatarUrl: row.avatar_url || '',
-  playerId: row.player_id || undefined,
-  teamId: row.team_id || undefined,
-  provider: row.provider || 'email',
-  teamJoinStatus: row.team_join_status || undefined,
-  requestedTeamId: row.requested_team_id || undefined,
-  requestedTeamName: row.requested_team_name || undefined,
-  position: row.position || undefined,
-  jerseyNumber: row.jersey_number !== null && row.jersey_number !== undefined ? Number(row.jersey_number) : undefined,
-  phone: row.phone || undefined,
-});
+export const mapUserFromDb = (row: any): AppUser => {
+  const rawTeamIds = Array.isArray(row.team_ids) ? row.team_ids.filter(Boolean) : [];
+  const mergedTeamIds = Array.from(
+    new Set([...rawTeamIds, ...(row.team_id ? [row.team_id] : [])])
+  );
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    username: row.username || undefined,
+    password: row.password || undefined,
+    role: row.role || 'player',
+    avatarUrl: row.avatar_url || '',
+    playerId: row.player_id || undefined,
+    teamId: row.team_id || undefined,
+    teamIds: mergedTeamIds,
+    provider: row.provider || 'email',
+    teamJoinStatus: row.team_join_status || undefined,
+    requestedTeamId: row.requested_team_id || undefined,
+    requestedTeamName: row.requested_team_name || undefined,
+    position: row.position || undefined,
+    jerseyNumber: row.jersey_number !== null && row.jersey_number !== undefined ? Number(row.jersey_number) : undefined,
+    phone: row.phone || undefined,
+  };
+};
 
 export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
   id: req.id,
@@ -346,6 +364,26 @@ export const supabaseFetchPlayers = async (teamId: string): Promise<Player[] | n
   } catch (err: any) {
     console.warn('[Supabase] fetchPlayers exception:', err?.message || err);
     return null;
+  }
+};
+
+export const supabaseFetchPlayersByUser = async (userId: string): Promise<Player[]> => {
+  const client = getSupabaseClient();
+  if (!client || !userId) return [];
+
+  try {
+    const { data, error } = await client
+      .from('players')
+      .select('*')
+      .eq('user_id', userId);
+    if (error) {
+      console.warn('[Supabase] fetchPlayersByUser error:', error.message);
+      return [];
+    }
+    return (data || []).map(mapPlayerFromDb);
+  } catch (err: any) {
+    console.warn('[Supabase] fetchPlayersByUser exception:', err?.message || err);
+    return [];
   }
 };
 
@@ -630,6 +668,73 @@ export const supabaseDeleteJoinRequest = async (requestId: string): Promise<bool
     return true;
   } catch (err: any) {
     console.error('[Supabase] Excepción al eliminar join_request:', err?.message || err);
+    return false;
+  }
+};
+
+// ==========================================
+// 7B. TEAM INVITATIONS SERVICE
+// ==========================================
+export const mapInvitationFromDb = (row: any): TeamInvitation => ({
+  id: row.id,
+  email: row.email || '',
+  playerName: row.player_name || '',
+  teamId: row.team_id || undefined,
+  teamName: row.team_name || 'Equipo',
+  teamLogo: row.team_logo || undefined,
+  stadium: row.stadium || undefined,
+  sentAt: row.sent_at || new Date().toISOString(),
+  role: (row.role || 'player') as TeamInvitation['role'],
+  status: row.status === 'accepted' ? 'accepted' : 'sent',
+});
+
+export const supabaseFetchTeamInvitations = async (email?: string): Promise<TeamInvitation[]> => {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    let query = client.from('team_invitations').select('*');
+    if (email) {
+      query = query.eq('email', email.toLowerCase().trim());
+    }
+    const { data, error } = await query;
+    if (error) {
+      console.warn('[Supabase] fetchTeamInvitations error:', error.message);
+      return [];
+    }
+    return (data || []).map(mapInvitationFromDb);
+  } catch (err: any) {
+    console.warn('[Supabase] fetchTeamInvitations exception:', err?.message || err);
+    return [];
+  }
+};
+
+export const supabaseUpsertTeamInvitation = async (inv: TeamInvitation): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('team_invitations').upsert(
+      {
+        id: inv.id,
+        email: inv.email.toLowerCase().trim(),
+        player_name: inv.playerName || null,
+        team_id: inv.teamId || '',
+        team_name: inv.teamName || null,
+        team_logo: inv.teamLogo || null,
+        stadium: inv.stadium || null,
+        role: inv.role || 'player',
+        status: inv.status === 'accepted' ? 'accepted' : 'pending',
+      },
+      { onConflict: 'id' }
+    );
+    if (error) {
+      console.error('[Supabase] Error al guardar team_invitation:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('[Supabase] Excepción al guardar team_invitation:', err?.message || err);
     return false;
   }
 };
