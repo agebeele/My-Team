@@ -116,6 +116,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     const matchedUser = allUsers.find(
       (u) =>
         u.email.toLowerCase() === cleanInput ||
+        u.email.split('@')[0].toLowerCase() === cleanInput ||
         (u.username && u.username.toLowerCase() === cleanInput)
     );
 
@@ -208,7 +209,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setRegistrationError(null);
 
     const name = newPlayerForm.name.trim();
-    const email = newPlayerForm.email.trim();
+    const rawPrefix = newPlayerForm.email.trim().split('@')[0].replace(/\s+/g, '').toLowerCase();
     const password = newPlayerForm.password.trim();
     const confirmPassword = newPlayerForm.confirmPassword.trim();
 
@@ -216,10 +217,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setRegistrationError('Por favor ingresa tu nombre completo.');
       return;
     }
-    if (!email || !email.includes('@')) {
-      setRegistrationError('Por favor ingresa un correo electrónico válido al que te llegará la invitación.');
+    if (!rawPrefix) {
+      setRegistrationError('Por favor ingresa el inicio de tu correo (antes del @) para crear tu cuenta.');
       return;
     }
+    const email = `${rawPrefix}@dreamteam.com`;
     if (!password || password.length < 3) {
       setRegistrationError('Por favor define una contraseña de al menos 3 caracteres.');
       return;
@@ -507,18 +509,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             <div>
               <label className="block text-[11px] font-bold text-[#050505] mb-1">
-                Correo Electrónico * (Aquí llegará tu invitación)
+                Correo Electrónico Oficial * (Solo escribe antes del @)
               </label>
-              <input
-                type="email"
-                required
-                placeholder="rodrigo@ejemplo.com"
-                value={newPlayerForm.email}
-                onChange={(e) =>
-                  setNewPlayerForm((prev) => ({ ...prev, email: e.target.value }))
-                }
-                className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
-              />
+              <div className="flex items-center rounded-xl bg-[#F0F2F5] border border-[#CED0D4] focus-within:ring-2 focus-within:ring-[#1877F2] focus-within:bg-white overflow-hidden transition-all">
+                <input
+                  type="text"
+                  required
+                  placeholder="ej. rodrigo.mendoza"
+                  value={newPlayerForm.email}
+                  onChange={(e) => {
+                    const cleanPrefix = e.target.value.split('@')[0].replace(/\s+/g, '').toLowerCase();
+                    setNewPlayerForm((prev) => ({ ...prev, email: cleanPrefix }));
+                  }}
+                  className="flex-1 min-w-0 px-3 py-2 bg-transparent text-xs font-medium text-[#050505] outline-hidden"
+                />
+                <span className="px-3 py-2 bg-[#E4E6EB]/80 border-l border-[#CED0D4] text-xs font-bold text-[#1877F2] select-none shrink-0">
+                  @dreamteam.com
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">

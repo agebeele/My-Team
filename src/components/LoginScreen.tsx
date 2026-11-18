@@ -343,6 +343,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     const matchedUser = allUsers.find(
       (u) =>
         u.email.toLowerCase() === identifier ||
+        u.email.split('@')[0].toLowerCase() === identifier ||
         (u.username && u.username.toLowerCase() === identifier)
     );
 
@@ -437,7 +438,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setRegisterError(null);
 
     const name = newPlayerForm.name.trim();
-    const email = newPlayerForm.email.trim();
+    const rawPrefix = newPlayerForm.email.trim().split('@')[0].replace(/\s+/g, '').toLowerCase();
     const password = newPlayerForm.password.trim();
     const confirmPassword = newPlayerForm.confirmPassword.trim();
 
@@ -445,10 +446,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setRegisterError('Por favor ingresa tu nombre completo.');
       return;
     }
-    if (!email || !email.includes('@')) {
-      setRegisterError('Por favor ingresa un correo electrónico válido.');
+    if (!rawPrefix) {
+      setRegisterError('Por favor ingresa el inicio de tu correo (antes del @).');
       return;
     }
+    const email = `${rawPrefix}@dreamteam.com`;
     if (!password || password.length < 3) {
       setRegisterError('Crea una contraseña de al menos 3 caracteres.');
       return;
@@ -956,17 +958,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-[#050505] mb-1">
-                  Correo Electrónico *
+                  Correo Electrónico Oficial *
                 </label>
-                <input
-                  type="email"
-                  required
-                  value={newPlayerForm.email}
-                  onChange={(e) => setNewPlayerForm({ ...newPlayerForm, email: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-medium text-[#050505] focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
-                />
+                <div className="flex items-center rounded-xl bg-[#F0F2F5] border border-[#CED0D4] focus-within:ring-2 focus-within:ring-[#1877F2] focus-within:bg-white overflow-hidden transition-all">
+                  <input
+                    id="input-register-email-prefix"
+                    type="text"
+                    required
+                    placeholder="ej. rodrigo.mendoza"
+                    value={newPlayerForm.email}
+                    onChange={(e) => {
+                      const cleanPrefix = e.target.value.split('@')[0].replace(/\s+/g, '').toLowerCase();
+                      setNewPlayerForm({ ...newPlayerForm, email: cleanPrefix });
+                    }}
+                    className="flex-1 min-w-0 px-3 py-2 bg-transparent text-xs font-medium text-[#050505] outline-hidden"
+                  />
+                  <span className="px-3 py-2 bg-[#E4E6EB]/80 border-l border-[#CED0D4] text-xs font-bold text-[#1877F2] select-none shrink-0">
+                    @dreamteam.com
+                  </span>
+                </div>
                 <p className="text-[10px] text-[#65676B] mt-1">
-                  * Se vinculará para que recibas notificaciones y convocatorias del equipo.
+                  * Solo escribe lo que va antes del @. Tu correo quedará como{' '}
+                  <span className="font-bold text-[#050505]">
+                    {newPlayerForm.email ? `${newPlayerForm.email}@dreamteam.com` : 'usuario@dreamteam.com'}
+                  </span>
                 </p>
               </div>
 
