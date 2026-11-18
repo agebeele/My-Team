@@ -10,6 +10,7 @@ import {
   Settings,
   X,
   Zap,
+  User,
 } from 'lucide-react';
 import { AppUser, Language, UserRole } from '../types';
 import { getT } from '../utils/translations';
@@ -57,6 +58,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     ? [
         { id: 'wall', label: t.nav.wall || 'Muro', icon: MessageSquare, isLive: false },
         { id: 'tables', label: t.nav.tables || 'Tablas', icon: Trophy, isLive: false },
+        { id: 'profile', label: 'Mi Perfil', icon: User, isLive: false },
       ]
     : isUnassignedPlayer
     ? [
@@ -99,6 +101,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       label: t.nav.wall,
       description: 'Noticias, comunicados y comentarios',
       icon: MessageSquare,
+      badge: null,
+      color: 'blue',
+    },
+    {
+      id: 'profile',
+      label: 'Mi Perfil',
+      description: 'Tu ficha, foto, credencial y estadísticas',
+      icon: User,
       badge: null,
       color: 'blue',
     },

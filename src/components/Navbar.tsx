@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Database,
   RefreshCw,
+  XCircle,
 } from 'lucide-react';
 import { AppUser, Language, TeamInfo, UserRole, TeamInvitation, TeamJoinRequest } from '../types';
 import { getT } from '../utils/translations';
@@ -89,6 +90,38 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   });
 
+  const [seenDecisionKeys, setSeenDecisionKeys] = useState<string[]>(() => {
+    try {
+      const key = `dreamteam_seen_join_decisions_${currentUser?.id || 'anon'}`;
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const key = `dreamteam_seen_join_decisions_${currentUser?.id || 'anon'}`;
+      const stored = localStorage.getItem(key);
+      setSeenDecisionKeys(stored ? JSON.parse(stored) : []);
+    } catch {
+      setSeenDecisionKeys([]);
+    }
+  }, [currentUser?.id]);
+
+  const markDecisionAsSeen = (reqId: string, status: string) => {
+    const decisionKey = `${reqId}_${status}`;
+    setSeenDecisionKeys((prev) => {
+      if (prev.includes(decisionKey)) return prev;
+      const next = [...prev, decisionKey];
+      try {
+        localStorage.setItem(`dreamteam_seen_join_decisions_${currentUser?.id || 'anon'}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
   useEffect(() => {
     const handleStorage = () => {
       try {
@@ -112,7 +145,26 @@ export const Navbar: React.FC<NavbarProps> = ({
       )
     : [];
 
-  const totalUnreadCount = unreadAlertsCount + myPendingInvitations.length + pendingTeamRequests.length;
+  // Notifications for a player whose join request was accepted or rejected
+  const myDecisionRequests = currentUser?.role === 'player'
+    ? joinRequests.filter((r) => {
+        const matchesUser =
+          r.userId === currentUser.id ||
+          (r.playerEmail && currentUser.email && r.playerEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+          (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase());
+        return matchesUser && (r.status === 'accepted' || r.status === 'rejected');
+      })
+    : [];
+
+  const unreadDecisionRequests = myDecisionRequests.filter(
+    (r) => !seenDecisionKeys.includes(`${r.id}_${r.status}`)
+  );
+
+  const totalUnreadCount =
+    unreadAlertsCount +
+    myPendingInvitations.length +
+    pendingTeamRequests.length +
+    unreadDecisionRequests.length;
 
   const handleAcceptInvite = (inv: TeamInvitation) => {
     const updated = sentInvitations.map((i) =>
@@ -180,12 +232,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Left Brand & Active Club */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {currentUser.role === 'league_admin' ? (
-              /* Dedicated League Admin Shield / Trophy */
+              /* Dedicated League Admin Avatar & Name */
               <>
                 <div className="relative shrink-0">
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center text-white text-xl shadow-md border border-amber-300">
-                    🏆
-                  </div>
+                  {currentUser.avatarUrl ? (
+                    <img
+                      src={currentUser.avatarUrl}
+                      alt={currentUser.name}
+                      referrerPolicy="no-referrer"
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover ring-2 ring-amber-400 shadow-md bg-white"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 flex items-center justify-center text-white text-xl shadow-md border border-amber-300">
+                      🏆
+                    </div>
+                  )}
                   <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-600 text-white flex items-center justify-center text-[9px] font-black shadow-xs">
                     ★
                   </span>
@@ -193,12 +254,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                    <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1">
-                      <span>Administrador de Liga</span>
+                    <h1 className="text-sm sm:text-base font-black tracking-tight text-[#050505] dark:text-white flex items-center gap-1 truncate max-w-[160px] sm:max-w-xs">
+                      <span>{currentUser.name || 'Administrador de Liga'}</span>
                     </h1>
                   </div>
                   <p className="text-[11px] sm:text-xs text-[#65676B] dark:text-gray-400 truncate max-w-[150px] sm:max-w-xs font-semibold">
-                    Panel General • Todas las Ligas
+                    {currentUser.adminTitle || 'Panel General • Todas las Ligas'}
                   </p>
                 </div>
               </>
@@ -269,6 +330,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   }`}
                 >
                   🏆 {t.nav.tables}
+                </button>
+                <button
+                  id="nav-btn-league-profile"
+                  onClick={() => handleTabChange('profile')}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    selectedTab === 'profile'
+                      ? 'bg-white dark:bg-[#242526] text-[#1877F2] dark:text-[#60A5FA] shadow-xs'
+                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  👤 Mi Perfil
                 </button>
               </>
             ) : !currentUser.teamId && currentUser.role === 'player' ? (
@@ -587,7 +659,105 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </div>
                     ))}
 
-                    {pendingTeamRequests.length === 0 && myPendingInvitations.length === 0 && (
+                    {/* 2.5 Player Join Request Decisions (Accepted or Rejected) */}
+                    {myDecisionRequests.map((req) => {
+                      const isAccepted = req.status === 'accepted';
+                      const isUnread = !seenDecisionKeys.includes(`${req.id}_${req.status}`);
+                      return (
+                        <div
+                          key={`${req.id}_${req.status}`}
+                          className={`p-3 rounded-xl border space-y-2 ${
+                            isAccepted
+                              ? 'bg-gradient-to-r from-emerald-50 to-green-50/60 dark:from-emerald-950/40 dark:to-green-950/30 border-emerald-300 dark:border-emerald-700/60'
+                              : 'bg-gradient-to-r from-rose-50 to-red-50/60 dark:from-rose-950/40 dark:to-red-950/30 border-rose-300 dark:border-rose-700/60'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                                isAccepted ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
+                              }`}
+                            >
+                              {isAccepted ? (
+                                <CheckCircle2 className="w-5 h-5" />
+                              ) : (
+                                <XCircle className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span
+                                  className={`font-black text-xs block ${
+                                    isAccepted
+                                      ? 'text-emerald-900 dark:text-emerald-200'
+                                      : 'text-rose-900 dark:text-rose-200'
+                                  }`}
+                                >
+                                  {isAccepted
+                                    ? '¡Solicitud Aceptada!'
+                                    : 'Solicitud Rechazada'}
+                                </span>
+                                {isUnread && (
+                                  <span className="px-1.5 py-0.5 rounded-full bg-[#E41E3F] text-white text-[9px] font-black">
+                                    NUEVA
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-[#050505] dark:text-gray-200 mt-0.5 leading-snug">
+                                {isAccepted ? (
+                                  <>
+                                    Has sido aceptado en <strong>{req.teamName}</strong>. Tu perfil ya está actualizado con acceso completo a partidos, convocatorias, alineaciones y estadísticas.
+                                  </>
+                                ) : (
+                                  <>
+                                    Tu solicitud para unirte a <strong>{req.teamName}</strong> fue rechazada. Puedes postularte a otro club disponible en la liga.
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-0.5">
+                            {isAccepted ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  markDecisionAsSeen(req.id, req.status);
+                                  handleTabChange('calendar');
+                                  setShowNotificationsMenu(false);
+                                }}
+                                className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                              >
+                                Ir al Equipo
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  markDecisionAsSeen(req.id, req.status);
+                                  handleTabChange('leagues');
+                                  setShowNotificationsMenu(false);
+                                }}
+                                className="flex-1 py-1.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                              >
+                                Explorar Equipos
+                              </button>
+                            )}
+                            {isUnread && (
+                              <button
+                                type="button"
+                                onClick={() => markDecisionAsSeen(req.id, req.status)}
+                                className="py-1.5 px-2.5 rounded-lg bg-white/80 hover:bg-white text-[#65676B] font-bold text-[11px] border border-gray-200 cursor-pointer"
+                              >
+                                Marcar leída
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {pendingTeamRequests.length === 0 && myPendingInvitations.length === 0 && myDecisionRequests.length === 0 && (
                       <div className="py-6 text-center space-y-1">
                         <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto opacity-70" />
                         <p className="text-xs font-bold text-[#050505] dark:text-white">Al día</p>
@@ -675,17 +845,35 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   {/* Direct Actions for Active User */}
                   <div className="mt-2 space-y-1">
-                    <button
-                      id="btn-menu-my-profile"
-                      onClick={() => {
-                        handleTabChange('profile');
-                        setShowRoleMenu(false);
-                      }}
-                      className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#050505] dark:text-white hover:bg-[#F0F2F5] dark:hover:bg-white/5 transition-colors cursor-pointer"
-                    >
-                      <User className="w-4 h-4 text-[#1877F2]" />
-                      <span>Ver mi perfil y estadísticas</span>
-                    </button>
+                    {currentUser.role === 'player' && !currentUser.teamId ? (
+                      <button
+                        id="btn-menu-explore-leagues"
+                        onClick={() => {
+                          handleTabChange('leagues');
+                          setShowRoleMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#050505] dark:text-white hover:bg-[#F0F2F5] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <User className="w-4 h-4 text-[#1877F2]" />
+                        <span>Explorar Ligas y Equipos</span>
+                      </button>
+                    ) : (
+                      <button
+                        id="btn-menu-my-profile"
+                        onClick={() => {
+                          handleTabChange('profile');
+                          setShowRoleMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs font-semibold text-[#050505] dark:text-white hover:bg-[#F0F2F5] dark:hover:bg-white/5 transition-colors cursor-pointer"
+                      >
+                        <User className="w-4 h-4 text-[#1877F2]" />
+                        <span>
+                          {currentUser.role === 'league_admin'
+                            ? 'Mi Perfil de Admin (Foto y Nombre)'
+                            : 'Ver mi perfil y estadísticas'}
+                        </span>
+                      </button>
+                    )}
 
                     {onRefresh && (
                       <button

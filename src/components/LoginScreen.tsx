@@ -315,6 +315,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       );
 
       const targetLeagueAdmin: AppUser = {
+        ...(leagueUserInList || {}),
         id: leagueUserInList?.id || 'u_league_admin',
         name: leagueUserInList?.name || 'Administrador de Liga',
         email: 'admin@dreamteam.com',

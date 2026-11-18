@@ -57,6 +57,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   // Post Authorization Modal state (Admin only)
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authSuccessToast, setAuthSuccessToast] = useState<string | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -520,23 +521,37 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                   </p>
                 </div>
 
-                {/* Attached Media: Image or Video */}
+                {/* Attached Media: Uniform 4:3 Aspect Ratio without Cropping Vertical Images */}
                 {post.imageUrl && (
-                  <div className="rounded-xl overflow-hidden border border-[#CED0D4] max-h-96 bg-black/5 flex items-center justify-center">
+                  <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden border border-[#CED0D4] bg-slate-950 flex items-center justify-center">
                     {isVideoMedia ? (
                       <video
                         controls
                         playsInline
                         src={post.imageUrl}
-                        className="w-full max-h-96 object-contain bg-black rounded-xl"
+                        className="w-full h-full object-contain bg-black"
                       />
                     ) : (
-                      <img
-                        src={post.imageUrl}
-                        alt={post.title}
-                        referrerPolicy="no-referrer"
-                        className="w-full max-h-96 object-cover"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setLightboxImage({ url: post.imageUrl!, title: post.title })}
+                        className="relative w-full h-full flex items-center justify-center cursor-zoom-in group focus:outline-none"
+                        title="Tocar para ver imagen completa"
+                      >
+                        <img
+                          src={post.imageUrl}
+                          alt=""
+                          aria-hidden="true"
+                          referrerPolicy="no-referrer"
+                          className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-45 pointer-events-none select-none"
+                        />
+                        <img
+                          src={post.imageUrl}
+                          alt={post.title}
+                          referrerPolicy="no-referrer"
+                          className="relative z-10 w-full h-full object-contain transition-transform duration-200 group-hover:scale-[1.01]"
+                        />
+                      </button>
                     )}
                   </div>
                 )}
@@ -823,20 +838,28 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                       </button>
                     </div>
 
-                    <div className="rounded-lg overflow-hidden border border-[#CED0D4] max-h-48 bg-black/5 flex items-center justify-center">
+                    <div className="relative w-full aspect-[4/3] max-h-56 mx-auto rounded-lg overflow-hidden border border-[#CED0D4] bg-slate-950 flex items-center justify-center">
                       {attachedMediaType === 'video' ? (
                         <video
                           controls
                           playsInline
                           src={attachedMediaUrl}
-                          className="max-h-48 w-full object-contain bg-black"
+                          className="w-full h-full object-contain bg-black"
                         />
                       ) : (
-                        <img
-                          src={attachedMediaUrl}
-                          alt="Vista previa"
-                          className="max-h-48 w-full object-cover"
-                        />
+                        <>
+                          <img
+                            src={attachedMediaUrl}
+                            alt=""
+                            aria-hidden="true"
+                            className="absolute inset-0 w-full h-full object-cover blur-xl scale-110 opacity-45 pointer-events-none"
+                          />
+                          <img
+                            src={attachedMediaUrl}
+                            alt="Vista previa"
+                            className="relative z-10 w-full h-full object-contain"
+                          />
+                        </>
                       )}
                     </div>
                   </div>
@@ -963,20 +986,28 @@ export const SocialWall: React.FC<SocialWallProps> = ({
 
                             {/* Attached Preview */}
                             {post.imageUrl && (
-                              <div className="rounded-lg overflow-hidden border border-[#CED0D4] max-h-56 bg-black/5 flex items-center justify-center">
+                              <div className="relative w-full aspect-[4/3] max-h-60 rounded-lg overflow-hidden border border-[#CED0D4] bg-slate-950 flex items-center justify-center">
                                 {isVideoMedia ? (
                                   <video
                                     controls
                                     playsInline
                                     src={post.imageUrl}
-                                    className="max-h-56 w-full object-contain bg-black"
+                                    className="w-full h-full object-contain bg-black"
                                   />
                                 ) : (
-                                  <img
-                                    src={post.imageUrl}
-                                    alt="Vista previa adjunta"
-                                    className="max-h-56 w-full object-cover"
-                                  />
+                                  <>
+                                    <img
+                                      src={post.imageUrl}
+                                      alt=""
+                                      aria-hidden="true"
+                                      className="absolute inset-0 w-full h-full object-cover blur-xl scale-110 opacity-45 pointer-events-none"
+                                    />
+                                    <img
+                                      src={post.imageUrl}
+                                      alt="Vista previa adjunta"
+                                      className="relative z-10 w-full h-full object-contain"
+                                    />
+                                  </>
                                 )}
                               </div>
                             )}
@@ -1015,6 +1046,39 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                 Cerrar Panel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal to view full resolution image */}
+      {lightboxImage && (
+        <div
+          onClick={() => setLightboxImage(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm animate-in fade-in"
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxImage(null)}
+            className="absolute top-4 right-4 p-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white transition-colors cursor-pointer"
+            title="Cerrar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-4xl max-h-[90vh] flex flex-col items-center gap-2"
+          >
+            <img
+              src={lightboxImage.url}
+              alt={lightboxImage.title}
+              referrerPolicy="no-referrer"
+              className="max-w-full max-h-[82vh] object-contain rounded-xl shadow-2xl"
+            />
+            {lightboxImage.title && (
+              <p className="text-xs sm:text-sm font-bold text-white/90 text-center px-3">
+                {lightboxImage.title}
+              </p>
+            )}
           </div>
         </div>
       )}
