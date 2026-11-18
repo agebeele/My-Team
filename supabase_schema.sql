@@ -1,6 +1,6 @@
 -- ========================================================
--- ESQUEMA COMPLETO DE BASE DE DATOS TEAMGOL PARA SUPABASE
--- Estratificado sin ningún tipo de datos semilla (0 filas)
+-- ESQUEMA COMPLETO Y ACTUALIZADO DE BASE DE DATOS TEAMGOL
+-- Compatible con RLS, Realtime y el mapeo exacto del Frontend
 -- ========================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -55,8 +55,22 @@ CREATE TABLE IF NOT EXISTS app_users (
   player_id TEXT,
   team_id TEXT,
   provider TEXT DEFAULT 'email',
+  team_join_status TEXT DEFAULT 'none',
+  requested_team_id TEXT,
+  requested_team_name TEXT,
+  position TEXT,
+  jersey_number INTEGER,
+  phone TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Migraciones idempotentes para app_users
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_join_status TEXT DEFAULT 'none';
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_id TEXT;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_name TEXT;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS position TEXT;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS jersey_number INTEGER;
+ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone TEXT;
 
 -- 4. TABLA DE PARTIDOS (MATCHES)
 CREATE TABLE IF NOT EXISTS matches (
@@ -87,6 +101,11 @@ CREATE TABLE IF NOT EXISTS matches (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS mvp_photo_url TEXT;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS created_at_timestamp BIGINT;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_start_timestamp BIGINT;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS finished_at_timestamp BIGINT;
+
 -- 5. TABLA DE PUBLICACIONES / MURO (POSTS)
 CREATE TABLE IF NOT EXISTS posts (
   id TEXT PRIMARY KEY,
@@ -110,17 +129,11 @@ CREATE TABLE IF NOT EXISTS posts (
   inserted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Migraciones idempotentes
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_type TEXT;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{"likes":0,"fire":0,"clap":0,"goal":0,"userReactions":{}}'::JSONB;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]'::JSONB;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS created_at_iso TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS inserted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-
-ALTER TABLE matches ADD COLUMN IF NOT EXISTS mvp_photo_url TEXT;
-ALTER TABLE matches ADD COLUMN IF NOT EXISTS created_at_timestamp BIGINT;
-ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_start_timestamp BIGINT;
-ALTER TABLE matches ADD COLUMN IF NOT EXISTS finished_at_timestamp BIGINT;
 
 -- 6. TABLA DE CLASIFICACIÓN / TABLAS DE LIGA (STANDINGS)
 CREATE TABLE IF NOT EXISTS standings (
@@ -147,23 +160,42 @@ CREATE TABLE IF NOT EXISTS join_requests (
   team_id TEXT NOT NULL,
   team_name TEXT,
   user_id TEXT NOT NULL,
-  player_email TEXT NOT NULL,
-  player_name TEXT NOT NULL,
+  user_name TEXT,
+  user_email TEXT,
+  player_email TEXT,
+  player_name TEXT,
   player_position TEXT DEFAULT 'MED',
   player_number INTEGER,
   player_avatar TEXT,
   status TEXT DEFAULT 'pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Migraciones para app_users y join_requests
-ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_join_status TEXT DEFAULT 'none';
-ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_id TEXT;
-ALTER TABLE app_users ADD COLUMN IF NOT EXISTS requested_team_name TEXT;
-ALTER TABLE app_users ADD COLUMN IF NOT EXISTS position TEXT;
-ALTER TABLE app_users ADD COLUMN IF NOT EXISTS jersey_number INTEGER;
-ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone TEXT;
+-- Migraciones y corrección de restricciones en join_requests
+ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS user_email TEXT;
 ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS player_avatar TEXT;
+ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE join_requests ALTER COLUMN player_email DROP NOT NULL;
+ALTER TABLE join_requests ALTER COLUMN player_name DROP NOT NULL;
+
+-- Eliminar tabla duplicada obsoleta si aún existe
+DROP TABLE IF EXISTS team_join_requests;
+
+-- 8. TABLA DE INVITACIONES OFICIALES (TEAM_INVITATIONS)
+CREATE TABLE IF NOT EXISTS team_invitations (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  player_name TEXT,
+  team_id TEXT NOT NULL,
+  team_name TEXT,
+  team_logo TEXT,
+  stadium TEXT,
+  role TEXT DEFAULT 'player',
+  status TEXT DEFAULT 'pending',
+  sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 -- ========================================================
 -- POLÍTICAS DE SEGURIDAD (ROW LEVEL SECURITY)
@@ -175,6 +207,7 @@ ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE standings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE join_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE team_invitations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public access teams" ON teams;
 CREATE POLICY "Public access teams" ON teams FOR ALL USING (true) WITH CHECK (true);
@@ -197,13 +230,16 @@ CREATE POLICY "Public access standings" ON standings FOR ALL USING (true) WITH C
 DROP POLICY IF EXISTS "Public access join_requests" ON join_requests;
 CREATE POLICY "Public access join_requests" ON join_requests FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public access team_invitations" ON team_invitations;
+CREATE POLICY "Public access team_invitations" ON team_invitations FOR ALL USING (true) WITH CHECK (true);
+
 -- ========================================================
 -- TIEMPO REAL (REALTIME)
 -- ========================================================
 DO $$
 BEGIN
   BEGIN
-    ALTER PUBLICATION supabase_realtime ADD TABLE posts, players, matches, app_users, teams, standings, join_requests;
+    ALTER PUBLICATION supabase_realtime ADD TABLE posts, players, matches, app_users, teams, standings, join_requests, team_invitations;
   EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;
