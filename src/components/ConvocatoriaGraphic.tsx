@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Users,
   Download,
@@ -135,10 +135,26 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
   const posterRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const customBgFileInputRef = useRef<HTMLInputElement>(null);
+  const [customBgUrl, setCustomBgUrl] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(`dreamteam_convocatoria_custom_bg_${team.id}`);
+    } catch {
+      return null;
+    }
+  });
+
   // Stadium background & team color customization
-  const [selectedBg, setSelectedBg] = useState<string>(
-    STADIUM_BACKGROUND_PRESETS[0].url
-  );
+  const [selectedBg, setSelectedBg] = useState<string>(() => {
+    try {
+      return (
+        localStorage.getItem(`dreamteam_convocatoria_selected_bg_${team.id}`) ||
+        STADIUM_BACKGROUND_PRESETS[0].url
+      );
+    } catch {
+      return STADIUM_BACKGROUND_PRESETS[0].url;
+    }
+  });
   const [primaryColor, setPrimaryColor] = useState<string>(
     team.primaryColor || '#1877F2'
   );
@@ -149,6 +165,71 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
   const [showStyleControls, setShowStyleControls] = useState(false);
   const [generatedResult, setGeneratedResult] = useState<CanvasExportResult | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedCustom = localStorage.getItem(`dreamteam_convocatoria_custom_bg_${team.id}`);
+      const savedSelected = localStorage.getItem(`dreamteam_convocatoria_selected_bg_${team.id}`);
+      setCustomBgUrl(savedCustom);
+      setSelectedBg(savedSelected || STADIUM_BACKGROUND_PRESETS[0].url);
+    } catch {
+      setCustomBgUrl(null);
+      setSelectedBg(STADIUM_BACKGROUND_PRESETS[0].url);
+    }
+    setPrimaryColor(team.primaryColor || '#1877F2');
+    setSecondaryColor(team.secondaryColor || '#0866FF');
+  }, [team.id, team.primaryColor, team.secondaryColor]);
+
+  const selectBackground = (url: string) => {
+    setSelectedBg(url);
+    try {
+      localStorage.setItem(`dreamteam_convocatoria_selected_bg_${team.id}`, url);
+    } catch {
+      // ignore storage quota errors
+    }
+  };
+
+  const handleCustomBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      if (!result) return;
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1400;
+        const origW = img.naturalWidth || img.width;
+        const origH = img.naturalHeight || img.height;
+        const scale = Math.min(1, maxDim / Math.max(origW, origH));
+        const targetW = Math.max(1, Math.round(origW * scale));
+        const targetH = Math.max(1, Math.round(origH * scale));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, targetW, targetH);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setCustomBgUrl(dataUrl);
+        setSelectedBg(dataUrl);
+        try {
+          localStorage.setItem(`dreamteam_convocatoria_custom_bg_${team.id}`, dataUrl);
+          localStorage.setItem(`dreamteam_convocatoria_selected_bg_${team.id}`, dataUrl);
+        } catch {
+          // ignore storage quota errors
+        }
+        setToastMessage('¡Imagen de fondo cargada para la convocatoria!');
+        setTimeout(() => setToastMessage(null), 3500);
+      };
+      img.src = result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   // Save customized colors to team
   const handleSaveColorsToClub = () => {
@@ -280,11 +361,14 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
       ctx.fillStyle = '#05070B';
       ctx.fillRect(0, 0, width, height);
 
-      // Layer 1: Draw Stadium / Pitch / Players background image
+      // Layer 1: Draw Stadium / Pitch / Players background image (cover fit)
       const bgImg = await loadCanvasImageSafe(selectedBg);
       if (bgImg) {
         ctx.save();
-        ctx.drawImage(bgImg, 0, 0, width, height);
+        const bgRatio = Math.max(width / bgImg.width, height / bgImg.height);
+        const bw = bgImg.width * bgRatio;
+        const bh = bgImg.height * bgRatio;
+        ctx.drawImage(bgImg, (width - bw) / 2, (height - bh) / 2, bw, bh);
         ctx.restore();
       }
 
@@ -589,7 +673,10 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
 
       const bgImg = await loadCanvasImageSafe(selectedBg);
       if (bgImg) {
-        ctx.drawImage(bgImg, 0, 0, width, height);
+        const bgRatio = Math.max(width / bgImg.width, height / bgImg.height);
+        const bw = bgImg.width * bgRatio;
+        const bh = bgImg.height * bgRatio;
+        ctx.drawImage(bgImg, (width - bw) / 2, (height - bh) / 2, bw, bh);
       } else {
         ctx.fillStyle = '#0F172A';
         ctx.fillRect(0, 0, width, height);
@@ -777,7 +864,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                 onClick={() => {
                   setPrimaryColor(team.primaryColor || '#1877F2');
                   setSecondaryColor(team.secondaryColor || '#0866FF');
-                  setSelectedBg(STADIUM_BACKGROUND_PRESETS[0].url);
+                  selectBackground(STADIUM_BACKGROUND_PRESETS[0].url);
                 }}
                 className="text-xs text-gray-500 hover:text-[#1877F2] flex items-center gap-1 cursor-pointer"
               >
@@ -790,18 +877,64 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Background Stadium Selectors */}
             <div>
-              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-2 flex items-center gap-1.5">
-                <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
-                <span>Fondo de Estadio / Campo / Jugadores</span>
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Fondo de Estadio / Campo / Jugadores</span>
+                </label>
+                <input
+                  ref={customBgFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCustomBgUpload}
+                  className="hidden"
+                />
+                <button
+                  id="btn-upload-convocatoria-bg"
+                  type="button"
+                  onClick={() => customBgFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1877F2] hover:bg-[#0866FF] text-white text-[11px] font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                >
+                  <Upload className="w-3 h-3" />
+                  <span>Cargar imagen de fondo</span>
+                </button>
+              </div>
               <div className="grid grid-cols-3 gap-2">
+                {customBgUrl && (
+                  <button
+                    type="button"
+                    onClick={() => selectBackground(customBgUrl)}
+                    className={`relative rounded-xl overflow-hidden text-left p-1 border transition-all cursor-pointer group ${
+                      selectedBg === customBgUrl
+                        ? 'border-amber-400 ring-2 ring-amber-400/40'
+                        : 'border-[#CED0D4] dark:border-white/10 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="h-12 rounded-lg overflow-hidden relative mb-1">
+                      <img
+                        src={customBgUrl}
+                        alt="Fondo personalizado"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      />
+                      <div className="absolute inset-0 bg-black/30" />
+                      {selectedBg === customBgUrl && (
+                        <span className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold text-[9px]">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-bold text-[#1877F2] dark:text-blue-400 block truncate">
+                      Mi Fondo
+                    </span>
+                  </button>
+                )}
                 {STADIUM_BACKGROUND_PRESETS.map((preset) => {
                   const isSelected = selectedBg === preset.url;
                   return (
                     <button
                       key={preset.id}
                       type="button"
-                      onClick={() => setSelectedBg(preset.url)}
+                      onClick={() => selectBackground(preset.url)}
                       className={`relative rounded-xl overflow-hidden text-left p-1 border transition-all cursor-pointer group ${
                         isSelected
                           ? 'border-amber-400 ring-2 ring-amber-400/40'
