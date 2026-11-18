@@ -9,7 +9,7 @@ export const STADIUM_BACKGROUND_PRESETS: StadiumPreset[] = [
   {
     id: 'stadium-night',
     name: 'Estadio Nocturno y Reflectores',
-    url: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?auto=format&fit=crop&w=1200&q=80',
     description: 'Iluminación profesional de noche con graderías',
   },
   {
