@@ -19,6 +19,7 @@ import {
   Database,
   RefreshCw,
   XCircle,
+  Megaphone,
 } from 'lucide-react';
 import { AppUser, Language, TeamInfo, UserRole, TeamInvitation, TeamJoinRequest } from '../types';
 import { getT } from '../utils/translations';
@@ -174,16 +175,17 @@ export const Navbar: React.FC<NavbarProps> = ({
       )
     : [];
 
-  // Notifications for a player whose join request was accepted or rejected
-  const myDecisionRequests = currentUser?.role === 'player'
-    ? joinRequests.filter((r) => {
-        const matchesUser =
-          r.userId === currentUser.id ||
-          (r.playerEmail && currentUser.email && r.playerEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
-          (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase());
-        return matchesUser && (r.status === 'accepted' || r.status === 'rejected');
-      })
-    : [];
+  // Notifications for a player/fan whose join request was accepted or rejected
+  const myDecisionRequests =
+    currentUser?.role === 'player' || currentUser?.role === 'fan'
+      ? joinRequests.filter((r) => {
+          const matchesUser =
+            r.userId === currentUser.id ||
+            (r.playerEmail && currentUser.email && r.playerEmail.toLowerCase() === currentUser.email.toLowerCase()) ||
+            (r.userEmail && currentUser.email && r.userEmail.toLowerCase() === currentUser.email.toLowerCase());
+          return matchesUser && (r.status === 'accepted' || r.status === 'rejected');
+        })
+      : [];
 
   const unreadDecisionRequests = myDecisionRequests.filter(
     (r) => !seenDecisionKeys.includes(`${r.id}_${r.status}`)
@@ -245,6 +247,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
             <Crown className="w-3 h-3 text-amber-600" />
             <span>DT / Dueño</span>
+          </span>
+        );
+      case 'fan':
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+            <Megaphone className="w-3 h-3 text-amber-600" />
+            <span>📣 Aficionado</span>
           </span>
         );
       case 'player':
@@ -494,7 +503,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   👤 Mi Perfil
                 </button>
               </>
-            ) : !currentUser.teamId && (!currentUser.teamIds || currentUser.teamIds.length === 0) && currentUser.role === 'player' ? (
+            ) : !currentUser.teamId && (!currentUser.teamIds || currentUser.teamIds.length === 0) && (currentUser.role === 'player' || currentUser.role === 'fan') ? (
               <>
                 <button
                   id="nav-btn-leagues"
@@ -532,27 +541,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   {t.nav.calendar}
                 </button>
-                <button
-                  id="nav-btn-live-match"
-                  onClick={() => handleTabChange('live_match')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                    selectedTab === 'live_match'
-                      ? 'bg-white dark:bg-[#242526] text-rose-600 shadow-xs'
-                      : hasLiveMatch
-                      ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 animate-pulse'
-                      : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
-                  }`}
-                >
-                  <Zap
-                    className={`w-3.5 h-3.5 ${
-                      hasLiveMatch ? 'text-rose-600 fill-rose-600' : 'text-[#65676B] dark:text-gray-400'
+                {currentUser.role !== 'fan' && (
+                  <button
+                    id="nav-btn-live-match"
+                    onClick={() => handleTabChange('live_match')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      selectedTab === 'live_match'
+                        ? 'bg-white dark:bg-[#242526] text-rose-600 shadow-xs'
+                        : hasLiveMatch
+                        ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 animate-pulse'
+                        : 'text-[#65676B] dark:text-gray-300 hover:text-[#050505] dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10'
                     }`}
-                  />
-                  <span>{t.nav.liveMatch || 'Modo Partido'}</span>
-                  {hasLiveMatch && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
-                  )}
-                </button>
+                  >
+                    <Zap
+                      className={`w-3.5 h-3.5 ${
+                        hasLiveMatch ? 'text-rose-600 fill-rose-600' : 'text-[#65676B] dark:text-gray-400'
+                      }`}
+                    />
+                    <span>{t.nav.liveMatch || 'Modo Partido'}</span>
+                    {hasLiveMatch && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />
+                    )}
+                  </button>
+                )}
                 <button
                   id="nav-btn-convocatoria"
                   onClick={() => handleTabChange('convocatoria')}
@@ -698,67 +709,86 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="py-2 space-y-3 max-h-80 overflow-y-auto">
-                    {/* 1. Pending Player Join Requests for this Team's DT */}
-                    {pendingTeamRequests.map((req) => (
-                      <div
-                        key={req.id}
-                        className="p-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50/50 dark:from-amber-950/40 dark:to-orange-950/30 border border-amber-300 dark:border-amber-700/60 space-y-2.5"
-                      >
-                        <div className="flex items-start gap-2.5">
-                          <img
-                            src={req.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
-                            alt={req.userName}
-                            className="w-10 h-10 rounded-xl object-cover ring-2 ring-amber-400 shrink-0 bg-white"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-xs text-[#050505] dark:text-white block truncate">
-                                {req.userName}
+                    {/* 1. Pending Player / Fan Join Requests for this Team's DT */}
+                    {pendingTeamRequests.map((req) => {
+                      const isFanReq = req.requestType === 'fan';
+                      return (
+                        <div
+                          key={req.id}
+                          className={`p-3 rounded-xl bg-gradient-to-r border space-y-2.5 ${
+                            isFanReq
+                              ? 'from-amber-50 to-yellow-50/70 dark:from-amber-950/40 dark:to-yellow-950/30 border-amber-300 dark:border-amber-700/60'
+                              : 'from-amber-50 to-orange-50/50 dark:from-amber-950/40 dark:to-orange-950/30 border-amber-300 dark:border-amber-700/60'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <img
+                              src={req.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+                              alt={req.userName}
+                              className="w-10 h-10 rounded-xl object-cover ring-2 ring-amber-400 shrink-0 bg-white"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-xs text-[#050505] dark:text-white block truncate">
+                                  {req.userName}
+                                </span>
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
+                                    isFanReq
+                                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                      : 'bg-blue-100 text-[#1877F2] border border-blue-200'
+                                  }`}
+                                >
+                                  {isFanReq ? '📣 Aficionado / Porra' : '⚽ Jugador'}
+                                </span>
+                                {!isFanReq && req.number && (
+                                  <span className="text-[10px] bg-black text-white px-1.5 py-0.2 rounded font-mono font-bold">
+                                    #{req.number}
+                                  </span>
+                                )}
+                                {!isFanReq && req.position && (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
+                                    {req.position}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-[#65676B] dark:text-gray-300 mt-0.5 leading-snug">
+                                {isFanReq
+                                  ? 'Solicita unirse como Aficionado / Porra oficial de '
+                                  : 'Solicita unirse al plantel oficial de '}
+                                <strong>{team.name}</strong>.
+                              </p>
+                              <span className="text-[10px] text-gray-400 mt-0.5 block truncate">
+                                {req.userEmail}
                               </span>
-                              {req.number && (
-                                <span className="text-[10px] bg-black text-white px-1.5 py-0.2 rounded font-mono font-bold">
-                                  #{req.number}
-                                </span>
-                              )}
-                              {req.position && (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
-                                  {req.position}
-                                </span>
-                              )}
                             </div>
-                            <p className="text-[11px] text-[#65676B] dark:text-gray-300 mt-0.5 leading-snug">
-                              Solicita unirse al plantel oficial de <strong>{team.name}</strong>.
-                            </p>
-                            <span className="text-[10px] text-gray-400 mt-0.5 block truncate">
-                              {req.userEmail}
-                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onAcceptJoinRequest) onAcceptJoinRequest(req);
+                                setShowNotificationsMenu(false);
+                              }}
+                              className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>{isFanReq ? 'Aceptar Aficionado' : 'Aceptar Jugador'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onRejectJoinRequest) onRejectJoinRequest(req.id);
+                              }}
+                              className="py-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors cursor-pointer"
+                            >
+                              Rechazar
+                            </button>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (onAcceptJoinRequest) onAcceptJoinRequest(req);
-                              setShowNotificationsMenu(false);
-                            }}
-                            className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Aceptar Jugador</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (onRejectJoinRequest) onRejectJoinRequest(req.id);
-                            }}
-                            className="py-1.5 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors cursor-pointer"
-                          >
-                            Rechazar
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
 
                     {/* 2. Team invitations sent to this player */}
                     {myPendingInvitations.map((inv) => (
@@ -1001,7 +1031,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                   {/* Direct Actions for Active User */}
                   <div className="mt-2 space-y-1">
-                    {currentUser.role === 'player' && !currentUser.teamId ? (
+                    {(currentUser.role === 'player' || currentUser.role === 'fan') &&
+                    !currentUser.teamId &&
+                    (!currentUser.teamIds || currentUser.teamIds.length === 0) ? (
                       <button
                         id="btn-menu-explore-leagues"
                         onClick={() => {

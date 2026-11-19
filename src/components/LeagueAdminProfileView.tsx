@@ -14,6 +14,7 @@ import {
 import confetti from 'canvas-confetti';
 import { AppUser, Post, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { CameraCaptureModal } from './CameraCaptureModal';
+import { ChangePasswordSection } from './ChangePasswordSection';
 import { pushBackendSyncImmediate } from '../utils/backendSync';
 import { isSupabaseConfigured, supabaseUpsertUser, supabaseUpsertPost } from '../services/supabaseService';
 
@@ -350,6 +351,13 @@ export const LeagueAdminProfileView: React.FC<LeagueAdminProfileViewProps> = ({
           </button>
         </div>
       </form>
+
+      <ChangePasswordSection
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+        users={users}
+        setUsers={setUsers}
+      />
 
       <CameraCaptureModal
         isOpen={isCameraOpen}

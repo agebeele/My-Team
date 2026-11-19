@@ -15,6 +15,8 @@ import {
   Pencil,
   Eye,
   CheckCircle2,
+  AlertTriangle,
+  Clock,
 } from 'lucide-react';
 import { Match, Player, AppUser, Language, LineupPosition, MatchModality, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
@@ -313,6 +315,12 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [touchCoord, setTouchCoord] = useState<{ x: number; y: number } | null>(null);
   const [swapNotification, setSwapNotification] = useState<string | null>(null);
+  const [pendingUnavailablePlayerId, setPendingUnavailablePlayerId] = useState<string | null>(null);
+
+  const playerConfirmations = activeMatch?.playerConfirmations || {};
+  const confirmedAttendanceCount = players.filter((p) => playerConfirmations[p.id] === 'confirmed').length;
+  const unavailableAttendanceCount = players.filter((p) => playerConfirmations[p.id] === 'unavailable').length;
+  const pendingAttendanceCount = Math.max(0, players.length - confirmedAttendanceCount - unavailableAttendanceCount);
 
   // Sync state when activeMatchId changes - ensure exactly 7 players
   useEffect(() => {
@@ -581,7 +589,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
     setTouchCoord(null);
   };
 
-  const handleAssignPlayerToSlot = (playerId: string) => {
+  const assignPlayerToSlotConfirmed = (playerId: string) => {
     if (selectedSlotIndex === null) return;
 
     setPitchLineup((prev) => {
@@ -600,6 +608,15 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
     });
 
     setSelectedSlotIndex(null);
+  };
+
+  const handleAssignPlayerToSlot = (playerId: string) => {
+    if (selectedSlotIndex === null) return;
+    if (playerConfirmations[playerId] === 'unavailable') {
+      setPendingUnavailablePlayerId(playerId);
+      return;
+    }
+    assignPlayerToSlotConfirmed(playerId);
   };
 
   const handleSaveLineupToMatch = () => {
@@ -628,12 +645,17 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Informative Banner for Players */}
+      {/* Informative Banner for Players & Fans */}
       {!isOwnerOrAdmin && (
         <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 flex items-start gap-3 shadow-xs">
           <Shield className="w-5 h-5 text-[#1877F2] shrink-0 mt-0.5" />
           <div className="text-xs leading-relaxed">
-            <span className="font-bold text-[#050505]">Alineación Oficial (Modo Jugador):</span> Consulta la formación táctica de 7 jugadores y los titulares confirmados por el cuerpo técnico.
+            <span className="font-bold text-[#050505]">
+              {currentUser.role === 'fan'
+                ? 'Alineación Oficial (Vista Aficionado):'
+                : 'Alineación Oficial (Modo Jugador):'}
+            </span>{' '}
+            Consulta la formación táctica de 7 jugadores y los titulares confirmados por el cuerpo técnico.
           </div>
         </div>
       )}
@@ -817,6 +839,30 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
             </div>
           )}
         </div>
+
+        {/* Attendance Summary Bar for Active Match */}
+        {activeMatch && (
+          <div className="pt-2.5 border-t border-[#CED0D4]/60 dark:border-white/5 flex items-center justify-between gap-2 flex-wrap text-xs">
+            <span className="font-bold text-[#65676B] dark:text-gray-300 flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-[#1877F2]" />
+              <span>Asistencia al partido vs {activeMatch.rival}:</span>
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                <CheckCircle2 className="w-3 h-3" />
+                {confirmedAttendanceCount} Confirmados
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold">
+                <AlertTriangle className="w-3 h-3" />
+                {unavailableAttendanceCount} No disponibles
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200 text-[11px] font-bold">
+                <Clock className="w-3 h-3" />
+                {pendingAttendanceCount} Sin responder
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -941,6 +987,8 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                         ? 'ring-4 ring-amber-400 scale-125 bg-amber-400 text-black'
                         : isOtherSelected
                         ? 'bg-emerald-500 text-black ring-2 ring-amber-400/60 hover:scale-110 hover:ring-amber-400'
+                        : player && playerConfirmations[player.id] === 'unavailable'
+                        ? 'bg-rose-600 text-white ring-2 ring-rose-300'
                         : player?.position === 'POR'
                         ? 'bg-amber-500 text-black ring-2 ring-white/90'
                         : `bg-emerald-500 text-black ring-2 ring-white/90 ${isOwnerOrAdmin ? 'group-hover:scale-110' : ''}`
@@ -963,6 +1011,32 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                     <span className="absolute -bottom-1 -right-1 bg-black text-emerald-400 border border-emerald-500/50 rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-mono font-bold">
                       {player ? (player.number || slot.roleName) : slot.roleName}
                     </span>
+
+                    {/* Attendance Confirmation Badge on Pitch Node */}
+                    {player && (
+                      <span
+                        title={
+                          playerConfirmations[player.id] === 'confirmed'
+                            ? 'Confirmó asistencia'
+                            : playerConfirmations[player.id] === 'unavailable'
+                            ? 'Marcó No disponible'
+                            : 'Sin responder'
+                        }
+                        className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black border border-white shadow-sm ${
+                          playerConfirmations[player.id] === 'confirmed'
+                            ? 'bg-emerald-500 text-white'
+                            : playerConfirmations[player.id] === 'unavailable'
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-slate-500 text-white'
+                        }`}
+                      >
+                        {playerConfirmations[player.id] === 'confirmed'
+                          ? '✓'
+                          : playerConfirmations[player.id] === 'unavailable'
+                          ? '!'
+                          : '?'}
+                      </span>
+                    )}
 
                     {/* Quick drag indicator dot */}
                     {isOwnerOrAdmin && (
@@ -1054,6 +1128,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
               {(isOwnerOrAdmin && selectedSlotIndex !== null ? players : benchPlayers).map((player) => {
                 const isOnPitch = starterPlayerIds.includes(player.id);
+                const status = playerConfirmations[player.id];
                 return (
                   <button
                     key={player.id}
@@ -1063,7 +1138,9 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                       }
                     }}
                     className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
-                      isOwnerOrAdmin && selectedSlotIndex !== null
+                      status === 'unavailable'
+                        ? 'bg-rose-50/70 border-rose-200 opacity-85 hover:opacity-100 cursor-pointer'
+                        : isOwnerOrAdmin && selectedSlotIndex !== null
                         ? 'hover:bg-[#E7F3FF] dark:hover:bg-emerald-500/10 hover:border-[#1877F2]/40 dark:hover:border-emerald-500/30 cursor-pointer bg-white dark:bg-black/40 border-[#CED0D4] dark:border-white/10'
                         : 'bg-[#F0F2F5] dark:bg-black/40 border-[#CED0D4]/70 dark:border-white/5 cursor-default'
                     }`}
@@ -1088,7 +1165,21 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                      {status === 'confirmed' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          ✓ Confirmado
+                        </span>
+                      ) : status === 'unavailable' ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-300">
+                          ✕ No disponible
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
+                          Sin responder
+                        </span>
+                      )}
+
                       {isOnPitch ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#E7F3FF] dark:bg-emerald-500/20 text-[#1877F2] dark:text-emerald-400 border border-[#1877F2]/30 dark:border-emerald-500/30">
                           En Cancha
@@ -1329,6 +1420,48 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
         benchPlayers={benchPlayers}
         language={language}
       />
+
+      {/* In-app confirmation modal when assigning a player marked No disponible */}
+      {pendingUnavailablePlayerId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#CED0D4] w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4 text-[#050505]">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-black text-[#050505]">
+                Jugador no disponible
+              </h3>
+              <p className="text-xs text-[#65676B]">
+                <strong>
+                  {players.find((p) => p.id === pendingUnavailablePlayerId)?.name || 'Este jugador'}
+                </strong>{' '}
+                marcó que <strong>no estará disponible</strong> para este partido. ¿Deseas alinearlo de todas formas?
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPendingUnavailablePlayerId(null)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-[#050505] text-xs font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pid = pendingUnavailablePlayerId;
+                  setPendingUnavailablePlayerId(null);
+                  if (pid) assignPlayerToSlotConfirmed(pid);
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer"
+              >
+                Sí, alinear igual
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

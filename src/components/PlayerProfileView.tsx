@@ -26,12 +26,16 @@ import confetti from 'canvas-confetti';
 import { Player, TeamInfo, AppUser, Language, DEFAULT_FACEBOOK_AVATAR, getPlayerPositionName } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
+import { ChangePasswordSection } from './ChangePasswordSection';
 
 interface PlayerProfileViewProps {
   player: Player;
   setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
   team: TeamInfo;
   currentUser: AppUser;
+  setCurrentUser?: (user: AppUser) => void;
+  users?: AppUser[];
+  setUsers?: React.Dispatch<React.SetStateAction<AppUser[]>>;
   language: Language;
   onBack?: () => void;
   onOpenStoryShare?: (type: 'standings' | 'scorers' | 'mvp' | 'player_card') => void;
@@ -42,13 +46,23 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
   setPlayers,
   team,
   currentUser,
+  setCurrentUser,
+  users,
+  setUsers,
   language,
   onBack,
   onOpenStoryShare,
 }) => {
   const t = getT(language);
   const isOwnerOrAdmin = currentUser.role === 'owner';
-  const isSelf = currentUser.playerId === player.id;
+  const isSelf =
+    currentUser.playerId === player.id ||
+    player.linkedUserId === currentUser.id ||
+    Boolean(
+      player.name &&
+        currentUser.name &&
+        player.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim()
+    );
   // Players can always edit their profile photo via camera and alias directly
   const canEdit = true;
 
@@ -679,6 +693,16 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Seguridad / Cambiar Contraseña */}
+      {(isSelf || isOwnerOrAdmin) && setCurrentUser && (
+        <ChangePasswordSection
+          currentUser={currentUser}
+          setCurrentUser={setCurrentUser}
+          users={users}
+          setUsers={setUsers}
+        />
+      )}
 
       {/* ========================================================= */}
       {/* MODAL 1: CAMERA SNAPSHOT FOR PROFILE PHOTO                 */}

@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'player' | 'admin' | 'coach' | 'league_admin';
+export type UserRole = 'owner' | 'player' | 'fan' | 'admin' | 'coach' | 'league_admin';
 
 // All standard football / soccer positions
 export type PlayerPosition =
@@ -194,6 +194,9 @@ export interface Match {
   mvpPlayerName?: string;
   mvpPhotoUrl?: string;
   mvpVotes?: Record<string, number>;
+  playerConfirmations?: Record<string, 'confirmed' | 'unavailable'>;
+  fanAttendance?: string[];
+  fanMvpVotes?: Record<string, string>;
   isLineupSaved?: boolean; // Whether the starting lineup has been configured and saved for this match
   createdAtTimestamp: number;
   matchStartTimestamp: number;
@@ -295,6 +298,7 @@ export interface TeamJoinRequest {
   teamLeague?: string;
   leagueName?: string;
   teamLogo?: string;
+  requestType?: 'player' | 'fan';
   status: 'pending' | 'accepted' | 'rejected';
   createdAt?: string;
   requestedAt?: string;

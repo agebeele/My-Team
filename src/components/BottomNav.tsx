@@ -51,8 +51,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const role = userRole || currentUser?.role || 'player';
   const isOwner = role === 'owner';
   const isLeagueAdmin = role === 'league_admin';
+  const isFan = role === 'fan';
   const isUnassignedPlayer =
-    role === 'player' &&
+    (role === 'player' || role === 'fan') &&
     !currentUser?.teamId &&
     (!currentUser?.teamIds || currentUser.teamIds.length === 0);
 
@@ -67,6 +68,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
     ? [
         { id: 'leagues', label: 'Ligas y Equipos', icon: Trophy, isLive: false },
         { id: 'wall', label: 'Muro de la Liga', icon: MessageSquare, isLive: false },
+      ]
+    : isFan
+    ? [
+        { id: 'calendar', label: t.nav.calendar, icon: CalendarDays, isLive: false },
+        { id: 'lineup', label: t.nav.lineup, icon: Shield, isLive: false },
+        { id: 'tables', label: t.nav.tables, icon: Trophy, isLive: false },
+        { id: 'wall', label: t.nav.wall, icon: MessageSquare, isLive: false },
       ]
     : [
         { id: 'calendar', label: t.nav.calendar, icon: CalendarDays, isLive: false },

@@ -19,6 +19,7 @@ import {
   FileText,
   Check,
   X,
+  Megaphone,
 } from 'lucide-react';
 import { Post, AppUser, Language, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
@@ -58,6 +59,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authSuccessToast, setAuthSuccessToast] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ url: string; title: string } | null>(null);
+  const [postToDeleteId, setPostToDeleteId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -82,8 +84,11 @@ export const SocialWall: React.FC<SocialWallProps> = ({
       return p.authorId === currentUser.id || p.authorRole === 'league_admin' || p.category === 'Liga';
     }
 
-    // For player without an assigned team yet: they see official league posts or their own posts
-    if (!currentUser.teamId) {
+    // For player/fan without an assigned team yet: they see official league posts or their own posts
+    const hasNoTeam =
+      !currentUser.teamId &&
+      (!Array.isArray(currentUser.teamIds) || currentUser.teamIds.length === 0);
+    if (hasNoTeam) {
       return (
         p.authorId === currentUser.id ||
         p.isLeagueOfficial ||
@@ -134,7 +139,8 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     const isImage = file.type.startsWith('image/');
 
     if (!isVideo && !isImage) {
-      alert('Por favor selecciona un archivo de imagen o video válido.');
+      setFormFeedback('Por favor selecciona un archivo de imagen o video válido.');
+      setTimeout(() => setFormFeedback(null), 4000);
       return;
     }
 
@@ -158,7 +164,13 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   };
 
   const handleDeletePost = (postId: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta publicación?')) return;
+    setPostToDeleteId(postId);
+  };
+
+  const confirmDeletePost = () => {
+    if (!postToDeleteId) return;
+    const postId = postToDeleteId;
+    setPostToDeleteId(null);
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     fetch(`/api/publicaciones/${postId}`, { method: 'DELETE' }).catch(() => {});
     if (isSupabaseConfigured()) {
@@ -170,10 +182,10 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) return;
 
-    const isOwner = currentUser.role === 'owner' || currentUser.role === 'league_admin';
+    const isFan = currentUser.role === 'fan';
     const isLeagueOfficialPost = newCategory === 'Liga' || currentUser.role === 'league_admin';
-    // All posts created in the app are approved and visible immediately
-    const postStatus: Post['status'] = 'approved';
+    // Fan posts require DT/Admin moderation ('pending'); team members & admins publish directly
+    const postStatus: Post['status'] = isFan ? 'pending' : 'approved';
 
     const selectedLeague = currentUser.role === 'league_admin' ? targetLeague : (team?.leagueName || 'Champions League');
 
@@ -212,15 +224,19 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     setNewContent('');
     handleRemoveAttachedMedia();
 
-    setFormFeedback('¡Publicación agregada exitosamente al muro!');
+    setFormFeedback(
+      isFan
+        ? '¡Tu publicación de aficionado fue enviada! Quedará visible en el muro en cuanto el Admin/DT la apruebe.'
+        : '¡Publicación agregada exitosamente al muro!'
+    );
     setTimeout(() => setFormFeedback(null), 5000);
   };
 
   const handleApprovePost = (postId: string) => {
+    const postToApprove = posts.find((p) => p.id === postId);
     setPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, status: 'approved' as const } : p))
     );
-    const postToApprove = posts.find((p) => p.id === postId);
     if (postToApprove && isSupabaseConfigured()) {
       supabaseUpsertPost({ ...postToApprove, status: 'approved' });
     }
@@ -229,11 +245,14 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   };
 
   const handleRejectPost = (postId: string) => {
-    setPosts((prev) => prev.filter((p) => p.id !== postId));
-    if (isSupabaseConfigured()) {
-      supabaseDeletePost(postId);
+    const postToReject = posts.find((p) => p.id === postId);
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, status: 'rejected' as const } : p))
+    );
+    if (postToReject && isSupabaseConfigured()) {
+      supabaseUpsertPost({ ...postToReject, status: 'rejected' });
     }
-    setAuthSuccessToast('Publicación rechazada y eliminada.');
+    setAuthSuccessToast('Publicación rechazada.');
     setTimeout(() => setAuthSuccessToast(null), 4000);
   };
 
@@ -339,10 +358,17 @@ export const SocialWall: React.FC<SocialWallProps> = ({
         </span>
       );
     }
-    if (role === 'owner') {
+    if (role === 'owner' || role === 'admin') {
       return (
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 font-bold border border-amber-300 inline-flex items-center gap-1">
           <Crown className="w-2.5 h-2.5" /> Dueño / DT
+        </span>
+      );
+    }
+    if (role === 'fan') {
+      return (
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold border border-amber-300 inline-flex items-center gap-1">
+          <Megaphone className="w-2.5 h-2.5 text-amber-600" /> 📣 Porra Oficial
         </span>
       );
     }
@@ -352,6 +378,11 @@ export const SocialWall: React.FC<SocialWallProps> = ({
       </span>
     );
   };
+
+  const isClubModerator =
+    currentUser.role === 'owner' ||
+    currentUser.role === 'admin' ||
+    currentUser.role === 'league_admin';
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -363,13 +394,13 @@ export const SocialWall: React.FC<SocialWallProps> = ({
             {t.wall.title}
           </h2>
           <p className="text-xs sm:text-sm text-[#65676B] mt-0.5 font-medium">
-            Muro de anuncios, celebraciones y comunicados de los integrantes del club
+            Muro de anuncios, celebraciones y comunicados de los integrantes y porra del club
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Admin Authorization Button */}
-          {currentUser.role === 'owner' && (
+          {isClubModerator && (
             <button
               onClick={() => setShowAuthModal(true)}
               className="relative inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
@@ -413,8 +444,96 @@ export const SocialWall: React.FC<SocialWallProps> = ({
         </div>
       )}
 
-      {/* If current user is a player and has pending posts */}
-      {currentUser.role === 'player' && myPendingPosts.length > 0 && (
+      {/* Inline Moderation Block for Admin / DT */}
+      {isClubModerator && pendingPosts.length > 0 && (
+        <div
+          id="inline-pending-posts-moderation"
+          className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs"
+        >
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-black text-amber-900">
+              <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>Publicaciones pendientes de aprobación ({pendingPosts.length})</span>
+            </div>
+            {pendingPosts.length > 1 && (
+              <button
+                type="button"
+                onClick={handleApproveAll}
+                className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+              >
+                Aprobar Todas
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {pendingPosts.map((p) => (
+              <div
+                key={p.id}
+                className="bg-white rounded-xl border border-amber-200 p-3.5 space-y-2.5 shadow-2xs"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={p.authorAvatar}
+                      alt={p.authorName}
+                      referrerPolicy="no-referrer"
+                      className="w-8 h-8 rounded-full object-cover ring-1 ring-[#CED0D4]"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-bold text-[#050505]">{p.authorName}</span>
+                        {getRoleBadge(p.authorRole)}
+                      </div>
+                      <span className="text-[10px] text-[#65676B]">
+                        {formatDisplayTime(p.createdAt)} • {p.category}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">
+                    Pendiente
+                  </span>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-black text-[#050505]">{p.title}</h4>
+                  <p className="text-xs text-[#050505] whitespace-pre-wrap mt-0.5">{p.content}</p>
+                </div>
+
+                {p.imageUrl && (
+                  <img
+                    src={p.imageUrl}
+                    alt={p.title}
+                    className="max-h-44 rounded-lg object-contain bg-slate-950 border border-[#CED0D4]"
+                  />
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleRejectPost(p.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold cursor-pointer"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Rechazar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApprovePost(p.id)}
+                    className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Aprobar</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* If current user is a player or fan and has pending posts */}
+      {(currentUser.role === 'player' || currentUser.role === 'fan') && myPendingPosts.length > 0 && (
         <div className="bg-amber-50/70 border border-amber-300 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
             <Clock className="w-4 h-4 text-amber-600" />
@@ -645,10 +764,13 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                           className="w-7 h-7 rounded-full object-cover ring-1 ring-[#CED0D4]"
                         />
                         <div className="flex-1 bg-[#F0F2F5] p-2.5 rounded-xl border border-[#CED0D4]/60 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-[#050505]">
-                              {comment.authorName}
-                            </span>
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-[#050505]">
+                                {comment.authorName}
+                              </span>
+                              {getRoleBadge(comment.authorRole)}
+                            </div>
                             <span className="text-[10px] text-[#65676B]">
                               {formatDisplayTime(comment.createdAt)}
                             </span>
@@ -715,11 +837,11 @@ export const SocialWall: React.FC<SocialWallProps> = ({
               </button>
             </div>
 
-            {currentUser.role === 'player' && (
+            {currentUser.role === 'fan' && (
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>
-                  Como jugador, tu publicación será enviada al panel de autorización del DT/Admin antes de aparecer en el muro.
+                  Como aficionado de la Porra Oficial, tu publicación pasará por moderación del DT/Admin antes de aparecer en el muro.
                 </span>
               </div>
             )}
@@ -878,7 +1000,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-[#1877F2] hover:bg-[#0866FF] text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>{currentUser.role === 'owner' ? 'Publicar Directo' : 'Enviar a Aprobación'}</span>
+                  <span>{currentUser.role === 'fan' ? 'Enviar a Aprobación' : 'Publicar Directo'}</span>
                 </button>
               </div>
             </form>
@@ -1079,6 +1201,39 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                 {lightboxImage.title}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Post Modal */}
+      {postToDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white border border-[#CED0D4] w-full max-w-sm rounded-2xl shadow-2xl p-6 space-y-4 text-[#050505]">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-base font-black">¿Eliminar publicación?</h3>
+              <p className="text-xs text-[#65676B]">
+                Esta publicación se eliminará permanentemente del muro.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setPostToDeleteId(null)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-[#F0F2F5] hover:bg-[#E4E6EB] text-xs font-bold cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeletePost}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer"
+              >
+                Sí, eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}

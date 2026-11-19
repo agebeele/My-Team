@@ -21,6 +21,10 @@ import {
   X,
   Eye,
   Lock,
+  ThumbsUp,
+  ThumbsDown,
+  Megaphone,
+  Instagram,
 } from 'lucide-react';
 import { Match, MatchModality, TeamInfo, Player, AppUser, Language } from '../types';
 import { getT } from '../utils/translations';
@@ -30,6 +34,7 @@ import { getModalityInfo, ALL_MODALITIES } from '../utils/modalityHelper';
 import { generateMatchPosterCanvas } from '../utils/matchPosterGenerator';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
 import { MatchLineupViewerModal } from './MatchLineupViewerModal';
+import { InstagramFlyerModal } from './InstagramFlyerModal';
 
 interface MatchCalendarProps {
   matches: Match[];
@@ -77,6 +82,19 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
 }) => {
   const t = getT(language);
   const isOwner = currentUser?.role === 'owner';
+  const isManager =
+    currentUser?.role === 'owner' ||
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'coach';
+  const isFan = currentUser?.role === 'fan';
+  const myPlayer = players.find(
+    (p) =>
+      p.linkedUserId === currentUser?.id ||
+      p.id === currentUser?.playerId ||
+      (p.name &&
+        currentUser?.name &&
+        p.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+  );
   const handleGoToMvp = onOpenMvp || onNavigateToMvp || (() => {});
 
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'finished'>('all');
@@ -85,6 +103,11 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
   const [showResultModal, setShowResultModal] = useState<Match | null>(null);
   const [matchToDelete, setMatchToDelete] = useState<Match | null>(null);
   const [viewingLineupMatch, setViewingLineupMatch] = useState<Match | null>(null);
+  const [flyerModalState, setFlyerModalState] = useState<{
+    isOpen: boolean;
+    match: Match;
+    mode: 'matchday' | 'result';
+  } | null>(null);
 
   // Form states for creating / editing match
   const [formData, setFormData] = useState({
@@ -119,6 +142,56 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
     fileName: string;
     title: string;
   } | null>(null);
+
+  const handleTogglePlayerConfirmation = (
+    matchId: string,
+    status: 'confirmed' | 'unavailable'
+  ) => {
+    if (!myPlayer) return;
+    setMatches((prev) =>
+      prev.map((m) => {
+        if (m.id !== matchId) return m;
+        const currentConfirmations = { ...(m.playerConfirmations || {}) };
+        currentConfirmations[myPlayer.id] = status;
+        return {
+          ...m,
+          playerConfirmations: currentConfirmations,
+        };
+      })
+    );
+    setCalendarToast(
+      status === 'confirmed'
+        ? '¡Asistencia confirmada para el partido!'
+        : 'Has marcado que no estarás disponible para este partido.'
+    );
+    setTimeout(() => setCalendarToast(null), 3000);
+  };
+
+  const handleToggleFanAttendance = (matchId: string) => {
+    if (!currentUser?.id) return;
+    let added = false;
+    setMatches((prev) =>
+      prev.map((m) => {
+        if (m.id !== matchId) return m;
+        const currentList = Array.isArray(m.fanAttendance) ? [...m.fanAttendance] : [];
+        const exists = currentList.includes(currentUser.id);
+        added = !exists;
+        const updatedList = exists
+          ? currentList.filter((uid) => uid !== currentUser.id)
+          : [...currentList, currentUser.id];
+        return {
+          ...m,
+          fanAttendance: updatedList,
+        };
+      })
+    );
+    setCalendarToast(
+      added
+        ? '¡Gracias por apoyar al club en las gradas!'
+        : 'Confirmación de asistencia retirada.'
+    );
+    setTimeout(() => setCalendarToast(null), 3000);
+  };
 
   const handleDownloadMatchImage = async (match: Match) => {
     setDownloadingMatchId(match.id);
@@ -655,6 +728,84 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 )}
               </div>
 
+              {/* Attendance Confirmations (Players & Fans) for Scheduled/Live Matches */}
+              {match.status !== 'finished' && (() => {
+                const confirmations = match.playerConfirmations || {};
+                const confirmedCount = players.filter((p) => confirmations[p.id] === 'confirmed').length;
+                const unavailableCount = players.filter((p) => confirmations[p.id] === 'unavailable').length;
+                const pendingCount = Math.max(0, players.length - confirmedCount - unavailableCount);
+                const myPlayerStatus = myPlayer ? confirmations[myPlayer.id] : undefined;
+                const fanAttendanceList = Array.isArray(match.fanAttendance) ? match.fanAttendance : [];
+                const isFanAttending = Boolean(currentUser?.id && fanAttendanceList.includes(currentUser.id));
+
+                return (
+                  <div className="bg-[#F0F2F5] dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 rounded-xl p-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-[#050505] dark:text-gray-200 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-[#1877F2]" />
+                        <span>
+                          {isManager
+                            ? `${confirmedCount} Confirmados · ${unavailableCount} No disponibles · ${pendingCount} Sin responder`
+                            : `Asistencia: ${confirmedCount} Confirmados · ${unavailableCount} No disponibles`}
+                        </span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-black">
+                        <span>📣 {fanAttendanceList.length} aficionados confirmados</span>
+                      </span>
+                    </div>
+
+                    {/* Player Self-Confirmation Controls */}
+                    {myPlayer && !isFan && (
+                      <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                        <button
+                          type="button"
+                          id={`btn-confirm-attendance-${match.id}`}
+                          onClick={() => handleTogglePlayerConfirmation(match.id, 'confirmed')}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                            myPlayerStatus === 'confirmed'
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                              : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-300'
+                          }`}
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                          <span>{myPlayerStatus === 'confirmed' ? '✓ Confirmado' : 'Confirmo'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          id={`btn-unavailable-attendance-${match.id}`}
+                          onClick={() => handleTogglePlayerConfirmation(match.id, 'unavailable')}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                            myPlayerStatus === 'unavailable'
+                              ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
+                              : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-300'
+                          }`}
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                          <span>{myPlayerStatus === 'unavailable' ? '✕ No disponible' : 'No disponible'}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Fan Attendance Control */}
+                    {isFan && (
+                      <button
+                        type="button"
+                        id={`btn-fan-support-${match.id}`}
+                        onClick={() => handleToggleFanAttendance(match.id)}
+                        className={`w-full py-2 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                          isFanAttending
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                            : 'bg-white hover:bg-amber-50 text-amber-800 border-amber-300'
+                        }`}
+                      >
+                        <Megaphone className="w-3.5 h-3.5" />
+                        <span>{isFanAttending ? '✓ Voy a apoyar (Confirmado)' : 'Voy a apoyar'}</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* 50-Minute MVP Rule Banner if active */}
               {/* MVP Section: Admin voting flow vs Player read-only badge */}
               {isOwner ? (
@@ -749,6 +900,24 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     >
                       <Download className="w-3.5 h-3.5 text-[#1877F2]" />
                       <span>{downloadingMatchId === match.id ? 'Guardando...' : 'Guardar Foto'}</span>
+                    </button>
+
+                    {/* 3. Generar Flyer Instagram */}
+                    <button
+                      id={`btn-ig-flyer-${match.id}`}
+                      type="button"
+                      onClick={() =>
+                        setFlyerModalState({
+                          isOpen: true,
+                          match,
+                          mode: match.status === 'finished' ? 'result' : 'matchday',
+                        })
+                      }
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-fuchsia-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black transition-all cursor-pointer shadow-xs"
+                      title="Generar flyer para Story o Post de Instagram"
+                    >
+                      <Instagram className="w-3.5 h-3.5" />
+                      <span>Generar Flyer IG</span>
                     </button>
                   </div>
                 ) : (
@@ -886,6 +1055,24 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                       >
                         <Trophy className="w-3 h-3 text-amber-500" />
                         {t.calendar.recordResult}
+                      </button>
+
+                      {/* Owner: Generate Instagram Flyer */}
+                      <button
+                        id={`btn-ig-flyer-owner-${match.id}`}
+                        type="button"
+                        onClick={() =>
+                          setFlyerModalState({
+                            isOpen: true,
+                            match,
+                            mode: match.status === 'finished' ? 'result' : 'matchday',
+                          })
+                        }
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-rose-500 to-amber-500 hover:opacity-95 text-white text-xs font-black transition-all cursor-pointer shadow-xs"
+                        title="Generar Flyer automático para Instagram (Story 9:16 o Post 4:5)"
+                      >
+                        <Instagram className="w-3.5 h-3.5" />
+                        <span>Generar Flyer IG</span>
                       </button>
                     </div>
                   </>
@@ -1293,6 +1480,17 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
             setViewingLineupMatch(null);
             onNavigateToLineup(matchId);
           }}
+        />
+      )}
+
+      {/* Instagram Dynamic Flyer Modal */}
+      {flyerModalState && (
+        <InstagramFlyerModal
+          isOpen={flyerModalState.isOpen}
+          onClose={() => setFlyerModalState(null)}
+          mode={flyerModalState.mode}
+          team={team}
+          match={flyerModalState.match}
         />
       )}
     </div>

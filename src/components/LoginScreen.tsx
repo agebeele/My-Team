@@ -24,6 +24,7 @@ import {
   Search,
   ExternalLink,
   ChevronDown,
+  Megaphone,
 } from 'lucide-react';
 import {
   AppUser,
@@ -36,6 +37,7 @@ import {
   DEFAULT_FACEBOOK_AVATAR,
   ALL_POSITIONS,
   TeamInvitation,
+  TeamJoinRequest,
 } from '../types';
 import { INITIAL_TEAM, INITIAL_TEAMS } from '../data/initialData';
 import { CameraCaptureModal } from './CameraCaptureModal';
@@ -49,7 +51,7 @@ import {
   saveStandingsForLeague,
 } from '../utils/storage';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
-import { supabaseUpsertUser, supabaseUpsertPlayer, supabaseUpsertTeam } from '../utils/supabaseService';
+import { supabaseUpsertUser, supabaseUpsertPlayer, supabaseUpsertTeam, supabaseUpsertJoinRequest } from '../utils/supabaseService';
 import { pushBackendSync } from '../utils/backendSync';
 
 interface LoginScreenProps {
@@ -70,6 +72,9 @@ interface LoginScreenProps {
   language: Language;
   invitedTeam?: { id?: string; name: string; logoUrl?: string } | null;
   invitedTeamName?: string | null;
+  joinFanTeam?: { id: string; name: string; logoUrl?: string } | null;
+  joinRequests?: TeamJoinRequest[];
+  setJoinRequests?: React.Dispatch<React.SetStateAction<TeamJoinRequest[]>>;
 }
 
 const PRESET_CRESTS = [
@@ -117,20 +122,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   onInvitationSent,
   invitedTeam,
   invitedTeamName,
+  joinFanTeam,
+  joinRequests = [],
+  setJoinRequests,
 }) => {
   const teamList = allTeams && allTeams.length > 0 ? allTeams : INITIAL_TEAMS;
 
-  // Determine if the user was invited to a specific team
-  const hasInvite = Boolean(invitedTeam?.name || invitedTeamName);
-  const invitedName = invitedTeam?.name || invitedTeamName || '';
-  const invitedLogo = invitedTeam?.logoUrl;
+  // Determine if the user was invited to a specific team or via ?joinFan=
+  const hasInvite = Boolean(invitedTeam?.name || invitedTeamName || joinFanTeam?.name);
+  const invitedName = joinFanTeam?.name || invitedTeam?.name || invitedTeamName || '';
+  const invitedLogo = joinFanTeam?.logoUrl || invitedTeam?.logoUrl;
 
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'create_team' | 'teams_list'>(
     hasInvite ? 'register' : 'login'
   );
+  const [registerRole, setRegisterRole] = useState<'player' | 'fan'>(
+    joinFanTeam ? 'fan' : 'player'
+  );
 
   // Selected team state for registration (never hardcoded to Bayern!)
   const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
+    if (joinFanTeam?.id) return joinFanTeam.id;
     if (invitedTeam?.id) return invitedTeam.id;
     if (invitedName) {
       const match = teamList.find((t) => t.name.toLowerCase() === invitedName.toLowerCase());
@@ -138,6 +150,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
     return teamList[0]?.id || team.id || '';
   });
+
+  React.useEffect(() => {
+    if (joinFanTeam) {
+      setActiveTab('register');
+      setRegisterRole('fan');
+      if (joinFanTeam.id) setSelectedTeamId(joinFanTeam.id);
+    }
+  }, [joinFanTeam]);
 
   const selectedTeam = teamList.find((t) => t.id === selectedTeamId) || teamList[0] || team;
 
@@ -232,29 +252,33 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    // Direct check for required admin: email agbl141201@gmail.com, usuario admin, pass root
-    if (
-      (identifier === 'admin' || identifier === 'agbl141201@gmail.com') &&
-      pass === 'root'
-    ) {
+    // Direct check for required admin: email agbl141201@gmail.com, usuario admin
+    if (identifier === 'admin' || identifier === 'agbl141201@gmail.com') {
       const adminInList = allUsers.find(
         (u) =>
           u.email.toLowerCase() === 'agbl141201@gmail.com' ||
           (u.username && u.username.toLowerCase() === 'admin')
       );
+      const expectedAdminPass = adminInList?.password || 'root';
+      if (pass !== expectedAdminPass) {
+        setLoginError('Contraseña incorrecta. Por favor intenta nuevamente.');
+        return;
+      }
 
       const targetAdmin: AppUser = {
+        ...(adminInList || {}),
         id: adminInList?.id || 'u_admin',
         name: adminInList?.name || 'Administrador (Admin)',
         email: 'agbl141201@gmail.com',
         username: 'admin',
-        password: 'root',
+        password: expectedAdminPass,
         role: 'owner',
         avatarUrl:
           adminInList?.avatarUrl ||
           'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
         playerId: adminInList?.playerId || 'p_1',
-        teamId: 'team_01', // Bayern Munich
+        teamId: adminInList?.teamId || 'team_01',
+        teamIds: adminInList?.teamIds?.length ? adminInList.teamIds : ['team_01'],
         provider: 'email',
       };
 
@@ -303,16 +327,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    // Direct check for League Admin: usuario admin@dreamteam.com, pass admin
-    if (
-      (identifier === 'admin@dreamteam.com' || identifier === 'liga') &&
-      pass === 'admin'
-    ) {
+    // Direct check for League Admin: usuario admin@dreamteam.com
+    if (identifier === 'admin@dreamteam.com' || identifier === 'liga') {
       const leagueUserInList = allUsers.find(
         (u) =>
           u.email.toLowerCase() === 'admin@dreamteam.com' ||
           (u.username && u.username.toLowerCase() === 'admin@dreamteam.com')
       );
+      const expectedLeaguePass = leagueUserInList?.password || 'admin';
+      if (pass !== expectedLeaguePass) {
+        setLoginError('Contraseña incorrecta. Por favor intenta nuevamente.');
+        return;
+      }
 
       const targetLeagueAdmin: AppUser = {
         ...(leagueUserInList || {}),
@@ -320,7 +346,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
         name: leagueUserInList?.name || 'Administrador de Liga',
         email: 'admin@dreamteam.com',
         username: 'admin@dreamteam.com',
-        password: 'admin',
+        password: expectedLeaguePass,
         role: 'league_admin',
         avatarUrl:
           leagueUserInList?.avatarUrl ||
@@ -355,7 +381,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     }
 
     const expectedPass =
-      matchedUser.password || (matchedUser.role === 'owner' ? 'root' : '123');
+      matchedUser.password ||
+      (matchedUser.role === 'owner'
+        ? 'root'
+        : matchedUser.role === 'league_admin'
+        ? 'admin'
+        : '123');
 
     if (expectedPass !== pass) {
       setLoginError('Contraseña incorrecta. Por favor intenta nuevamente.');
@@ -447,13 +478,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     e.target.value = '';
   };
 
-  // Handle Player Registration Submit
+  // Handle Player or Fan Registration Submit
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterError(null);
 
     const name = newPlayerForm.name.trim();
-    const rawPrefix = newPlayerForm.email.trim().split('@')[0].replace(/\s+/g, '').toLowerCase();
+    const rawEmailInput = newPlayerForm.email.trim().toLowerCase();
+    const expectedDomain = registerRole === 'fan' ? '@dmaficion.com' : '@dreamteam.com';
+    if (rawEmailInput.includes('@') && !rawEmailInput.endsWith(expectedDomain)) {
+      setRegisterError(
+        `El correo para ${registerRole === 'fan' ? 'Aficionado' : 'Jugador'} debe terminar en ${expectedDomain}.`
+      );
+      return;
+    }
+    const rawPrefix = rawEmailInput.split('@')[0].replace(/\s+/g, '').toLowerCase();
     const password = newPlayerForm.password.trim();
     const confirmPassword = newPlayerForm.confirmPassword.trim();
 
@@ -465,7 +504,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setRegisterError('Por favor ingresa el inicio de tu correo (antes del @).');
       return;
     }
-    const email = `${rawPrefix}@dreamteam.com`;
+    const email = `${rawPrefix}${expectedDomain}`;
     if (!password || password.length < 3) {
       setRegisterError('Crea una contraseña de al menos 3 caracteres.');
       return;
@@ -483,10 +522,91 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    const dorsal = parseInt(newPlayerForm.number, 10) || Math.floor(Math.random() * 89) + 10;
-    const newPlayerId = `p_${Date.now()}`;
     const newUserId = `u_${Date.now()}`;
     const username = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    const avatarUrl = newPlayerForm.avatarUrl || DEFAULT_FACEBOOK_AVATAR;
+
+    if (registerRole === 'fan') {
+      const targetFanTeam = joinFanTeam || null;
+      const newFanUser: AppUser = {
+        id: newUserId,
+        name,
+        email,
+        username,
+        password,
+        role: 'fan',
+        avatarUrl,
+        teamId: undefined,
+        teamIds: [],
+        teamJoinStatus: targetFanTeam ? 'pending' : 'none',
+        requestedTeamId: targetFanTeam?.id,
+        requestedTeamName: targetFanTeam?.name,
+        provider: 'email',
+      };
+
+      const nextUsers = [...allUsers, newFanUser];
+      if (setUsers) {
+        setUsers(nextUsers);
+      }
+      if (isSupabaseConfigured()) {
+        supabaseUpsertUser(newFanUser);
+      }
+
+      let nextRequests = joinRequests;
+      if (targetFanTeam) {
+        const fanReq: TeamJoinRequest = {
+          id: `req_fan_${Date.now()}_${targetFanTeam.id}`,
+          userId: newUserId,
+          userName: name,
+          playerName: name,
+          userEmail: email,
+          playerEmail: email,
+          userAvatar: avatarUrl,
+          playerAvatar: avatarUrl,
+          teamId: targetFanTeam.id,
+          teamName: targetFanTeam.name,
+          teamLogo: targetFanTeam.logoUrl,
+          requestType: 'fan',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          requestedAt: new Date().toISOString(),
+          mensaje: 'Desea unirse como Aficionado Oficial / Porra',
+        };
+        nextRequests = [fanReq, ...joinRequests];
+        if (setJoinRequests) {
+          setJoinRequests(nextRequests);
+        }
+        try {
+          localStorage.setItem('teamgol_join_requests', JSON.stringify(nextRequests));
+        } catch {}
+        fetch('/api/solicitudes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fanReq),
+        }).catch(() => {});
+        if (isSupabaseConfigured()) {
+          supabaseUpsertJoinRequest(fanReq);
+        }
+      }
+
+      pushBackendSync({
+        users: nextUsers,
+        joinRequests: nextRequests,
+      });
+
+      setLoginSuccess(
+        targetFanTeam
+          ? `¡Cuenta de Aficionado creada! Tu solicitud para la porra de ${targetFanTeam.name} fue enviada.`
+          : `¡Cuenta de Aficionado creada con éxito! Bienvenido, ${name}.`
+      );
+      setTimeout(() => {
+        onLoginSuccess(newFanUser, rememberDevice);
+      }, 600);
+      return;
+    }
+
+    const dorsal = parseInt(newPlayerForm.number, 10) || Math.floor(Math.random() * 89) + 10;
+    const newPlayerId = `p_${Date.now()}`;
 
     const newPlayer: Player = {
       id: newPlayerId,
@@ -494,7 +614,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       nickname: newPlayerForm.nickname.trim() || undefined,
       number: dorsal,
       position: newPlayerForm.position,
-      avatarUrl: newPlayerForm.avatarUrl || DEFAULT_FACEBOOK_AVATAR,
+      avatarUrl,
       matches: 0,
       goals: 0,
       assists: 0,
@@ -505,7 +625,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       mvpHistory: [],
     };
 
-    // No hardcoded team assignment during registration
     const newUser: AppUser = {
       id: newUserId,
       name,
@@ -523,7 +642,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       provider: 'email',
     };
 
-    // Check if this email was invited by an admin/DT for a team
     try {
       const storedInvs = localStorage.getItem('teamgol_sent_invitations');
       if (storedInvs) {
@@ -771,8 +889,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           </div>
         </div>
 
-        {/* Invited Link Banner if accessed via invite URL / invitation */}
-        {hasInvite && activeTab !== 'create_team' && (
+        {/* Invited Link Banner if accessed via invite URL / ?joinFan= */}
+        {joinFanTeam && activeTab !== 'create_team' && (
+          <div className="bg-amber-50 border border-amber-300 p-3.5 rounded-2xl flex items-start gap-3 shadow-xs">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Megaphone className="w-4 h-4" />
+            </div>
+            <div className="text-xs text-amber-950 leading-relaxed">
+              <span className="font-black block">¡Únete a la Porra Oficial de {joinFanTeam.name}!</span>
+              Regístrate como <strong>Aficionado</strong> con tu correo <strong>@dmaficion.com</strong> para seguir partidos, confirmar asistencia en la grada y votar por el MVP.
+            </div>
+          </div>
+        )}
+        {!joinFanTeam && hasInvite && activeTab !== 'create_team' && (
           <div className="bg-emerald-50 border border-emerald-300 p-3.5 rounded-2xl flex items-start gap-3 shadow-xs">
             <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
               <Trophy className="w-4 h-4" />
@@ -958,9 +1087,41 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </form>
           )}
 
-          {/* ================= FORM 2: REGISTER AS PLAYER ================= */}
+          {/* ================= FORM 2: REGISTER AS PLAYER OR FAN ================= */}
           {activeTab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-3.5">
+              {/* Role Selector: Jugador vs Aficionado / Porra */}
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[#F0F2F5] border border-[#CED0D4]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegisterRole('player');
+                    setRegisterError(null);
+                  }}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    registerRole === 'player'
+                      ? 'bg-white text-[#1877F2] shadow-xs'
+                      : 'text-[#65676B] hover:text-[#050505]'
+                  }`}
+                >
+                  ⚽ Soy Jugador (@dreamteam.com)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRegisterRole('fan');
+                    setRegisterError(null);
+                  }}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    registerRole === 'fan'
+                      ? 'bg-amber-500 text-white shadow-xs'
+                      : 'text-[#65676B] hover:text-[#050505]'
+                  }`}
+                >
+                  📣 Aficionado / Porra (@dmaficion.com)
+                </button>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-[#050505] mb-1">
                   Nombre Completo *
@@ -983,7 +1144,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     id="input-register-email-prefix"
                     type="text"
                     required
-                    placeholder="ej. rodrigo.mendoza"
+                    placeholder={registerRole === 'fan' ? 'ej. maria.porra' : 'ej. rodrigo.mendoza'}
                     value={newPlayerForm.email}
                     onChange={(e) => {
                       const cleanPrefix = e.target.value.split('@')[0].replace(/\s+/g, '').toLowerCase();
@@ -991,14 +1152,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     }}
                     className="flex-1 min-w-0 px-3 py-2 bg-transparent text-xs font-medium text-[#050505] outline-hidden"
                   />
-                  <span className="px-3 py-2 bg-[#E4E6EB]/80 border-l border-[#CED0D4] text-xs font-bold text-[#1877F2] select-none shrink-0">
-                    @dreamteam.com
+                  <span className={`px-3 py-2 bg-[#E4E6EB]/80 border-l border-[#CED0D4] text-xs font-bold select-none shrink-0 ${
+                    registerRole === 'fan' ? 'text-amber-700' : 'text-[#1877F2]'
+                  }`}>
+                    {registerRole === 'fan' ? '@dmaficion.com' : '@dreamteam.com'}
                   </span>
                 </div>
                 <p className="text-[10px] text-[#65676B] mt-1">
                   * Solo escribe lo que va antes del @. Tu correo quedará como{' '}
                   <span className="font-bold text-[#050505]">
-                    {newPlayerForm.email ? `${newPlayerForm.email}@dreamteam.com` : 'usuario@dreamteam.com'}
+                    {newPlayerForm.email
+                      ? `${newPlayerForm.email}${registerRole === 'fan' ? '@dmaficion.com' : '@dreamteam.com'}`
+                      : `usuario${registerRole === 'fan' ? '@dmaficion.com' : '@dreamteam.com'}`}
                   </span>
                 </p>
               </div>
@@ -1030,38 +1195,40 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#050505] mb-1">
-                    Dorsal Deseado *
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    required
-                    value={newPlayerForm.number}
-                    onChange={(e) => setNewPlayerForm({ ...newPlayerForm, number: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-medium text-[#050505] focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
-                  />
+              {registerRole === 'player' && (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-[#050505] mb-1">
+                      Dorsal Deseado *
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      required
+                      value={newPlayerForm.number}
+                      onChange={(e) => setNewPlayerForm({ ...newPlayerForm, number: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-medium text-[#050505] focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#050505] mb-1">
+                      Posición *
+                    </label>
+                    <select
+                      value={newPlayerForm.position}
+                      onChange={(e) => setNewPlayerForm({ ...newPlayerForm, position: e.target.value as PlayerPosition })}
+                      className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-medium text-[#050505] focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden cursor-pointer"
+                    >
+                      {ALL_POSITIONS.map((pos) => (
+                        <option key={pos.value} value={pos.value}>
+                          {pos.label} ({pos.category})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#050505] mb-1">
-                    Posición *
-                  </label>
-                  <select
-                    value={newPlayerForm.position}
-                    onChange={(e) => setNewPlayerForm({ ...newPlayerForm, position: e.target.value as PlayerPosition })}
-                    className="w-full px-3 py-2 rounded-xl bg-[#F0F2F5] border border-[#CED0D4] text-xs font-medium text-[#050505] focus:ring-2 focus:ring-[#1877F2] focus:bg-white outline-hidden cursor-pointer"
-                  >
-                    {ALL_POSITIONS.map((pos) => (
-                      <option key={pos.value} value={pos.value}>
-                        {pos.label} ({pos.category})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              )}
 
               {/* Photo section with camera capture & gallery upload */}
               <div className="p-3 bg-[#F0F2F5] rounded-2xl border border-[#CED0D4] space-y-2">
@@ -1114,12 +1281,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 </div>
               </div>
 
-              {/* Notice: Selection of Team is done after registration via official league catalog */}
+              {/* Notice: Selection of Team */}
               <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-blue-950 text-xs flex items-start gap-2.5 shadow-xs">
                 <Shield className="w-4 h-4 text-[#1877F2] shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <span className="font-bold block text-[#1877F2]">Selección de Club posterior al registro:</span>
-                  Al crear tu cuenta ingresarás directamente al catálogo de las <strong>5 Ligas Oficiales</strong> para solicitar unirte al equipo de tu preferencia. El Director Técnico recibirá tu notificación para aceptarte en el plantel.
+                  {registerRole === 'fan' ? (
+                    joinFanTeam ? (
+                      <>
+                        <span className="font-bold block text-amber-800">Solicitud directa de Porra Oficial:</span>
+                        Al completar tu registro se enviará automáticamente tu solicitud de Aficionado al club <strong>{joinFanTeam.name}</strong> para que el administrador te apruebe.
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold block text-amber-800">Aficionado / Porra Oficial:</span>
+                        Podrás elegir a qué clubes seguir, confirmar tu asistencia en las gradas, publicar contenido (sujeto a moderación) y votar por el MVP de la Afición.
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <span className="font-bold block text-[#1877F2]">Selección de Club posterior al registro:</span>
+                      Al crear tu cuenta ingresarás directamente al catálogo de las <strong>5 Ligas Oficiales</strong> para solicitar unirte al equipo de tu preferencia. El Director Técnico recibirá tu notificación para aceptarte en el plantel.
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1139,9 +1322,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               <button
                 type="submit"
                 id="btn-submit-register"
-                className="w-full py-3 px-4 rounded-2xl bg-[#1877F2] hover:bg-[#0866FF] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className={`w-full py-3 px-4 rounded-2xl text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                  registerRole === 'fan' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-[#1877F2] hover:bg-[#0866FF]'
+                }`}
               >
-                <span>Registrar mi Perfil de Jugador</span>
+                <span>{registerRole === 'fan' ? 'Registrarme como Aficionado' : 'Registrar mi Perfil de Jugador'}</span>
                 <CheckCircle2 className="w-4 h-4" />
               </button>
             </form>

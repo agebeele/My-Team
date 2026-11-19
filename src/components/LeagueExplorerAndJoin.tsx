@@ -97,6 +97,8 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
     );
   });
 
+  const isFan = currentUser.role === 'fan';
+
   // Handle request to join a team (allowed even if user already belongs to other clubs)
   const handleRequestJoin = async (targetTeam: TeamInfo) => {
     if (memberTeamIds.has(targetTeam.id)) {
@@ -119,20 +121,21 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
       playerEmail: currentUser.email,
       userAvatar: currentUser.avatarUrl,
       playerAvatar: currentUser.avatarUrl,
-      position: currentUser.position || 'MED',
-      playerPosition: currentUser.position || 'MED',
-      number: currentUser.jerseyNumber || 10,
-      playerNumber: currentUser.jerseyNumber || 10,
+      position: isFan ? undefined : currentUser.position || 'MED',
+      playerPosition: isFan ? undefined : currentUser.position || 'MED',
+      number: isFan ? undefined : currentUser.jerseyNumber || 10,
+      playerNumber: isFan ? undefined : currentUser.jerseyNumber || 10,
       phone: currentUser.phone,
       teamId: targetTeam.id,
       teamName: targetTeam.name,
       teamLeague: targetTeam.leagueName,
       leagueName: targetTeam.leagueName,
       teamLogo: targetTeam.logoUrl,
+      requestType: isFan ? 'fan' : 'player',
       status: 'pending',
       createdAt: new Date().toISOString(),
       requestedAt: new Date().toISOString(),
-      mensaje: 'Desea unirse al plantel',
+      mensaje: isFan ? 'Desea unirse como Aficionado / Porra' : 'Desea unirse al plantel',
     };
 
     const updatedRequests = [
@@ -188,7 +191,9 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
     });
 
     setActionSuccessToast(
-      `¡Solicitud enviada al Director Técnico de ${targetTeam.name}! Te notificaremos cuando seas aceptado en el plantel.`
+      isFan
+        ? `¡Solicitud de Aficionado enviada al club ${targetTeam.name}! Te avisaremos en cuanto sea aprobada.`
+        : `¡Solicitud enviada al Director Técnico de ${targetTeam.name}! Te notificaremos cuando seas aceptado en el plantel.`
     );
     setTimeout(() => setActionSuccessToast(null), 6000);
   };
@@ -273,15 +278,19 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
                 <h1 className="text-xl sm:text-2xl font-black text-[#050505] dark:text-white tracking-tight">
                   {currentUser.name}
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
-                  Jugador Fut 7
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider border ${
+                  isFan
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-blue-100 text-blue-700 border-blue-200'
+                }`}>
+                  {isFan ? '📣 Aficionado / Porra' : 'Jugador Fut 7'}
                 </span>
-                {currentUser.jerseyNumber && (
+                {!isFan && currentUser.jerseyNumber && (
                   <span className="px-2 py-0.5 rounded-md text-[11px] font-black bg-amber-400 text-black">
                     #{currentUser.jerseyNumber}
                   </span>
                 )}
-                {currentUser.position && (
+                {!isFan && currentUser.position && (
                   <span className="px-2 py-0.5 rounded-md text-[11px] font-black bg-emerald-100 text-emerald-800">
                     {currentUser.position}
                   </span>
@@ -290,7 +299,9 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
               <p className="text-xs sm:text-sm text-[#65676B] dark:text-gray-400 mt-0.5">
                 {currentUser.email} •{' '}
                 {memberTeamIds.size > 0
-                  ? `Miembro activo en ${memberTeamIds.size} ${memberTeamIds.size === 1 ? 'club' : 'clubes'}`
+                  ? `${isFan ? 'Siguiendo a' : 'Miembro activo en'} ${memberTeamIds.size} ${memberTeamIds.size === 1 ? 'club' : 'clubes'}`
+                  : isFan
+                  ? 'Elige un club para unirte a su Porra Oficial'
                   : 'Pendiente de asignación a un club oficial'}
               </p>
             </div>

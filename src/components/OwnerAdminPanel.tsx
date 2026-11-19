@@ -30,6 +30,8 @@ import {
   Send,
   Database,
   ChevronDown,
+  Megaphone,
+  Instagram,
 } from 'lucide-react';
 import {
   TeamInfo,
@@ -51,6 +53,7 @@ import { CameraCaptureModal } from './CameraCaptureModal';
 import { TableAiScannerModal } from './TableAiScannerModal';
 import { EmailInvitationModal } from './EmailInvitationModal';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
+import { ChangePasswordSection } from './ChangePasswordSection';
 import { pushBackendSync } from '../utils/backendSync';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 import { isSupabaseConfigured, getSupabaseClient } from '../utils/supabaseClient';
@@ -517,6 +520,7 @@ const [invitePlayerNameInput, setInvitePlayerNameInput] = useState('');
 const [activeEmailInvitation, setActiveEmailInvitation] = useState<TeamInvitation | null>(null);
 const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 const [copiedInvite, setCopiedInvite] = useState(false);
+const [copiedFanInvite, setCopiedFanInvite] = useState(false);
 
 const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
   try {
@@ -539,11 +543,23 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
   };
 
   const inviteUrl = getInviteUrlForEmail();
+  const fanInviteUrl = `${window.location.origin}${window.location.pathname}?joinFan=${encodeURIComponent(team.id || 'team_01')}`;
 
   const handleCopyInviteLink = () => {
     navigator.clipboard.writeText(inviteUrl).then(() => {
       setCopiedInvite(true);
       setTimeout(() => setCopiedInvite(false), 3000);
+    });
+  };
+
+  const handleCopyFanInviteLink = () => {
+    navigator.clipboard.writeText(fanInviteUrl).then(() => {
+      setCopiedFanInvite(true);
+      setNotificationStatus(`¡Enlace de Porra Oficial copiado para la bio de Instagram de ${team.name}!`);
+      setTimeout(() => {
+        setCopiedFanInvite(false);
+        setNotificationStatus(null);
+      }, 3500);
     });
   };
 
@@ -1047,12 +1063,31 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
         {/* Current Active Invite Link Box */}
         <div className="p-3 rounded-xl bg-white border border-[#CED0D4] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[11px] font-bold text-[#65676B] shrink-0">Enlace base:</span>
+            <span className="text-[11px] font-bold text-[#65676B] shrink-0">Enlace Jugadores:</span>
             <span className="font-mono text-xs text-[#050505] truncate">{inviteUrl}</span>
           </div>
           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0 self-start sm:self-auto">
             Email Ready
           </span>
+        </div>
+
+        {/* Instagram Bio Link for Fans (?joinFan=<team_id>) */}
+        <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="min-w-0 space-y-0.5">
+            <div className="flex items-center gap-1.5 text-xs font-black text-amber-950">
+              <Instagram className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>Enlace Directo para Aficionados / Bio de Instagram</span>
+            </div>
+            <p className="font-mono text-[11px] text-amber-900 truncate">{fanInviteUrl}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyFanInviteLink}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            {copiedFanInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            <span>{copiedFanInvite ? '¡Enlace IG Copiado!' : 'Copiar Link para Bio IG'}</span>
+          </button>
         </div>
 
         {/* Sent invitations list */}
@@ -1167,7 +1202,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-[#1877F2]" />
                   </span>
                   <h4 className="text-xs font-black uppercase tracking-wider text-[#1877F2]">
-                    Solicitudes de Jugadores para Unirse al Plantel ({pendingTeamRequests.length})
+                    Solicitudes Pendientes ({pendingTeamRequests.length})
                   </h4>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#1877F2]">
@@ -1175,30 +1210,43 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                 </span>
               </div>
               <p className="text-xs text-[#65676B]">
-                Futbolistas registrados en la liga que han solicitado ingresar a <span className="font-bold text-[#050505]">{team.name}</span>. Acéptalos para sumarlos a tu plantilla oficial.
+                Futbolistas y Aficionados registrados que han solicitado unirse a <span className="font-bold text-[#050505]">{team.name}</span>.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                {pendingTeamRequests.map((req) => (
+                {pendingTeamRequests.map((req) => {
+                  const isFanRequest = req.requestType === 'fan';
+                  return (
                   <div
                     key={req.id}
-                    className="p-3 rounded-xl bg-white border border-blue-200 shadow-2xs space-y-2.5"
+                    className={`p-3 rounded-xl bg-white shadow-2xs space-y-2.5 border ${
+                      isFanRequest ? 'border-amber-300' : 'border-blue-200'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
                       <img
                         src={req.playerAvatar || DEFAULT_FACEBOOK_AVATAR}
                         alt={req.playerName}
-                        className="w-11 h-11 rounded-full object-cover ring-2 ring-blue-500 shrink-0 bg-gray-100"
+                        className={`w-11 h-11 rounded-full object-cover ring-2 shrink-0 bg-gray-100 ${
+                          isFanRequest ? 'ring-amber-400' : 'ring-blue-500'
+                        }`}
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = DEFAULT_FACEBOOK_AVATAR;
                         }}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-black text-xs text-[#050505] truncate">
                             {req.playerName}
                           </span>
-                          {req.playerNumber && (
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                            isFanRequest
+                              ? 'bg-amber-100 text-amber-800 border-amber-300'
+                              : 'bg-blue-100 text-blue-800 border-blue-200'
+                          }`}>
+                            {isFanRequest ? '📣 Aficionado' : '⚽ Jugador'}
+                          </span>
+                          {!isFanRequest && req.playerNumber && (
                             <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-gray-100 text-[#050505]">
                               #{req.playerNumber}
                             </span>
@@ -1208,7 +1256,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                           {req.playerEmail}
                         </span>
                         <div className="flex items-center gap-2 mt-0.5">
-                          {req.playerPosition && (
+                          {!isFanRequest && req.playerPosition && (
                             <span className="text-[10px] font-bold px-2 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200">
                               Pos: {req.playerPosition}
                             </span>
@@ -1225,13 +1273,19 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                         type="button"
                         onClick={() => {
                           if (onAcceptJoinRequest) onAcceptJoinRequest(req);
-                          setNotificationStatus(`¡${req.playerName} aceptado en el plantel de ${team.name}!`);
+                          setNotificationStatus(
+                            isFanRequest
+                              ? `¡${req.playerName} aceptado como Aficionado Oficial de ${team.name}!`
+                              : `¡${req.playerName} aceptado en el plantel de ${team.name}!`
+                          );
                           setTimeout(() => setNotificationStatus(null), 4000);
                         }}
-                        className="flex-1 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                          isFanRequest ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'
+                        }`}
                       >
                         <Check className="w-3.5 h-3.5" />
-                        <span>Aceptar al Plantel</span>
+                        <span>{isFanRequest ? 'Aceptar Aficionado' : 'Aceptar al Plantel'}</span>
                       </button>
                       <button
                         type="button"
@@ -1246,7 +1300,8 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -1715,6 +1770,17 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
             </button>
           </div>
         </form>
+
+        {setCurrentUser && (
+          <div className="pt-2 border-t border-[#CED0D4]">
+            <ChangePasswordSection
+              currentUser={currentUser}
+              setCurrentUser={setCurrentUser}
+              users={users}
+              setUsers={setUsers}
+            />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -2165,6 +2231,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                         >
                           <option value="owner">Dueño de Equipo</option>
                           <option value="player">Jugador</option>
+                          <option value="fan">Aficionado / Porra</option>
                         </select>
                       </div>
                     </div>

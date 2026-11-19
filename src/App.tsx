@@ -50,6 +50,7 @@ import { WelcomeModal } from './components/WelcomeModal';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
 import { LeagueExplorerAndJoin } from './components/LeagueExplorerAndJoin';
 import { LeagueAdminProfileView } from './components/LeagueAdminProfileView';
+import { FanProfileView } from './components/FanProfileView';
 import confetti from 'canvas-confetti';
 import { isSupabaseConfigured, initSupabaseFromServer, supabase } from './utils/supabaseClient';
 import {
@@ -142,6 +143,8 @@ export default function App() {
     return null;
   });
   const [joinSuccessAlert, setJoinSuccessAlert] = useState<string | null>(null);
+  const [joinFanTeam, setJoinFanTeam] = useState<{ id: string; name: string; logoUrl?: string } | null>(null);
+  const handledUrlInviteRef = useRef(false);
   const [joinDecisionAlert, setJoinDecisionAlert] = useState<{
     type: 'accepted' | 'rejected';
     teamName: string;
@@ -165,7 +168,7 @@ export default function App() {
     latestTeams?: TeamInfo[]
   ) => {
     const me = currentUserRef.current;
-    if (!me || me.role !== 'player') return;
+    if (!me || (me.role !== 'player' && me.role !== 'fan')) return;
 
     const teamsPool = latestTeams && latestTeams.length > 0 ? latestTeams : allTeamsRef.current;
     const freshMe = latestUsers?.find(
@@ -246,17 +249,19 @@ export default function App() {
           if (teamPlayers && teamPlayers.length > 0) {
             setPlayers(teamPlayers);
             savePlayersForTeam(targetAcceptedTeamId, teamPlayers);
-            const matchedPl = teamPlayers.find(
-              (p) =>
-                p.linkedUserId === me.id ||
-                p.id === updatedMe.playerId ||
-                (p.name && me.name && p.name.toLowerCase().trim() === me.name.toLowerCase().trim())
-            );
-            if (matchedPl) {
-              setSelectedPlayerId(matchedPl.id);
-              const withPlayer = { ...updatedMe, playerId: matchedPl.id };
-              setCurrentUser(withPlayer);
-              saveDeviceSession(withPlayer);
+            if (me.role === 'player') {
+              const matchedPl = teamPlayers.find(
+                (p) =>
+                  p.linkedUserId === me.id ||
+                  p.id === updatedMe.playerId ||
+                  (p.name && me.name && p.name.toLowerCase().trim() === me.name.toLowerCase().trim())
+              );
+              if (matchedPl) {
+                setSelectedPlayerId(matchedPl.id);
+                const withPlayer = { ...updatedMe, playerId: matchedPl.id };
+                setCurrentUser(withPlayer);
+                saveDeviceSession(withPlayer);
+              }
             }
           }
           if (teamMatches) {
@@ -291,7 +296,10 @@ export default function App() {
       setJoinDecisionAlert({
         type: 'accepted',
         teamName: teamLabel,
-        message: `¡Fuiste aceptado en ${teamLabel}! Tu ficha fue añadida y ya puedes cambiar entre tus clubes desde el encabezado.`,
+        message:
+          me.role === 'fan'
+            ? `¡Fuiste aceptado en la Porra Oficial de ${teamLabel}! Ya puedes confirmar asistencia, votar en el MVP de la Afición y publicar en el muro.`
+            : `¡Fuiste aceptado en ${teamLabel}! Tu ficha fue añadida y ya puedes cambiar entre tus clubes desde el encabezado.`,
       });
       return;
     }
@@ -439,6 +447,7 @@ export default function App() {
             phone: u.phone,
             teamId: u.requestedTeamId || team.id,
             teamName: u.requestedTeamName || team.name,
+            requestType: u.role === 'fan' ? ('fan' as const) : ('player' as const),
             status: 'pending' as const,
             createdAt: new Date().toISOString(),
           }));
@@ -580,6 +589,7 @@ export default function App() {
             phone: u.phone,
             teamId: u.requestedTeamId || team.id,
             teamName: u.requestedTeamName || team.name,
+            requestType: u.role === 'fan' ? ('fan' as const) : ('player' as const),
             status: 'pending' as const,
             createdAt: new Date().toISOString(),
             requestedAt: new Date().toISOString(),
@@ -666,6 +676,7 @@ export default function App() {
               phone: u.phone,
               teamId: u.requestedTeamId || team.id,
               teamName: u.requestedTeamName || team.name,
+              requestType: u.role === 'fan' ? ('fan' as const) : ('player' as const),
               status: 'pending' as const,
               createdAt: new Date().toISOString(),
               requestedAt: new Date().toISOString(),
@@ -918,15 +929,32 @@ export default function App() {
     localStorage.removeItem('app_theme');
   }, []);
 
-  // Detect invite link in URL: ?joinTeam=...&teamName=...&teamLogo=...
+  // Detect invite link in URL: ?joinTeam=... or ?joinFan=<team_id>
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const joinTeamId = params.get('joinTeam');
+      const joinFanId = params.get('joinFan');
       const teamNameParam = params.get('teamName');
       const teamLogoParam = params.get('teamLogo');
 
-      if (joinTeamId || teamNameParam) {
+      if (joinFanId) {
+        const matched = allTeams.find((t) => t.id === joinFanId) || (team.id === joinFanId ? team : undefined);
+        const fanObj = {
+          id: joinFanId,
+          name: teamNameParam
+            ? decodeURIComponent(teamNameParam)
+            : matched?.name || 'Club Oficial',
+          logoUrl: teamLogoParam
+            ? decodeURIComponent(teamLogoParam)
+            : matched?.logoUrl,
+        };
+        setJoinFanTeam(fanObj);
+        if (!handledUrlInviteRef.current) {
+          handledUrlInviteRef.current = true;
+          setIsAuthModalOpen(true);
+        }
+      } else if (joinTeamId || teamNameParam) {
         const targetTeamName = teamNameParam ? decodeURIComponent(teamNameParam) : team.name;
         const targetTeamLogo = teamLogoParam
           ? decodeURIComponent(teamLogoParam)
@@ -945,12 +973,15 @@ export default function App() {
         } catch {
           // ignore
         }
-        setIsAuthModalOpen(true);
+        if (!handledUrlInviteRef.current) {
+          handledUrlInviteRef.current = true;
+          setIsAuthModalOpen(true);
+        }
       }
     } catch {
       // Ignore URL parsing errors
     }
-  }, [team.name, team.id, team.logoUrl]);
+  }, [team.name, team.id, team.logoUrl, allTeams]);
 
   // Handler to switch active team cleanly with distinct data segregation & instant reload
   const handleSwitchTeam = async (newTeam: TeamInfo, options?: { skipUserUpdate?: boolean }) => {
@@ -1086,16 +1117,18 @@ export default function App() {
     }
   }, [currentUser?.role, activeTab]);
 
-  // Restrict navigation for unassigned player (without any team) to leagues explorer and league wall
+  // Restrict navigation for unassigned player or fan (without any team) to leagues explorer and league wall
   useEffect(() => {
     const hasAnyTeam = Boolean(
       currentUser?.teamId || (Array.isArray(currentUser?.teamIds) && currentUser.teamIds.length > 0)
     );
-    if (currentUser?.role === 'player' && !hasAnyTeam) {
+    if ((currentUser?.role === 'player' || currentUser?.role === 'fan') && !hasAnyTeam) {
       const allowed = ['leagues', 'wall'];
       if (!allowed.includes(activeTab)) {
         setActiveTab('leagues');
       }
+    } else if (currentUser?.role === 'fan' && (activeTab === 'live_match' || activeTab === 'admin' || activeTab === 'owner_admin')) {
+      setActiveTab('calendar');
     }
   }, [currentUser?.role, currentUser?.teamId, currentUser?.teamIds, activeTab]);
 
@@ -1142,40 +1175,54 @@ export default function App() {
       localStorage.setItem('teamgol_join_requests', JSON.stringify(updatedRequests));
     } catch {}
 
-    // 2. Create (or reuse) an independent Player card for this (team_id, user_id)
-    const targetTeamPlayers =
-      req.teamId === team.id ? players : getPlayersForTeam(req.teamId);
-    const existingCard = targetTeamPlayers.find(
-      (p) => p.linkedUserId === req.userId && (!p.teamId || p.teamId === req.teamId)
+    const requestingUser = users.find(
+      (u) =>
+        u.id === req.userId ||
+        (req.playerEmail && u.email.toLowerCase() === req.playerEmail.toLowerCase())
     );
-    const newPlayerId = existingCard?.id || `p_${Date.now()}`;
-    const newPlayer: Player = {
-      id: newPlayerId,
-      name: req.playerName,
-      number: req.playerNumber || existingCard?.number || Math.floor(Math.random() * 80) + 10,
-      position: req.playerPosition || existingCard?.position || 'MED',
-      avatarUrl: req.playerAvatar || existingCard?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      goals: existingCard?.goals || 0,
-      assists: existingCard?.assists || 0,
-      matches: existingCard?.matches || 0,
-      yellowCards: existingCard?.yellowCards || 0,
-      redCards: existingCard?.redCards || 0,
-      isCalledUp: true,
-      isStarter: existingCard?.isStarter || false,
-      mvpHistory: existingCard?.mvpHistory || [],
-      linkedUserId: req.userId,
-      invitationStatus: 'confirmed',
-      teamId: req.teamId,
-    };
+    const isFanRequest = req.requestType === 'fan' || requestingUser?.role === 'fan';
 
-    const updatedTargetPlayers = [
-      ...targetTeamPlayers.filter((p) => p.id !== newPlayerId),
-      newPlayer,
-    ];
-    if (req.teamId === team.id) {
-      setPlayers(updatedTargetPlayers);
+    let newPlayer: Player | undefined;
+    let updatedTargetPlayers = players;
+    let newPlayerId: string | undefined;
+
+    // 2. For player requests only, create (or reuse) an independent Player card for (team_id, user_id).
+    // For fan requests ('fan'), NEVER create a record in players.
+    if (!isFanRequest) {
+      const targetTeamPlayers =
+        req.teamId === team.id ? players : getPlayersForTeam(req.teamId);
+      const existingCard = targetTeamPlayers.find(
+        (p) => p.linkedUserId === req.userId && (!p.teamId || p.teamId === req.teamId)
+      );
+      newPlayerId = existingCard?.id || `p_${Date.now()}`;
+      newPlayer = {
+        id: newPlayerId,
+        name: req.playerName,
+        number: req.playerNumber || existingCard?.number || Math.floor(Math.random() * 80) + 10,
+        position: req.playerPosition || existingCard?.position || 'MED',
+        avatarUrl: req.playerAvatar || existingCard?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        goals: existingCard?.goals || 0,
+        assists: existingCard?.assists || 0,
+        matches: existingCard?.matches || 0,
+        yellowCards: existingCard?.yellowCards || 0,
+        redCards: existingCard?.redCards || 0,
+        isCalledUp: true,
+        isStarter: existingCard?.isStarter || false,
+        mvpHistory: existingCard?.mvpHistory || [],
+        linkedUserId: req.userId,
+        invitationStatus: 'confirmed',
+        teamId: req.teamId,
+      };
+
+      updatedTargetPlayers = [
+        ...targetTeamPlayers.filter((p) => p.id !== newPlayerId),
+        newPlayer,
+      ];
+      if (req.teamId === team.id) {
+        setPlayers(updatedTargetPlayers);
+      }
+      savePlayersForTeam(req.teamId, updatedTargetPlayers);
     }
-    savePlayersForTeam(req.teamId, updatedTargetPlayers);
 
     // 3. Add req.teamId to app_users.team_ids without removing previous memberships, and set as active teamId
     let matchedUpdatedUser: AppUser | undefined;
@@ -1193,7 +1240,7 @@ export default function App() {
           teamId: req.teamId,
           teamIds: mergedTeamIds,
           teamJoinStatus: 'accepted' as const,
-          playerId: newPlayerId,
+          ...(newPlayerId ? { playerId: newPlayerId } : {}),
         };
         return matchedUpdatedUser;
       }
@@ -1214,17 +1261,24 @@ export default function App() {
 
     pushBackendSyncImmediate({
       joinRequests: updatedRequests,
-      players: req.teamId === team.id ? updatedTargetPlayers : players,
+      players: !isFanRequest && req.teamId === team.id ? updatedTargetPlayers : players,
       users: updatedUsers,
     });
 
     // 5. Update Supabase in real-time (upsert user BEFORE player so FK players.user_id satisfies)
     if (isSupabaseConfigured()) {
-      const acceptedReq: TeamJoinRequest = { ...req, status: 'accepted', respondedAt: nowIso };
+      const acceptedReq: TeamJoinRequest = {
+        ...req,
+        requestType: isFanRequest ? 'fan' : 'player',
+        status: 'accepted',
+        respondedAt: nowIso,
+      };
       if (matchedUpdatedUser) {
         await supabaseUpsertUser(matchedUpdatedUser);
       }
-      await supabaseUpsertPlayer(req.teamId, newPlayer);
+      if (!isFanRequest && newPlayer) {
+        await supabaseUpsertPlayer(req.teamId, newPlayer);
+      }
       await supabaseUpsertJoinRequest(acceptedReq);
     }
   };
@@ -1401,6 +1455,9 @@ export default function App() {
           language={language}
           invitedTeam={invitedTeam}
           invitedTeamName={invitedTeamName}
+          joinFanTeam={joinFanTeam}
+          joinRequests={joinRequests}
+          setJoinRequests={setJoinRequests}
           onLoginSuccess={(user, rememberDevice) => {
             setCurrentUser(user);
             currentUserRef.current = user;
@@ -1409,7 +1466,7 @@ export default function App() {
             );
             if (user.role === 'league_admin') {
               setActiveTab('wall');
-            } else if (user.role === 'player' && !hasAnyTeam) {
+            } else if ((user.role === 'player' || user.role === 'fan') && !hasAnyTeam) {
               setActiveTab('leagues');
             } else {
               const isAdmin =
@@ -1562,8 +1619,47 @@ export default function App() {
 
       {/* Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10">
-        {/* Unassigned Player View: only League Explorer and League Wall until admitted to at least one club */}
-        {currentUser?.role === 'player' && currentUserTeamIds.size === 0 ? (
+        {/* Club Community Strip with Official Fans Counter */}
+        {currentUser.role !== 'league_admin' && currentUserTeamIds.size > 0 && (() => {
+          const officialFansCount = users.filter(
+            (u) =>
+              u.role === 'fan' &&
+              (u.teamId === team.id || (Array.isArray(u.teamIds) && u.teamIds.includes(team.id)))
+          ).length;
+          return (
+            <div className="mb-4 px-4 py-2.5 rounded-2xl bg-white border border-[#CED0D4] shadow-xs flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <img
+                  src={team.logoUrl}
+                  alt={team.name}
+                  referrerPolicy="no-referrer"
+                  className="w-7 h-7 rounded-lg object-cover border border-[#CED0D4] bg-white shrink-0"
+                />
+                <span className="text-xs sm:text-sm font-black text-[#050505] truncate">
+                  {team.name}
+                </span>
+                <span className="text-[11px] font-bold text-[#65676B] hidden sm:inline">
+                  • {team.leagueName}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F0F2F5] text-[#050505] border border-[#CED0D4] text-[11px] font-bold">
+                  ⚽ {players.length} Jugadores
+                </span>
+                <span
+                  id="club-official-fans-counter"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-[11px] font-black"
+                >
+                  📣 {officialFansCount} Aficionados Oficiales
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Unassigned Player or Fan View: only League Explorer and League Wall until admitted to at least one club */}
+        {(currentUser?.role === 'player' || currentUser?.role === 'fan') && currentUserTeamIds.size === 0 ? (
           activeTab === 'wall' ? (
             <SocialWall
               posts={posts}
@@ -1740,7 +1836,21 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'profile' && currentUser.role !== 'league_admin' && (() => {
+            {activeTab === 'profile' && currentUser.role === 'fan' && (
+              <FanProfileView
+                currentUser={currentUser}
+                setCurrentUser={(u) => {
+                  setCurrentUser(u);
+                  saveDeviceSession(u);
+                }}
+                users={users}
+                setUsers={handleSetUsers}
+                team={team}
+                allTeams={allTeams}
+              />
+            )}
+
+            {activeTab === 'profile' && currentUser.role !== 'league_admin' && currentUser.role !== 'fan' && (() => {
               const effectivePlayer: Player | undefined = currentPlayer || (currentUser.role === 'player' ? {
                 id: currentUser.playerId || `p_user_${currentUser.id}`,
                 name: currentUser.name,
@@ -1765,6 +1875,12 @@ export default function App() {
                   setPlayers={handleSetPlayers}
                   team={team}
                   currentUser={currentUser}
+                  setCurrentUser={(u) => {
+                    setCurrentUser(u);
+                    saveDeviceSession(u);
+                  }}
+                  users={users}
+                  setUsers={handleSetUsers}
                   language={language}
                 />
               );
@@ -1813,6 +1929,10 @@ export default function App() {
         onClose={() => {
           setIsAuthModalOpen(false);
           setInvitedTeamName(null);
+          setJoinFanTeam(null);
+          if (window.location.search.includes('joinFan=') || window.location.search.includes('joinTeam=')) {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
         }}
         currentUser={currentUser}
         setCurrentUser={(u) => {
@@ -1830,6 +1950,21 @@ export default function App() {
         team={team}
         language={language}
         invitedTeamName={invitedTeamName}
+        joinFanTeam={joinFanTeam}
+        onFanJoinRequest={(fanReq) => {
+          setJoinRequests((prev) => {
+            const next = [fanReq, ...prev.filter((r) => r.id !== fanReq.id)];
+            try {
+              localStorage.setItem('teamgol_join_requests', JSON.stringify(next));
+            } catch {}
+            pushBackendSyncImmediate({ joinRequests: next });
+            return next;
+          });
+          setJoinSuccessAlert(
+            `¡Solicitud de Aficionado enviada para ${fanReq.teamName}! El Admin/DT aprobará tu ingreso a la Porra Oficial.`
+          );
+          setTimeout(() => setJoinSuccessAlert(null), 6000);
+        }}
         onJoinSuccess={(playerName) => {
           setJoinSuccessAlert(`¡Bienvenido al equipo, ${playerName}! Ya formas parte de ${team.name} y puedes ver todas las convocatorias y alineaciones.`);
           setTimeout(() => setJoinSuccessAlert(null), 7000);

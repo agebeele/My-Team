@@ -13,12 +13,15 @@ import {
   AlertTriangle,
   Award,
   Download,
+  Megaphone,
+  Instagram,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Match, Player, AppUser, Language, MVPRecord, TeamInfo } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
+import { InstagramFlyerModal } from './InstagramFlyerModal';
 
 interface MVPVotingAndCameraProps {
   team: TeamInfo;
@@ -76,6 +79,8 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
     fileName: string;
     title: string;
   } | null>(null);
+  const [isFanMvpFlyerOpen, setIsFanMvpFlyerOpen] = useState(false);
+  const [fanVotingClosedIds, setFanVotingClosedIds] = useState<Record<string, boolean>>({});
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -189,6 +194,58 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
   };
 
   const leader = getLeaderCandidate();
+
+  const isManager =
+    currentUser?.role === 'owner' ||
+    currentUser?.role === 'admin' ||
+    currentUser?.role === 'coach';
+
+  const fanVotesMap: Record<string, string> = activeMatch?.fanMvpVotes || {};
+  const fanVoteCounts: Record<string, number> = {};
+  Object.values(fanVotesMap).forEach((pid) => {
+    if (pid) fanVoteCounts[pid] = (fanVoteCounts[pid] || 0) + 1;
+  });
+  const totalFanMvpVotes = Object.values(fanVotesMap).length;
+  const myFanVotePlayerId = currentUser?.id ? fanVotesMap[currentUser.id] : undefined;
+  const isFanVotingClosed = Boolean(activeMatch && fanVotingClosedIds[activeMatch.id]);
+
+  const fanMvpLeader = (() => {
+    let bestPlayer: Player | undefined = players[0];
+    let bestCount = -1;
+    players.forEach((pl) => {
+      const c = fanVoteCounts[pl.id] || 0;
+      if (c > bestCount) {
+        bestCount = c;
+        bestPlayer = pl;
+      }
+    });
+    return { player: bestPlayer, votes: Math.max(0, bestCount) };
+  })();
+
+  const handleVoteFanMvp = (playerId: string) => {
+    if (!activeMatch || !currentUser?.id || isFanVotingClosed) return;
+    setMatches((prev) =>
+      prev.map((m) => {
+        if (m.id !== activeMatch.id) return m;
+        return {
+          ...m,
+          fanMvpVotes: {
+            ...(m.fanMvpVotes || {}),
+            [currentUser.id]: playerId,
+          },
+        };
+      })
+    );
+    setMvpToast('¡Tu voto para el MVP de la Afición ha sido registrado!');
+    setTimeout(() => setMvpToast(null), 3500);
+  };
+
+  const handleCloseFanVotingAndFlyer = () => {
+    if (activeMatch) {
+      setFanVotingClosedIds((prev) => ({ ...prev, [activeMatch.id]: true }));
+    }
+    setIsFanMvpFlyerOpen(true);
+  };
 
   // Start Camera Feed with specified facing mode
   const startCamera = async (facingOverride?: 'user' | 'environment') => {
@@ -916,6 +973,138 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
         </div>
       </div>
 
+      {/* Dedicated Fan MVP Voting Section ("MVP de la Afición") */}
+      {activeMatch && (
+        <div
+          id="fan-mvp-voting-section"
+          className="bg-white dark:bg-[#242526] p-5 rounded-2xl border-2 border-amber-300 dark:border-amber-500/40 shadow-xs space-y-4"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#CED0D4] dark:border-white/10 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shrink-0">
+                <Megaphone className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-black text-[#050505] dark:text-white">
+                    MVP de la Afición
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-black">
+                    {totalFanMvpVotes} {totalFanMvpVotes === 1 ? 'voto' : 'votos'} de la porra
+                  </span>
+                  {isFanVotingClosed && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black">
+                      ✓ Votación Cerrada
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[#65676B] dark:text-gray-400 font-medium">
+                  {activeMatch.status === 'finished'
+                    ? `Partido finalizado vs ${activeMatch.rival}. ¡Los aficionados eligen a su jugador favorito!`
+                    : `La votación de la afición se habilita oficialmente al finalizar el partido vs ${activeMatch.rival}.`}
+                </p>
+              </div>
+            </div>
+
+            {isManager && activeMatch.status === 'finished' && (
+              <button
+                type="button"
+                id="btn-close-fan-mvp-flyer"
+                onClick={handleCloseFanVotingAndFlyer}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 via-rose-500 to-amber-500 hover:opacity-95 text-white font-black text-xs shadow-md cursor-pointer shrink-0"
+              >
+                <Instagram className="w-4 h-4" />
+                <span>
+                  {isFanVotingClosed
+                    ? 'Generar Flyer IG (Ganador)'
+                    : 'Cerrar Votación y Generar Flyer IG'}
+                </span>
+              </button>
+            )}
+          </div>
+
+          {activeMatch.status !== 'finished' ? (
+            <div className="p-4 rounded-xl bg-[#F0F2F5] dark:bg-black/30 border border-[#CED0D4] dark:border-white/10 text-xs text-[#65676B] dark:text-gray-300 flex items-center justify-between gap-2 flex-wrap">
+              <span>
+                Una vez que finalice el partido, toda la porra podrá votar aquí por el MVP de la Afición y generar su Flyer oficial de Instagram.
+              </span>
+              {isManager && (
+                <button
+                  type="button"
+                  onClick={handleFinishMatch}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer"
+                >
+                  Finalizar Partido
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {players.map((player) => {
+                const count = fanVoteCounts[player.id] || 0;
+                const pct = totalFanMvpVotes > 0 ? Math.round((count / totalFanMvpVotes) * 100) : 0;
+                const isMyChoice = myFanVotePlayerId === player.id;
+                const isFanLeader = fanMvpLeader.player?.id === player.id && count > 0;
+
+                return (
+                  <div
+                    key={player.id}
+                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                      isMyChoice
+                        ? 'bg-amber-50 border-amber-400 shadow-xs'
+                        : 'bg-[#F0F2F5] dark:bg-black/30 border-[#CED0D4]/80 dark:border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <img
+                        src={player.avatarUrl}
+                        alt={player.name}
+                        referrerPolicy="no-referrer"
+                        className="w-10 h-10 rounded-full object-cover ring-1 ring-[#CED0D4] shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-black text-[#050505] dark:text-white truncate">
+                            #{player.number} {player.name}
+                          </span>
+                          {isFanLeader && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-400 text-black text-[9px] font-black uppercase">
+                              ★ Favorito
+                            </span>
+                          )}
+                        </div>
+                        <div className="w-full h-1.5 bg-white/80 dark:bg-white/10 rounded-full overflow-hidden mt-1.5">
+                          <div
+                            className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-300"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-[#65676B] dark:text-gray-400 font-semibold mt-0.5 block">
+                          {count} {count === 1 ? 'voto' : 'votos'} ({pct}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={isFanVotingClosed}
+                      onClick={() => handleVoteFanMvp(player.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isMyChoice
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'bg-white hover:bg-amber-100 text-[#050505] border border-[#CED0D4]'
+                      }`}
+                    >
+                      {isMyChoice ? '✓ Mi Voto' : 'Votar'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* MVP Card HD Preview Modal */}
       {photoPreview && (
         <PhotoPreviewModal
@@ -925,6 +1114,19 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
           subtitle="Marco oficial de distinción MVP con estrellas y escudo"
           imageUrl={photoPreview.imageUrl}
           fileName={photoPreview.fileName}
+        />
+      )}
+
+      {/* Instagram Flyer Modal for Fan MVP Winner */}
+      {isFanMvpFlyerOpen && activeMatch && (
+        <InstagramFlyerModal
+          isOpen={isFanMvpFlyerOpen}
+          onClose={() => setIsFanMvpFlyerOpen(false)}
+          mode="fan_mvp"
+          team={team}
+          match={activeMatch}
+          mvpPlayer={fanMvpLeader.player}
+          fanMvpVotesCount={fanMvpLeader.votes}
         />
       )}
     </div>

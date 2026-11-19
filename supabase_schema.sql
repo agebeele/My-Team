@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS app_users (
   email TEXT NOT NULL UNIQUE,
   username TEXT,
   password TEXT,
-  role TEXT DEFAULT 'player',
+  role TEXT DEFAULT 'player', -- Soporta: 'owner' | 'player' | 'fan' | 'admin' | 'coach' | 'league_admin'
   avatar_url TEXT,
   player_id TEXT,
   team_id TEXT,
@@ -102,6 +102,10 @@ CREATE TABLE IF NOT EXISTS matches (
   events JSONB DEFAULT '[]'::JSONB,
   called_up_player_ids JSONB DEFAULT '[]'::JSONB,
   lineup JSONB DEFAULT '[]'::JSONB,
+  is_lineup_saved BOOLEAN DEFAULT false,
+  player_confirmations JSONB DEFAULT '{}'::JSONB,
+  fan_attendance JSONB DEFAULT '[]'::JSONB,
+  fan_mvp_votes JSONB DEFAULT '{}'::JSONB,
   mvp_id TEXT,
   mvp_player_name TEXT,
   mvp_photo_url TEXT,
@@ -113,6 +117,10 @@ CREATE TABLE IF NOT EXISTS matches (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS is_lineup_saved BOOLEAN DEFAULT false;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS player_confirmations JSONB DEFAULT '{}'::JSONB;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS fan_attendance JSONB DEFAULT '[]'::JSONB;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS fan_mvp_votes JSONB DEFAULT '{}'::JSONB;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS mvp_photo_url TEXT;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS created_at_timestamp BIGINT;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_start_timestamp BIGINT;
@@ -141,6 +149,7 @@ CREATE TABLE IF NOT EXISTS posts (
   inserted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'approved';
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_type TEXT;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS reactions JSONB DEFAULT '{"likes":0,"fire":0,"clap":0,"goal":0,"userReactions":{}}'::JSONB;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]'::JSONB;
@@ -179,6 +188,7 @@ CREATE TABLE IF NOT EXISTS join_requests (
   player_position TEXT DEFAULT 'MED',
   player_number INTEGER,
   player_avatar TEXT,
+  request_type TEXT DEFAULT 'player', -- 'player' | 'fan'
   status TEXT DEFAULT 'pending',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -188,6 +198,7 @@ CREATE TABLE IF NOT EXISTS join_requests (
 ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS user_name TEXT;
 ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS user_email TEXT;
 ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS player_avatar TEXT;
+ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS request_type TEXT DEFAULT 'player';
 ALTER TABLE join_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE join_requests ALTER COLUMN player_email DROP NOT NULL;
 ALTER TABLE join_requests ALTER COLUMN player_name DROP NOT NULL;

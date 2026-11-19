@@ -24,6 +24,7 @@ import {
   PlayerPosition,
   ALL_POSITIONS,
 } from '../types';
+import { ChangePasswordSection } from './ChangePasswordSection';
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -318,6 +319,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             )}
           </div>
+
+          <ChangePasswordSection
+            currentUser={currentUser}
+            setCurrentUser={setCurrentUser}
+            users={allUsers}
+            setUsers={setUsers}
+          />
 
           {/* Quick Account Switcher for Testing In-App Invitations & Multiple Profiles */}
           <div className="pt-3 border-t border-[#CED0D4] dark:border-white/10 space-y-2">

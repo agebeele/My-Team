@@ -97,6 +97,9 @@ export const mapMatchToDb = (teamId: string, match: Match) => ({
   mvp_player_name: match.mvpPlayerName || null,
   mvp_photo_url: match.mvpPhotoUrl || null,
   mvp_votes: match.mvpVotes || {},
+  player_confirmations: match.playerConfirmations || {},
+  fan_attendance: Array.isArray(match.fanAttendance) ? match.fanAttendance : [],
+  fan_mvp_votes: match.fanMvpVotes || {},
   created_at_timestamp: match.createdAtTimestamp || null,
   match_start_timestamp: match.matchStartTimestamp || null,
   finished_at_timestamp: match.finishedAtTimestamp || null,
@@ -124,6 +127,9 @@ export const mapMatchFromDb = (row: any): Match => ({
   mvpPlayerName: row.mvp_player_name || undefined,
   mvpPhotoUrl: row.mvp_photo_url || undefined,
   mvpVotes: row.mvp_votes || {},
+  playerConfirmations: row.player_confirmations && typeof row.player_confirmations === 'object' ? row.player_confirmations : {},
+  fanAttendance: Array.isArray(row.fan_attendance) ? row.fan_attendance : [],
+  fanMvpVotes: row.fan_mvp_votes && typeof row.fan_mvp_votes === 'object' ? row.fan_mvp_votes : {},
   createdAtTimestamp: row.created_at_timestamp ? Number(row.created_at_timestamp) : undefined,
   matchStartTimestamp: row.match_start_timestamp ? Number(row.match_start_timestamp) : undefined,
   finishedAtTimestamp: row.finished_at_timestamp ? Number(row.finished_at_timestamp) : undefined,
@@ -249,6 +255,7 @@ export const mapJoinRequestToDb = (req: TeamJoinRequest) => ({
     ? Number(req.number)
     : null,
   player_avatar: req.playerAvatar || req.userAvatar || null,
+  request_type: req.requestType === 'fan' ? 'fan' : 'player',
   status: req.status || 'pending',
   created_at: req.createdAt || req.requestedAt || new Date().toISOString(),
 });
@@ -276,8 +283,8 @@ export const mapJoinRequestFromDb = (row: any): TeamJoinRequest => ({
   teamId: row.team_id,
   teamName: row.team_name || 'Equipo',
   userId: row.user_id,
-  userName: row.player_name || 'Jugador',
-  playerName: row.player_name || 'Jugador',
+  userName: row.player_name || (row.request_type === 'fan' ? 'Aficionado' : 'Jugador'),
+  playerName: row.player_name || (row.request_type === 'fan' ? 'Aficionado' : 'Jugador'),
   userEmail: row.player_email || '',
   playerEmail: row.player_email || '',
   userAvatar: row.player_avatar || undefined,
@@ -286,6 +293,7 @@ export const mapJoinRequestFromDb = (row: any): TeamJoinRequest => ({
   playerPosition: row.player_position || 'MED',
   number: row.player_number !== null && row.player_number !== undefined ? row.player_number : '',
   playerNumber: row.player_number !== null && row.player_number !== undefined ? Number(row.player_number) : undefined,
+  requestType: row.request_type === 'fan' ? 'fan' : 'player',
   status: (row.status || 'pending') as TeamJoinRequest['status'],
   createdAt: row.created_at || new Date().toISOString(),
   requestedAt: row.created_at || new Date().toISOString(),
@@ -580,6 +588,29 @@ export const supabaseUpsertUser = async (user: AppUser): Promise<boolean> => {
     return true;
   } catch (err: any) {
     console.error('[Supabase] Excepción al guardar usuario:', err?.message || err);
+    return false;
+  }
+};
+
+export const supabaseUpdateUserPassword = async (
+  userId: string,
+  newPassword: string
+): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client
+      .from('app_users')
+      .update({ password: newPassword })
+      .eq('id', userId);
+    if (error) {
+      console.error('[Supabase] Error al actualizar contraseña:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('[Supabase] Excepción al actualizar contraseña:', err?.message || err);
     return false;
   }
 };
