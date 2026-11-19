@@ -102,6 +102,7 @@ export const CLUB_CRESTS: Record<string, string> = {
   'inter': 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png',
   'inter milan': 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png',
   'int. de milan': 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png',
+  'int.de milan': 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png',
   'inter de milan': 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png',
   'palermo': 'https://a.espncdn.com/i/teamlogos/soccer/500/105.png',
   'fiorentina': 'https://a.espncdn.com/i/teamlogos/soccer/500/109.png',
@@ -129,6 +130,7 @@ export const CLUB_CRESTS: Record<string, string> = {
   'sporting cp': 'https://a.espncdn.com/i/teamlogos/soccer/500/440.png',
   'ajax': 'https://a.espncdn.com/i/teamlogos/soccer/500/139.png',
   'feyenoord': 'https://a.espncdn.com/i/teamlogos/soccer/500/140.png',
+  'feyernoord': 'https://a.espncdn.com/i/teamlogos/soccer/500/140.png',
   'psv': 'https://a.espncdn.com/i/teamlogos/soccer/500/148.png',
   'psv eindhoven': 'https://a.espncdn.com/i/teamlogos/soccer/500/148.png',
 
@@ -169,6 +171,10 @@ export const CLUB_CRESTS: Record<string, string> = {
  * 3. For any common, generic or amateur name ("los que tienen nombre comun deja un escudo gris"),
  *    returns an elegant, clean grey shield SVG.
  */
+const SORTED_CREST_ENTRIES = Object.entries(CLUB_CRESTS).sort(
+  (a, b) => b[0].length - a[0].length
+);
+
 export function getCrestForTeam(
   name: string,
   isOurTeam: boolean,
@@ -178,23 +184,27 @@ export function getCrestForTeam(
     return ourTeamLogo || '/fc_bayern_logo.png';
   }
 
-  const clean = name.toLowerCase().trim();
+  const clean = name.toLowerCase().replace(/\s+/g, ' ').trim();
 
   // Explicit Bayern check
   if (clean.includes('bayern')) {
     return ourTeamLogo || '/fc_bayern_logo.png';
   }
 
-  // Exact or contains match against known club crests
-  for (const [key, url] of Object.entries(CLUB_CRESTS)) {
-    // Word boundary or substring match
-    if (clean === key || clean.includes(` ${key} `) || clean.startsWith(`${key} `) || clean.endsWith(` ${key}`)) {
+  // Exact or word-boundary match sorted by specificity (longest key first)
+  for (const [key, url] of SORTED_CREST_ENTRIES) {
+    if (
+      clean === key ||
+      clean.includes(` ${key} `) ||
+      clean.startsWith(`${key} `) ||
+      clean.endsWith(` ${key}`)
+    ) {
       return url;
     }
   }
 
-  // Substring match for longer club names (len > 4)
-  for (const [key, url] of Object.entries(CLUB_CRESTS)) {
+  // Substring match for longer club names (len >= 4), also longest key first
+  for (const [key, url] of SORTED_CREST_ENTRIES) {
     if (key.length >= 4 && clean.includes(key)) {
       return url;
     }
@@ -207,8 +217,56 @@ export function getCrestForTeam(
 export const resolveTeamLogo = getCrestForTeam;
 
 /**
- * Pre-processes an image using an offscreen canvas to normalize dimensions,
- * remove transparency, and ensure optimal OCR recognition
+ * Normalizes an uploaded image size for fast API transfer while keeping crisp table text.
+ */
+function prepareImageForApi(img: TableImageInput): Promise<TableImageInput> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return resolve(img);
+    }
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const maxDim = 1800;
+        let w = image.naturalWidth || image.width || 800;
+        let h = image.naturalHeight || image.height || 600;
+        if (w <= maxDim && h <= maxDim && img.base64.length < 1_800_000) {
+          return resolve(img);
+        }
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(img);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(image, 0, 0, w, h);
+        resolve({
+          ...img,
+          base64: canvas.toDataURL('image/jpeg', 0.9),
+          mimeType: 'image/jpeg',
+        });
+      } catch {
+        resolve(img);
+      }
+    };
+    image.onerror = () => resolve(img);
+    image.src = img.base64;
+  });
+}
+
+/**
+ * Pre-processes an image using an offscreen canvas for Tesseract OCR:
+ * Upscales small screenshots to >= 1600px width and boosts grayscale contrast.
  */
 function preprocessImageForOcr(imageSrc: string): Promise<string> {
   return new Promise((resolve) => {
@@ -220,9 +278,16 @@ function preprocessImageForOcr(imageSrc: string): Promise<string> {
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
-        const maxDim = 2048;
+        const minTargetW = 1600;
+        const maxDim = 2400;
         let w = img.naturalWidth || img.width || 800;
         let h = img.naturalHeight || img.height || 600;
+
+        if (w < minTargetW) {
+          const scale = Math.min(2.5, minTargetW / w);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
         if (w > maxDim || h > maxDim) {
           if (w > h) {
             h = Math.round((h * maxDim) / w);
@@ -232,6 +297,7 @@ function preprocessImageForOcr(imageSrc: string): Promise<string> {
             h = maxDim;
           }
         }
+
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d');
@@ -240,8 +306,9 @@ function preprocessImageForOcr(imageSrc: string): Promise<string> {
         }
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, w, h);
+        ctx.filter = 'grayscale(100%) contrast(155%) brightness(105%)';
         ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
+        resolve(canvas.toDataURL('image/png'));
       } catch {
         resolve(imageSrc);
       }
@@ -258,7 +325,7 @@ async function runClientSideOcr(
   images: TableImageInput[],
   onProgress?: (msg: string) => void
 ): Promise<ParsedTableResult> {
-  onProgress?.('Inicializando motor inteligente de lectura OCR...');
+  onProgress?.('Inicializando motor de lectura OCR en dispositivo...');
   const worker = await createWorker('spa+eng');
   const results: ParsedTableResult[] = [];
 
@@ -268,7 +335,7 @@ async function runClientSideOcr(
       const img = images[i];
       const cleanImgData = await preprocessImageForOcr(img.base64);
 
-      onProgress?.(`Escaneando filas y estadísticas de foto ${i + 1} de ${images.length}...`);
+      onProgress?.(`Extrayendo filas de la foto ${i + 1} de ${images.length}...`);
       const ret = await worker.recognize(cleanImgData);
       const text = ret.data?.text || '';
       const parsed = parseStandingsFromOcrText(text);
@@ -291,59 +358,88 @@ export async function scanLeagueTableWithGemini(
   ourTeamLogo: string,
   onProgress?: (msg: string) => void
 ): Promise<{ leagueName?: string; rows: StandingsRow[]; engine?: string }> {
-  // Normalize input into TableImageInput array
-  const imageList: TableImageInput[] = Array.isArray(input)
+  const rawImageList: TableImageInput[] = Array.isArray(input)
     ? input
     : [{ base64: input, mimeType }];
 
-  if (imageList.length === 0) {
+  if (rawImageList.length === 0) {
     throw new Error('No se ha proporcionado ninguna imagen para escanear.');
   }
 
+  onProgress?.(`Preparando ${rawImageList.length} foto${rawImageList.length > 1 ? 's' : ''} para análisis con Gemini Vision AI...`);
+  const imageList = await Promise.all(rawImageList.map(prepareImageForApi));
+
   let data: ScanTableResponse | null = null;
   let usedEngine = 'unknown';
+  let serverErrorMessage: string | null = null;
 
-  onProgress?.(`Conectando con el servidor de análisis (${imageList.length} foto${imageList.length > 1 ? 's' : ''})...`);
+  onProgress?.(`Analizando ${imageList.length} foto${imageList.length > 1 ? 's' : ''} con Gemini Vision AI...`);
 
-  // Try server endpoint
-  try {
-    const res = await fetch('/api/ai/scan-table', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        images: imageList,
-        teamName: `${ourTeamName} ${ourTeamShortName}`.trim(),
-      }),
-    });
+  const endpoints = ['/api/ai/scan-table', '/api/scan-table'];
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: imageList,
+          teamName: `${ourTeamName} ${ourTeamShortName}`.trim(),
+        }),
+      });
 
-    if (res.ok) {
-      const json = await res.json();
-      if (json && json.teams && Array.isArray(json.teams) && json.teams.length > 0) {
-        data = json;
-        usedEngine = json.engine || 'server-ai';
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        continue;
       }
+
+      const json = await res.json();
+      if (res.ok && json && Array.isArray(json.teams) && json.teams.length > 0) {
+        data = json;
+        usedEngine = json.engine || 'Gemini Vision AI';
+        break;
+      }
+
+      if (json?.error && !json?.requiresClientScan) {
+        serverErrorMessage = json.error;
+      } else if (json?.error && json?.requiresClientScan) {
+        serverErrorMessage = json.error;
+      }
+
+      if (json?.requiresClientScan) {
+        break;
+      }
+    } catch (err) {
+      console.warn(`Endpoint ${endpoint} no disponible:`, err);
     }
-  } catch (err) {
-    console.warn('Servidor no disponible para escaneo directo, utilizando motor local:', err);
   }
 
-  // If server had no data or delegated, run browser OCR directly on device
+  // Fallback to browser OCR if backend AI key wasn't configured or endpoint unavailable
   if (!data || !data.teams || data.teams.length === 0) {
-    onProgress?.('Analizando texto y columnas con escáner inteligente en dispositivo...');
+    onProgress?.('Analizando filas y columnas con escáner OCR en dispositivo...');
     const localParsed = await runClientSideOcr(imageList, onProgress);
-    if (localParsed.teams && localParsed.teams.length > 0) {
+    if (localParsed.teams && localParsed.teams.length >= 2) {
       data = {
         leagueName: localParsed.leagueName,
         teams: localParsed.teams,
-        engine: 'client-ocr',
+        engine: 'OCR Local',
       };
-      usedEngine = 'client-ocr';
+      usedEngine = 'OCR Local';
+    } else if (serverErrorMessage) {
+      throw new Error(`Error de Gemini Vision: ${serverErrorMessage}`);
+    } else if (localParsed.teams && localParsed.teams.length > 0) {
+      data = {
+        leagueName: localParsed.leagueName,
+        teams: localParsed.teams,
+        engine: 'OCR Local',
+      };
+      usedEngine = 'OCR Local';
     }
   }
 
   if (!data || !data.teams || data.teams.length === 0) {
     throw new Error(
-      'No se pudieron identificar las filas de la tabla en las fotos proporcionadas. Puedes cargar los 31 equipos con 1 clic o agregarlos manualmente.'
+      serverErrorMessage ||
+        'No se pudieron identificar las filas de la tabla en las fotos proporcionadas. Verifica la claridad de las imágenes o pega el texto de la tabla.'
     );
   }
 
@@ -353,10 +449,13 @@ export async function scanLeagueTableWithGemini(
   let ourTeamFound = false;
 
   const rows: StandingsRow[] = data.teams.map((item, index) => {
-    const itemName = item.name || `Equipo ${item.rank || index + 1}`;
+    const rankNum = Number(item.rank) > 0 ? Number(item.rank) : index + 1;
+    let itemName = String(item.name || '').trim();
+    if (!itemName || itemName === '0') {
+      itemName = `Equipo ${rankNum}`;
+    }
     const cleanItemName = itemName.toLowerCase().trim();
 
-    // Check if this row is our team (Bayern Munich or user team)
     let isOurTeam = false;
     if (
       !ourTeamFound &&
@@ -371,25 +470,32 @@ export async function scanLeagueTableWithGemini(
     }
 
     const logo = getCrestForTeam(itemName, isOurTeam, ourTeamLogo);
+    const pj = Math.max(0, Number(item.pj) || 0);
+    const g = Math.max(0, Number(item.g) || 0);
+    const e = Math.max(0, Number(item.e) || 0);
+    const p = Math.max(0, Number(item.p) || 0);
+    const gf = Math.max(0, Number(item.gf) || 0);
+    const gc = Math.max(0, Number(item.gc) || 0);
+    const dg = Number.isFinite(Number(item.dg)) ? Number(item.dg) : gf - gc;
+    const pts = Number.isFinite(Number(item.pts)) ? Number(item.pts) : g * 3 + e;
 
     return {
       id: `standing_${Date.now()}_${index}`,
-      rank: item.rank || index + 1,
+      rank: rankNum,
       name: itemName,
       logo,
-      pj: Number(item.pj) || 0,
-      g: Number(item.g) || 0,
-      e: Number(item.e) || 0,
-      p: Number(item.p) || 0,
-      gf: Number(item.gf) || 0,
-      gc: Number(item.gc) || 0,
-      dg: Number(item.dg ?? (Number(item.gf) || 0) - (Number(item.gc) || 0)) || 0,
-      pts: Number(item.pts ?? (Number(item.g) || 0) * 3 + (Number(item.e) || 0)) || 0,
+      pj,
+      g,
+      e,
+      p,
+      gf,
+      gc,
+      dg,
+      pts,
       isOurTeam,
     };
   });
 
-  // If our team was not matched by name, check if any row is Bayern Munich
   if (!ourTeamFound && rows.length > 0) {
     const bayernIndex = rows.findIndex((r) => r.name.toLowerCase().includes('bayern'));
     if (bayernIndex >= 0) {

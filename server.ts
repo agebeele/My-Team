@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -1195,96 +1195,173 @@ app.post('/api/ai/scan-table', async (req, res) => {
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
-
-    if (apiKey) {
-      try {
-        const ai = new GoogleGenAI({
-          apiKey,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            },
-          },
-        });
-
-        const promptText = `Eres un asistente de inteligencia artificial experto en digitalización de tablas y estadísticas de ligas de fútbol (fútbol 7, fútbol rápido, fútbol soccer).
-Analiza detalladamente las ${imageList.length} imágenes adjuntas, que corresponden a la tabla de clasificación o posiciones de la liga.
-Extrae absolutamente TODAS las filas de la tabla combinadas en orden estricto de posición (desde la posición 1 hasta la última).
-Para cada equipo extrae:
-- rank: Posición numérica consecutiva
-- name: Nombre oficial del equipo
-- pj: Partidos jugados
-- g: Partidos ganados
-- e: Partidos empatados
-- p: Partidos perdidos
-- gf: Goles a favor
-- gc: Goles en contra
-- dg: Diferencia de goles
-- pts: Puntos totales
-
-El equipo del usuario es o contiene: "${teamName}".
-NO inventes datos: respeta fielmente los números de cada equipo que aparecen en las imágenes.
-Asegúrate de calcular los valores faltantes si alguna columna estuviera borrosa o cortada.
-Devuelve el nombre de la liga o torneo si es visible, y la lista completa de todos los equipos en orden de posición.`;
-
-        const parts: any[] = imageList.map((img) => ({
-          inlineData: {
-            mimeType: img.mimeType || 'image/jpeg',
-            data: img.base64.replace(/^data:[^;]+;base64,/, ''),
-          },
-        }));
-        parts.push({ text: promptText });
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: { parts },
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                leagueName: { type: Type.STRING },
-                teams: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      rank: { type: Type.INTEGER },
-                      name: { type: Type.STRING },
-                      pj: { type: Type.INTEGER },
-                      g: { type: Type.INTEGER },
-                      e: { type: Type.INTEGER },
-                      p: { type: Type.INTEGER },
-                      gf: { type: Type.INTEGER },
-                      gc: { type: Type.INTEGER },
-                      dg: { type: Type.INTEGER },
-                      pts: { type: Type.INTEGER },
-                    },
-                    required: ['rank', 'name', 'pj', 'g', 'e', 'p', 'gf', 'gc', 'dg', 'pts'],
-                  },
-                },
-              },
-              required: ['teams'],
-            },
-          },
-        });
-
-        const parsed = JSON.parse(response.text || '{}');
-        if (parsed.teams && Array.isArray(parsed.teams) && parsed.teams.length > 0) {
-          return res.json({
-            ...parsed,
-            engine: 'gemini-vision',
-          });
-        }
-      } catch (geminiError: any) {
-        console.warn('Gemini vision no disponible, delegando al motor OCR:', geminiError?.message);
-      }
+    if (!apiKey) {
+      return res.json({
+        requiresClientScan: true,
+        message: 'Escaneo visual directo activado en cliente (GEMINI_API_KEY no configurada).',
+      });
     }
 
-    return res.json({
-      requiresClientScan: true,
-      message: 'Escaneo visual directo activado en cliente.',
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
     });
+
+    const responseSchema = {
+      type: Type.OBJECT,
+      properties: {
+        leagueName: { type: Type.STRING },
+        teams: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              rank: { type: Type.INTEGER },
+              name: { type: Type.STRING },
+              pj: { type: Type.INTEGER },
+              g: { type: Type.INTEGER },
+              e: { type: Type.INTEGER },
+              p: { type: Type.INTEGER },
+              gf: { type: Type.INTEGER },
+              gc: { type: Type.INTEGER },
+              dg: { type: Type.INTEGER },
+              pts: { type: Type.INTEGER },
+            },
+            required: ['rank', 'name', 'pj', 'g', 'e', 'p', 'gf', 'gc', 'dg', 'pts'],
+          },
+        },
+      },
+      required: ['teams'],
+    };
+
+    const extractSingleImage = async (img: { base64: string; mimeType: string }, idx: number) => {
+      const promptText = `Eres un experto en digitalización de tablas de clasificación de ligas de fútbol.
+Analiza la imagen ${idx + 1} de ${imageList.length} adjunta.
+Extrae ABSOLUTAMENTE TODAS las filas visibles en esta imagen, desde la primera fila arriba hasta la última fila abajo, SIN OMITIR NI RESUMIR NINGUNA FILA.
+
+Guía de columnas (de izquierda a derecha en la mayoría de tablas):
+1. POS -> rank (número entero de posición, ej. 1, 2, ..., 16, ..., 31)
+2. Escudo/Logo (columna gráfica, ignorar)
+3. EQUIPO -> name (nombre exacto del equipo tal como aparece escrito; si la celda de nombre dice "0" o está vacía, escribe "Equipo " + rank, por ejemplo "Equipo 24")
+4. JJ o PJ -> pj (Partidos Jugados)
+5. JG o G -> g (Partidos Ganados)
+6. JE o E -> e (Partidos Empatados)
+7. JP o P -> p (Partidos Perdidos)
+8. GF -> gf (Goles a Favor)
+9. GC -> gc (Goles en Contra)
+10. DIF o DG -> dg (Diferencia de Goles, respeta signos negativos como -2, -7, -8)
+11. PTOS o PTS -> pts (Puntos totales)
+
+Importante:
+- Si esta imagen es la segunda parte de una tabla (por ejemplo filas 16 a 31) y NO tiene encabezados arriba, las columnas numéricas siguen exactamente ese orden: POS, [Escudo], EQUIPO, JJ, JG, JE, JP, GF, GC, DIF, PTOS.
+- Respeta fielmente los números exactos de la imagen (no inventes ni recalcules valores que sí son legibles).
+- El club del usuario puede ser "${teamName}".
+- Extrae el título de la liga en leagueName si aparece visible en la parte superior.`;
+
+      const cleanBase64 = img.base64.replace(/^data:[^;]+;base64,/, '');
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                mimeType: img.mimeType || 'image/jpeg',
+                data: cleanBase64,
+              },
+            },
+            { text: promptText },
+          ],
+        },
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+          responseMimeType: 'application/json',
+          responseSchema,
+        },
+      });
+
+      const rawText = (response.text ?? '{}').trim();
+      return JSON.parse(rawText) as { leagueName?: string; teams?: any[] };
+    };
+
+    try {
+      const perImageResults = await Promise.all(
+        imageList.map((img, idx) => extractSingleImage(img, idx))
+      );
+
+      let detectedLeagueName = '';
+      const mergedMap = new Map<string, any>();
+
+      for (const page of perImageResults) {
+        if (!detectedLeagueName && page.leagueName && page.leagueName.trim().length > 2) {
+          detectedLeagueName = page.leagueName.trim();
+        }
+        if (Array.isArray(page.teams)) {
+          for (const item of page.teams) {
+            const rank = Number(item.rank) || 0;
+            let rawName = String(item.name ?? '').trim();
+            if (!rawName || rawName === '0' || rawName === '-') {
+              rawName = rank > 0 ? `Equipo ${rank}` : `Equipo ${mergedMap.size + 1}`;
+            }
+
+            const normName = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const isGenericName = !normName || normName === '0' || /^equipo\d+$/.test(normName);
+            const dedupKey = isGenericName
+              ? `rank_${rank || mergedMap.size + 1}`
+              : `${normName}_${rank || ''}`;
+
+            // Deduplicate only same team at same/adjacent position; keep distinct teams
+            const existingByName = !isGenericName
+              ? Array.from(mergedMap.values()).find(
+                  (t) => t.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normName && t.rank === rank
+                )
+              : null;
+
+            const normalizedRow = {
+              rank: rank || mergedMap.size + 1,
+              name: rawName,
+              pj: Math.max(0, Number(item.pj) || 0),
+              g: Math.max(0, Number(item.g) || 0),
+              e: Math.max(0, Number(item.e) || 0),
+              p: Math.max(0, Number(item.p) || 0),
+              gf: Math.max(0, Number(item.gf) || 0),
+              gc: Math.max(0, Number(item.gc) || 0),
+              dg: Number.isFinite(Number(item.dg)) ? Number(item.dg) : (Number(item.gf) || 0) - (Number(item.gc) || 0),
+              pts: Number.isFinite(Number(item.pts)) ? Number(item.pts) : (Number(item.g) || 0) * 3 + (Number(item.e) || 0),
+            };
+
+            if (!existingByName && !mergedMap.has(dedupKey)) {
+              mergedMap.set(dedupKey, normalizedRow);
+            }
+          }
+        }
+      }
+
+      const combinedTeams = Array.from(mergedMap.values()).sort(
+        (a, b) => (a.rank || 999) - (b.rank || 999) || b.pts - a.pts || b.dg - a.dg
+      );
+
+      if (combinedTeams.length > 0) {
+        return res.json({
+          leagueName: detectedLeagueName || undefined,
+          teams: combinedTeams,
+          engine: 'gemini-vision',
+        });
+      }
+
+      return res.status(422).json({
+        error: 'Gemini Vision no encontró filas válidas en las imágenes proporcionadas.',
+      });
+    } catch (geminiError: any) {
+      console.error('Error en Gemini Vision:', geminiError);
+      return res.status(geminiError?.status || 502).json({
+        error: geminiError?.message || 'Error al analizar las imágenes con Gemini Vision.',
+        requiresClientScan: true,
+      });
+    }
   } catch (error: any) {
     console.error('Error en endpoint de escaneo:', error);
     return res.status(500).json({ error: error.message || 'Error procesando la tabla' });

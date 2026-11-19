@@ -2560,11 +2560,19 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
           onClose={() => setIsAiTableModalOpen(false)}
           team={team}
           onApplyStandings={(newRows, updatedLeague) => {
-            setStandings(newRows);
+            const targetLeague = updatedLeague || team.leagueName || 'Champions League';
+            const tagged = newRows.map((r) => ({ ...r, leagueName: targetLeague }));
+            setStandings((prev) => {
+              const normTarget = targetLeague.trim().toLowerCase();
+              const others = prev.filter(
+                (r) => r.leagueName && r.leagueName.trim().toLowerCase() !== normTarget
+              );
+              return [...others, ...tagged];
+            });
             if (updatedLeague) {
               setTeam((prev) => ({ ...prev, leagueName: updatedLeague }));
             }
-            setNotificationStatus('¡Tabla de la liga actualizada exitosamente con IA!');
+            setNotificationStatus(`¡Tabla de ${targetLeague} (${tagged.length} equipos) actualizada con IA!`);
             setTimeout(() => setNotificationStatus(null), 4000);
           }}
         />

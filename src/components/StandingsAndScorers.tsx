@@ -860,7 +860,10 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
             if (updatedLeague && setTeam) {
               setTeam((prev) => ({ ...prev, leagueName: updatedLeague }));
             }
-            setToastMessage(`¡Tabla de ${targetLeague} actualizada con IA exitosamente!`);
+            if (isLeagueAdmin && updatedLeague) {
+              setAdminSelectedLeague(updatedLeague);
+            }
+            setToastMessage(`¡Tabla de ${targetLeague} (${tagged.length} equipos) actualizada con IA exitosamente!`);
             setTimeout(() => setToastMessage(null), 4000);
           }}
         />

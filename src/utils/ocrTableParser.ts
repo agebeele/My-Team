@@ -42,6 +42,7 @@ export const LEAGUE_31_TEAMS_DATA: ExtractedTeamRaw[] = [
   { rank: 12, name: 'PSG', pj: 20, g: 17, e: 1, p: 2, gf: 105, gc: 29, dg: 76, pts: 52 },
   { rank: 13, name: 'AJAX', pj: 28, g: 16, e: 4, p: 8, gf: 81, gc: 57, dg: 24, pts: 52 },
   { rank: 14, name: 'BORUSSIA', pj: 28, g: 15, e: 3, p: 10, gf: 91, gc: 60, dg: 31, pts: 48 },
+  { rank: 15, name: 'BENFICA', pj: 28, g: 15, e: 2, p: 11, gf: 78, gc: 55, dg: 23, pts: 47 },
   { rank: 16, name: 'PALERMO', pj: 28, g: 14, e: 4, p: 10, gf: 89, gc: 58, dg: 31, pts: 46 },
   { rank: 17, name: 'MANCHESTER UNITED', pj: 28, g: 15, e: 1, p: 12, gf: 70, gc: 60, dg: 10, pts: 46 },
   { rank: 18, name: 'LIVERPOOL', pj: 27, g: 14, e: 3, p: 10, gf: 70, gc: 44, dg: 26, pts: 45 },
@@ -65,7 +66,8 @@ export const FAMOUS_TEAMS_DATA = LEAGUE_31_TEAMS_DATA;
 
 /**
  * Robust OCR and text parser for soccer standings tables.
- * Can parse from 1 to 50+ teams accurately across single or multi-photo text.
+ * Parses from the right side for trailing numeric stats so crest OCR artifacts
+ * between rank and team name never discard the team name.
  */
 export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
   if (!rawText || typeof rawText !== 'string') {
@@ -80,7 +82,6 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
 
   let detectedLeagueName: string | undefined = undefined;
 
-  // Header keywords to ignore as teams
   const headerKeywords = [
     'equipo',
     'pos',
@@ -93,6 +94,7 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
     'je',
     'jp',
     'pts',
+    'ptos',
     'puntos',
     'dif',
     'dg',
@@ -118,6 +120,7 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
         lower.includes('posiciones')) &&
       !lower.includes('pj') &&
       !lower.includes('pts') &&
+      !lower.includes('ptos') &&
       lines[i].length > 4
     ) {
       detectedLeagueName = lines[i]
@@ -132,64 +135,90 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
 
   const extractedTeams: ExtractedTeamRaw[] = [];
 
-  // Helper to test if line is purely table headers
   const isPureHeaderLine = (line: string): boolean => {
     const lower = line.toLowerCase();
     return (
       (lower.includes('pos') || lower.includes('equipo') || lower.includes('club')) &&
-      (lower.includes('pts') || lower.includes('pj') || lower.includes('jj') || lower.includes('dif') || lower.includes('g'))
+      (lower.includes('pts') ||
+        lower.includes('ptos') ||
+        lower.includes('pj') ||
+        lower.includes('jj') ||
+        lower.includes('dif') ||
+        lower.includes('jg'))
     );
   };
 
-  // PASS 1: Single line containing Name and all numeric stats
+  const parseIntToken = (tok: string): number | null => {
+    const cleaned = tok.replace(/^[(\[|]+|[)\].,|]+$/g, '');
+    if (/^[+-]?\d{1,4}$/.test(cleaned)) {
+      return parseInt(cleaned, 10);
+    }
+    return null;
+  };
+
+  // PASS 1: Single line containing Rank + Team Name + trailing numeric stats
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (isPureHeaderLine(line)) continue;
 
-    // Tokens split by spaces or pipes/tabs
-    const tokens = line.split(/[\s|\t,;]+/);
-    const numericIndices: number[] = [];
-    const numbers: number[] = [];
+    // Filter out empty tokens caused by leading/trailing table borders (|)
+    const tokens = line.split(/[\s|\t,;]+/).filter(Boolean);
+    if (tokens.length < 4) continue;
 
-    tokens.forEach((tok, idx) => {
-      const cleanTok = tok.replace(/^[(\[]|[)\]]$/g, '');
-      if (/^[+-]?\d{1,4}$/.test(cleanTok)) {
-        numericIndices.push(idx);
-        numbers.push(parseInt(cleanTok, 10));
+    // Collect trailing contiguous stats numbers from the right (up to 8 columns: PJ G E P GF GC DG PTS)
+    const trailingNumbers: number[] = [];
+    let statsStartIdx = tokens.length;
+
+    for (let tIdx = tokens.length - 1; tIdx >= 1 && trailingNumbers.length < 8; tIdx--) {
+      const rawTok = tokens[tIdx];
+      // Treat standalone 'O' or 'o' inside the trailing numeric columns as 0
+      const normalizedTok =
+        rawTok === 'O' || rawTok === 'o' ? '0' : rawTok === '—' || rawTok === '--' ? '0' : rawTok;
+      const numVal = parseIntToken(normalizedTok);
+      if (numVal !== null) {
+        trailingNumbers.unshift(numVal);
+        statsStartIdx = tIdx;
+      } else {
+        break;
       }
-    });
+    }
 
-    if (numbers.length >= 3) {
+    if (trailingNumbers.length >= 3) {
       let parsedRank: number | null = null;
-      let startTextIdx = 0;
+      let leftStartIdx = 0;
 
-      const firstTokClean = tokens[0].replace(/[.#:\-)]/g, '');
-      if (/^\d{1,2}$/.test(firstTokClean) && numericIndices.includes(0)) {
-        parsedRank = parseInt(firstTokClean, 10);
-        startTextIdx = 1;
-        numbers.shift();
-        numericIndices.shift();
-      }
-
-      // Collect name tokens and numeric stats
-      const nameTokens: string[] = [];
-      const statsNumbers: number[] = [];
-
-      tokens.slice(startTextIdx).forEach((tok) => {
-        const cleanTok = tok.replace(/^[(\[]|[)\]]$/g, '');
-        if (/^[+-]?\d{1,4}$/.test(cleanTok)) {
-          statsNumbers.push(parseInt(cleanTok, 10));
-        } else {
-          if (statsNumbers.length === 0) {
-            nameTokens.push(tok);
+      if (statsStartIdx > 0) {
+        const firstClean = tokens[0].replace(/[.#:\-)|(\[\]]/g, '');
+        if (/^\d{1,2}$/.test(firstClean)) {
+          const candidate = parseInt(firstClean, 10);
+          if (candidate >= 1 && candidate <= 99) {
+            parsedRank = candidate;
+            leftStartIdx = 1;
           }
         }
-      });
+      }
 
-      let teamName = nameTokens.join(' ').replace(/[|_\-=~*]+/g, ' ').trim();
-      teamName = teamName.replace(/^\d+[\s.-]+/, '').trim();
+      // Extract name tokens between rank and trailing stats
+      let nameRegion = tokens.slice(leftStartIdx, statsStartIdx);
 
-      if (teamName.length < 2) {
+      // Strip leading OCR crest artifacts (punctuation, single symbols, or short numbers before alphabetic words)
+      const hasAlphabeticWord = nameRegion.some((w) => /[a-zA-ZáéíóúñÁÉÍÓÚÑ]{2,}/.test(w));
+      if (hasAlphabeticWord) {
+        while (
+          nameRegion.length > 1 &&
+          !/[a-zA-ZáéíóúñÁÉÍÓÚÑ]{2,}/.test(nameRegion[0])
+        ) {
+          nameRegion = nameRegion.slice(1);
+        }
+      }
+
+      let teamName = nameRegion
+        .join(' ')
+        .replace(/[|_\-=~*©®•]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (!teamName || teamName === '0' || teamName.length < 2) {
         teamName = `Equipo ${parsedRank || extractedTeams.length + 1}`;
       }
 
@@ -207,30 +236,30 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
       let dg = 0;
       let pts = 0;
 
-      if (statsNumbers.length >= 8) {
-        [pj, g, e, p, gf, gc, dg, pts] = statsNumbers.slice(0, 8);
-      } else if (statsNumbers.length === 7) {
-        [pj, g, e, p, gf, gc, pts] = statsNumbers.slice(0, 7);
+      if (trailingNumbers.length >= 8) {
+        [pj, g, e, p, gf, gc, dg, pts] = trailingNumbers.slice(-8);
+      } else if (trailingNumbers.length === 7) {
+        [pj, g, e, p, gf, gc, pts] = trailingNumbers;
         dg = gf - gc;
-      } else if (statsNumbers.length === 6) {
-        [pj, g, e, p, dg, pts] = statsNumbers.slice(0, 6);
+      } else if (trailingNumbers.length === 6) {
+        [pj, g, e, p, dg, pts] = trailingNumbers;
         gf = dg > 0 ? dg : 0;
         gc = dg < 0 ? Math.abs(dg) : 0;
-      } else if (statsNumbers.length === 5) {
-        [pj, g, e, p, pts] = statsNumbers.slice(0, 5);
+      } else if (trailingNumbers.length === 5) {
+        [pj, g, e, p, pts] = trailingNumbers;
         dg = 0;
-      } else if (statsNumbers.length === 4) {
-        [pj, g, p, pts] = statsNumbers.slice(0, 4);
+      } else if (trailingNumbers.length === 4) {
+        [pj, g, p, pts] = trailingNumbers;
         e = Math.max(0, pj - (g + p));
         dg = 0;
-      } else if (statsNumbers.length === 3) {
-        [pj, dg, pts] = statsNumbers.slice(0, 3);
+      } else if (trailingNumbers.length === 3) {
+        [pj, dg, pts] = trailingNumbers;
         g = Math.floor(pts / 3);
         e = pts % 3;
         p = Math.max(0, pj - (g + e));
       }
 
-      if (dg === 0 && (gf !== 0 || gc !== 0)) {
+      if (trailingNumbers.length < 8 && dg === 0 && (gf !== 0 || gc !== 0)) {
         dg = gf - gc;
       }
       if (pts === 0 && (g > 0 || e > 0)) {
@@ -277,7 +306,7 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
           }
 
           extractedTeams.push({
-            rank: extractedTeams.length + 1,
+            rank: currentNumbers[0] || extractedTeams.length + 1,
             name: teamName,
             pj: Math.max(0, pj),
             g: Math.max(0, g),
@@ -294,14 +323,13 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
     }
   }
 
-  // Re-sort extracted teams by rank, points, or goal difference
   if (extractedTeams.length > 0) {
     const sorted = [...extractedTeams].sort(
       (a, b) => a.rank - b.rank || b.pts - a.pts || b.dg - a.dg || b.gf - a.gf
     );
     return {
       leagueName: detectedLeagueName,
-      teams: sorted.map((t, idx) => ({ ...t, rank: idx + 1 })),
+      teams: sorted,
     };
   }
 
@@ -312,8 +340,8 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
 }
 
 /**
- * Merge multiple parsed table results from multi-photo scans (e.g. Photo 1: 1-16, Photo 2: 17-31).
- * Deduplicates by cleaned team name and maintains overall sequential ranking 1..N.
+ * Merge multiple parsed table results from multi-photo scans (e.g. Photo 1: 1-15, Photo 2: 16-31).
+ * Preserves generic rows like "Equipo 24" / "0" by rank and maintains sequential ranking.
  */
 export function mergeExtractedTables(results: ParsedTableResult[]): ParsedTableResult {
   if (!results || results.length === 0) {
@@ -325,12 +353,14 @@ export function mergeExtractedTables(results: ParsedTableResult[]): ParsedTableR
 
   for (const res of results) {
     for (const team of res.teams) {
-      const key = team.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const normName = team.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const isGeneric = !normName || normName === '0' || /^equipo\d+$/.test(normName);
+      const key = isGeneric ? `rank_${team.rank}` : normName;
+
       if (!teamMap.has(key)) {
         teamMap.set(key, team);
       } else {
         const existing = teamMap.get(key)!;
-        // Keep row with higher matches played or more complete stats
         if (team.pj > existing.pj || team.pts > existing.pts) {
           teamMap.set(key, team);
         }
@@ -338,8 +368,7 @@ export function mergeExtractedTables(results: ParsedTableResult[]): ParsedTableR
     }
   }
 
-  const combined = Array.from(teamMap.values());
-  combined.sort((a, b) => {
+  const combined = Array.from(teamMap.values()).sort((a, b) => {
     if (a.rank && b.rank && a.rank !== b.rank) {
       return a.rank - b.rank;
     }
@@ -348,7 +377,7 @@ export function mergeExtractedTables(results: ParsedTableResult[]): ParsedTableR
 
   const reRanked = combined.map((t, idx) => ({
     ...t,
-    rank: idx + 1,
+    rank: t.rank > 0 ? t.rank : idx + 1,
   }));
 
   return {

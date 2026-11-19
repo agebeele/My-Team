@@ -72,35 +72,37 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFilesSelected = (fileList: FileList | null) => {
+  const handleFilesSelected = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     setScanError(null);
 
     const filesArray = Array.from(fileList);
-    const newPhotos: UploadedPhoto[] = [];
 
-    let processedCount = 0;
-    filesArray.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const res = ev.target?.result as string;
-        if (res) {
-          newPhotos.push({
+    const readFile = (file: File): Promise<UploadedPhoto | null> =>
+      new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const res = ev.target?.result as string;
+          if (!res) return resolve(null);
+          resolve({
             id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
             name: file.name,
             base64: res,
             mimeType: file.type || 'image/jpeg',
             sizeKb: Math.round(file.size / 1024),
           });
-        }
-        processedCount++;
-        if (processedCount === filesArray.length) {
-          setPhotos((prev) => [...prev, ...newPhotos]);
-          setSelectedPreviewIndex((prev) => (prev >= 0 ? prev : 0));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+        };
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
+
+    const results = await Promise.all(filesArray.map(readFile));
+    const newPhotos = results.filter((p): p is UploadedPhoto => p !== null);
+
+    if (newPhotos.length > 0) {
+      setPhotos((prev) => [...prev, ...newPhotos]);
+      setSelectedPreviewIndex((prev) => (prev >= 0 ? prev : 0));
+    }
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
