@@ -15,7 +15,7 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
-import { AppUser, TeamInfo, TeamJoinRequest, Language, PlayerPosition, DEFAULT_FACEBOOK_AVATAR } from '../types';
+import { AppUser, TeamInfo, TeamJoinRequest, Language, PlayerPosition, DEFAULT_FACEBOOK_AVATAR, normalizeCanonicalLeagueName } from '../types';
 import { getT } from '../utils/translations';
 import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 import { pushBackendSyncImmediate } from '../utils/backendSync';
@@ -81,10 +81,10 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
     myPendingRequests.map((r) => [r.teamId, r])
   );
 
-  // Filter teams for selected league
+  // Filter teams for selected league (normalizing legacy/OCR variants)
   const leagueTeams = allTeams.filter((t) => {
-    const tLeague = (t.leagueName || '').trim().toLowerCase();
-    const selLeague = selectedLeague.trim().toLowerCase();
+    const tLeague = normalizeCanonicalLeagueName(t.leagueName).trim().toLowerCase();
+    const selLeague = normalizeCanonicalLeagueName(selectedLeague).trim().toLowerCase();
     return tLeague === selLeague;
   });
 
@@ -408,7 +408,7 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
           {LEAGUES.map((league) => {
             const isSelected = selectedLeague === league.id;
             const teamsInLeague = allTeams.filter(
-              (t) => (t.leagueName || '').trim().toLowerCase() === league.id.toLowerCase()
+              (t) => normalizeCanonicalLeagueName(t.leagueName).trim().toLowerCase() === league.id.toLowerCase()
             ).length;
 
             return (

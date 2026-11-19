@@ -408,3 +408,23 @@ export const STANDARD_LEAGUES = [
   'Copa del Mundo',
 ] as const;
 
+export function normalizeCanonicalLeagueName(raw?: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+
+  const clean = trimmed
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (clean.includes('champions')) return 'Champions League';
+  if (clean.includes('francesa') || clean.includes('ligue 1') || clean.includes('ligue1')) return 'Liga Francesa';
+  if (clean.includes('espanola') || clean.includes('la liga') || clean.includes('laliga')) return 'Liga Española';
+  if (clean.includes('mexicana') || clean.includes('liga mx') || clean.includes('ligamx')) return 'Liga Mexicana';
+  if (clean.includes('copa del mundo') || clean.includes('mundial') || clean.includes('world cup')) return 'Copa del Mundo';
+
+  return trimmed;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Sparkles,
   Trophy,
@@ -19,7 +19,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { StandingsRow, TeamInfo } from '../types';
+import { StandingsRow, TeamInfo, STANDARD_LEAGUES, normalizeCanonicalLeagueName } from '../types';
 import {
   scanLeagueTableWithGemini,
   TableImageInput,
@@ -35,6 +35,7 @@ interface TableAiScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   team: TeamInfo;
+  activeLeagueName?: string;
   onApplyStandings: (newRows: StandingsRow[], updatedLeagueName?: string) => void;
 }
 
@@ -50,8 +51,12 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
   isOpen,
   onClose,
   team,
+  activeLeagueName,
   onApplyStandings,
 }) => {
+  const canonicalDefaultLeague =
+    normalizeCanonicalLeagueName(activeLeagueName || team.leagueName) || 'Champions League';
+
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number>(0);
   const [isScanning, setIsScanning] = useState(false);
@@ -66,7 +71,13 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
 
   // Review & Edit extracted rows
   const [extractedRows, setExtractedRows] = useState<StandingsRow[]>([]);
-  const [extractedLeagueName, setExtractedLeagueName] = useState<string>(team.leagueName || '');
+  const [extractedLeagueName, setExtractedLeagueName] = useState<string>(canonicalDefaultLeague);
+
+  useEffect(() => {
+    if (isOpen) {
+      setExtractedLeagueName(canonicalDefaultLeague);
+    }
+  }, [isOpen, canonicalDefaultLeague]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -147,7 +158,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
     });
 
     setExtractedRows(fullRows);
-    setExtractedLeagueName(team.leagueName || 'LIGA PREMIER FÚTBOL (31 EQUIPOS)');
+    setExtractedLeagueName(canonicalDefaultLeague);
     setScanEngineUsed('Tabla Completa de 31 Equipos');
     setActiveStep('review');
   };
@@ -190,7 +201,10 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
 
     setExtractedRows(rows);
     if (parsed.leagueName) {
-      setExtractedLeagueName(parsed.leagueName);
+      const normalized = normalizeCanonicalLeagueName(parsed.leagueName);
+      if ((STANDARD_LEAGUES as readonly string[]).includes(normalized)) {
+        setExtractedLeagueName(normalized);
+      }
     }
     setScanEngineUsed(`Texto Procesado (${rows.length} equipos)`);
     setActiveStep('review');
@@ -232,7 +246,10 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
       setExtractedRows(result.rows);
       setScanEngineUsed(result.engine || 'Gemini Vision AI');
       if (result.leagueName && result.leagueName.trim().length > 2) {
-        setExtractedLeagueName(result.leagueName.trim());
+        const normalized = normalizeCanonicalLeagueName(result.leagueName);
+        if ((STANDARD_LEAGUES as readonly string[]).includes(normalized)) {
+          setExtractedLeagueName(normalized);
+        }
       }
       setActiveStep('review');
     } catch (err: any) {
@@ -712,18 +729,26 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                 </div>
               </div>
 
-              {/* Tournament Name Input */}
+              {/* Tournament Name Selector (Canonical Leagues) */}
               <div className="bg-[#F8FAFC] dark:bg-white/5 p-3.5 rounded-xl border border-[#CED0D4] dark:border-white/10 space-y-1">
                 <label className="block text-[11px] font-bold uppercase text-[#65676B] dark:text-gray-400">
-                  Nombre de la Liga o Torneo:
+                  Liga / Torneo de esta Tabla:
                 </label>
-                <input
-                  type="text"
+                <select
                   value={extractedLeagueName}
                   onChange={(e) => setExtractedLeagueName(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 text-xs font-bold text-[#050505] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1877F2]"
-                  placeholder="Ej. Liga Premier Fútbol 7"
-                />
+                  className="w-full px-3 py-2 rounded-lg bg-white dark:bg-[#18191A] border border-[#CED0D4] dark:border-white/10 text-xs font-bold text-[#050505] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1877F2] cursor-pointer"
+                >
+                  <option value="Champions League">🏆 Champions League</option>
+                  <option value="Liga Francesa">🇫🇷 Liga Francesa</option>
+                  <option value="Liga Española">🇪🇸 Liga Española</option>
+                  <option value="Liga Mexicana">🇲🇽 Liga Mexicana</option>
+                  <option value="Copa del Mundo">🌍 Copa del Mundo</option>
+                  {extractedLeagueName &&
+                    !(STANDARD_LEAGUES as readonly string[]).includes(extractedLeagueName) && (
+                      <option value={extractedLeagueName}>{extractedLeagueName}</option>
+                    )}
+                </select>
               </div>
 
               {/* Editable Table */}

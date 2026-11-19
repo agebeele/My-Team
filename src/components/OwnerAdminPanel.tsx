@@ -47,6 +47,8 @@ import {
   getPositionBadgeClass,
   TeamInvitation,
   TeamJoinRequest,
+  STANDARD_LEAGUES,
+  normalizeCanonicalLeagueName,
 } from '../types';
 import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
@@ -100,11 +102,13 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
   const [isAiTableModalOpen, setIsAiTableModalOpen] = useState(false);
 
+  const canonicalTeamLeague = normalizeCanonicalLeagueName(team.leagueName) || 'Champions League';
+
   // Team identity form
   const [teamForm, setTeamForm] = useState({
     name: team.name,
     shortName: team.shortName,
-    leagueName: team.leagueName,
+    leagueName: canonicalTeamLeague,
     stadium: team.stadium,
     location: team.location || '',
     logoUrl: team.logoUrl,
@@ -115,7 +119,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
     setTeamForm({
       name: team.name,
       shortName: team.shortName,
-      leagueName: team.leagueName,
+      leagueName: normalizeCanonicalLeagueName(team.leagueName) || 'Champions League',
       stadium: team.stadium,
       location: team.location || '',
       logoUrl: team.logoUrl,
@@ -1837,7 +1841,7 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
                       <option value="Liga Española">🇪🇸 Liga Española</option>
                       <option value="Liga Mexicana">🇲🇽 Liga Mexicana</option>
                       <option value="Copa del Mundo">🌍 Copa del Mundo</option>
-                      {teamForm.leagueName && !['Champions League', 'Liga Francesa', 'Liga Española', 'Liga Mexicana', 'Copa del Mundo'].includes(teamForm.leagueName) && (
+                      {teamForm.leagueName && !(STANDARD_LEAGUES as readonly string[]).includes(teamForm.leagueName) && (
                         <option value={teamForm.leagueName}>{teamForm.leagueName}</option>
                       )}
                     </select>
@@ -2559,18 +2563,24 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
           isOpen={isAiTableModalOpen}
           onClose={() => setIsAiTableModalOpen(false)}
           team={team}
+          activeLeagueName={canonicalTeamLeague}
           onApplyStandings={(newRows, updatedLeague) => {
-            const targetLeague = updatedLeague || team.leagueName || 'Champions League';
+            const targetLeague = normalizeCanonicalLeagueName(updatedLeague || canonicalTeamLeague) || canonicalTeamLeague;
             const tagged = newRows.map((r) => ({ ...r, leagueName: targetLeague }));
             setStandings((prev) => {
               const normTarget = targetLeague.trim().toLowerCase();
-              const others = prev.filter(
-                (r) => r.leagueName && r.leagueName.trim().toLowerCase() !== normTarget
-              );
+              const others = prev.filter((r) => {
+                if (!r.leagueName) return false;
+                const rNorm = normalizeCanonicalLeagueName(r.leagueName).trim().toLowerCase();
+                return r.leagueName.trim().toLowerCase() !== normTarget && rNorm !== normTarget;
+              });
               return [...others, ...tagged];
             });
-            if (updatedLeague) {
-              setTeam((prev) => ({ ...prev, leagueName: updatedLeague }));
+            if (team.leagueName && normalizeCanonicalLeagueName(team.leagueName) !== team.leagueName) {
+              setTeam((prev) => ({
+                ...prev,
+                leagueName: normalizeCanonicalLeagueName(prev.leagueName) || 'Champions League',
+              }));
             }
             setNotificationStatus(`¡Tabla de ${targetLeague} (${tagged.length} equipos) actualizada con IA!`);
             setTimeout(() => setNotificationStatus(null), 4000);

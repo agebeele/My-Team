@@ -1,5 +1,5 @@
 import { getSupabaseClient, isSupabaseConfigured } from '../utils/supabaseClient';
-import { Player, Match, Post, TeamInfo, StandingsRow, AppUser, TeamJoinRequest, TeamInvitation } from '../types';
+import { Player, Match, Post, TeamInfo, StandingsRow, AppUser, TeamJoinRequest, TeamInvitation, normalizeCanonicalLeagueName } from '../types';
 
 // ==========================================
 // 1. CAMELCASE <-> SNAKE_CASE MAPPERS
@@ -11,7 +11,7 @@ export const mapTeamToDb = (team: TeamInfo) => ({
   short_name: team.shortName || team.name,
   logo_url: team.logoUrl || null,
   banner_url: team.bannerUrl || null,
-  league_name: team.leagueName || 'Champions League',
+  league_name: normalizeCanonicalLeagueName(team.leagueName) || 'Champions League',
   season: team.season || 'Temporada 2026',
   stadium: team.stadium || '',
   location: team.location || null,
@@ -26,7 +26,7 @@ export const mapTeamFromDb = (row: any): TeamInfo => ({
   shortName: row.short_name || row.name,
   logoUrl: row.logo_url || '',
   bannerUrl: row.banner_url || '',
-  leagueName: row.league_name || 'Champions League',
+  leagueName: normalizeCanonicalLeagueName(row.league_name) || 'Champions League',
   season: row.season || 'Temporada 2026',
   stadium: row.stadium || '',
   location: row.location || '',

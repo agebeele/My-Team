@@ -1,3 +1,5 @@
+import { normalizeCanonicalLeagueName } from '../types';
+
 export interface ExtractedTeamRaw {
   rank: number;
   name: string;
@@ -123,12 +125,13 @@ export function parseStandingsFromOcrText(rawText: string): ParsedTableResult {
       !lower.includes('ptos') &&
       lines[i].length > 4
     ) {
-      detectedLeagueName = lines[i]
+      const rawTitle = lines[i]
         .replace(/tabla (de )?posiciones/gi, '')
         .replace(/tabla general/gi, '')
         .replace(/clasificaci[oó]n/gi, '')
         .replace(/[-|:]/g, ' ')
         .trim();
+      detectedLeagueName = normalizeCanonicalLeagueName(rawTitle);
       break;
     }
   }
@@ -348,7 +351,8 @@ export function mergeExtractedTables(results: ParsedTableResult[]): ParsedTableR
     return { teams: [] };
   }
 
-  const leagueName = results.find((r) => r.leagueName && r.leagueName.length > 2)?.leagueName;
+  const rawLeagueName = results.find((r) => r.leagueName && r.leagueName.length > 2)?.leagueName;
+  const leagueName = rawLeagueName ? normalizeCanonicalLeagueName(rawLeagueName) : undefined;
   const teamMap = new Map<string, ExtractedTeamRaw>();
 
   for (const res of results) {

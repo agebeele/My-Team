@@ -21,7 +21,7 @@ import {
   X,
   Megaphone,
 } from 'lucide-react';
-import { Post, AppUser, Language, TeamInfo, DEFAULT_FACEBOOK_AVATAR } from '../types';
+import { Post, AppUser, Language, TeamInfo, DEFAULT_FACEBOOK_AVATAR, normalizeCanonicalLeagueName } from '../types';
 import { getT } from '../utils/translations';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
 import { supabaseUpsertPost, supabaseDeletePost } from '../utils/supabaseService';
@@ -74,7 +74,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
   // 2. Team-specific posts (teamId === team.id) appear for this team.
   // 3. Posts belonging to other teams (e.g. Bayern Munich) do NOT appear on another team's wall.
   const currentTeamId = team?.id || 'team_01';
-  const currentLeague = (team?.leagueName || 'Liga Premier Fútbol 7').trim().toLowerCase();
+  const currentLeague = normalizeCanonicalLeagueName(team?.leagueName || 'Champions League').trim().toLowerCase();
 
   const isLeagueAdmin = currentUser.role === 'league_admin';
 
@@ -119,7 +119,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
       if (!postLeague || postLeague === 'todas las ligas' || postLeague === 'todas') {
         return true;
       }
-      return postLeague === currentLeague;
+      return normalizeCanonicalLeagueName(p.leagueName).trim().toLowerCase() === currentLeague;
     }
 
     return false;

@@ -1,4 +1,4 @@
-import { StandingsRow } from '../types';
+import { StandingsRow, normalizeCanonicalLeagueName } from '../types';
 import { createWorker, PSM } from 'tesseract.js';
 import {
   parseStandingsFromOcrText,
@@ -832,7 +832,8 @@ async function runClientSideOcr(
                   /liga|torneo|campeonato|champions|premier|copa|clasificaci|posiciones/i.test(l)
                 );
                 if (candidate) {
-                  detectedLeagueName = candidate.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9\s.-]/g, ' ').replace(/\s+/g, ' ').trim();
+                  const cleanedCandidate = candidate.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9\s.-]/g, ' ').replace(/\s+/g, ' ').trim();
+                  detectedLeagueName = normalizeCanonicalLeagueName(cleanedCandidate);
                 }
               }
             } catch {
@@ -1157,7 +1158,7 @@ export async function scanLeagueTableWithGemini(
   }
 
   return {
-    leagueName: data.leagueName,
+    leagueName: data.leagueName ? normalizeCanonicalLeagueName(data.leagueName) : undefined,
     rows,
     engine: usedEngine,
   };

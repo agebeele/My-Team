@@ -10,6 +10,7 @@ import {
   Language,
   TeamJoinRequest,
   TeamInvitation,
+  normalizeCanonicalLeagueName,
 } from './types';
 import {
   INITIAL_TEAM,
@@ -83,13 +84,21 @@ export default function App() {
   const initial = loadInitialData();
 
   const [showSplash, setShowSplash] = useState(true);
-  const [team, setTeam] = useState<TeamInfo>(initial.team || INITIAL_TEAM);
+  const [team, setTeam] = useState<TeamInfo>(() => {
+    const t = initial.team || INITIAL_TEAM;
+    return t ? { ...t, leagueName: normalizeCanonicalLeagueName(t.leagueName) || t.leagueName || 'Champions League' } : t;
+  });
   const [players, setPlayers] = useState<Player[]>(initial.players || INITIAL_PLAYERS);
   const [matches, setMatches] = useState<Match[]>(initial.matches || INITIAL_MATCHES);
   const [posts, setPosts] = useState<Post[]>(initial.posts || INITIAL_POSTS);
   const [standings, setStandings] = useState<StandingsRow[]>(initial.standings || INITIAL_STANDINGS);
   const [users, setUsers] = useState<AppUser[]>(initial.users || INITIAL_USERS);
-  const [allTeams, setAllTeams] = useState<TeamInfo[]>(initial.allTeams || INITIAL_TEAMS);
+  const [allTeams, setAllTeams] = useState<TeamInfo[]>(() =>
+    (initial.allTeams || INITIAL_TEAMS).map((t) => ({
+      ...t,
+      leagueName: normalizeCanonicalLeagueName(t.leagueName) || t.leagueName || 'Champions League',
+    }))
+  );
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [welcomeInvitation, setWelcomeInvitation] = useState<TeamInvitation | null>(null);
   const deletedMatchIdsRef = useRef<Set<string>>(new Set());
@@ -829,7 +838,13 @@ export default function App() {
 
   const handleSetTeam: React.Dispatch<React.SetStateAction<TeamInfo>> = (action) => {
     setTeam((prev) => {
-      const next = typeof action === 'function' ? action(prev) : action;
+      const rawNext = typeof action === 'function' ? action(prev) : action;
+      const next: TeamInfo = rawNext
+        ? {
+            ...rawNext,
+            leagueName: normalizeCanonicalLeagueName(rawNext.leagueName) || rawNext.leagueName || 'Champions League',
+          }
+        : rawNext;
       try {
         localStorage.setItem('teamgol_team_data', JSON.stringify(next));
       } catch {}

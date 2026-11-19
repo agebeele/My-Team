@@ -19,7 +19,7 @@ import {
   Share2,
   Trash2,
 } from 'lucide-react';
-import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory, STANDARD_LEAGUES, DEFAULT_FACEBOOK_AVATAR } from '../types';
+import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory, STANDARD_LEAGUES, DEFAULT_FACEBOOK_AVATAR, normalizeCanonicalLeagueName } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage, captureElementAsDataUrl } from '../utils/imageDownloader';
 import { TableAiScannerModal } from './TableAiScannerModal';
@@ -60,18 +60,21 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   const [editRows, setEditRows] = useState<StandingsRow[]>([]);
 
   const isLeagueAdmin = currentUser.role === 'league_admin';
-  const defaultLeague = team.leagueName || 'Champions League';
+  const defaultLeague = normalizeCanonicalLeagueName(team.leagueName) || 'Champions League';
   const [adminSelectedLeague, setAdminSelectedLeague] = useState<string>(defaultLeague);
 
   // Normal players and team owners/coaches ONLY see their team's league table
-  const activeLeague = isLeagueAdmin ? adminSelectedLeague : (team.leagueName || 'Champions League');
+  const activeLeague = isLeagueAdmin
+    ? normalizeCanonicalLeagueName(adminSelectedLeague) || adminSelectedLeague
+    : defaultLeague;
 
   // Filter standings rows strictly for activeLeague
   const currentLeagueStandings = useMemo(() => {
     const normActive = activeLeague.trim().toLowerCase();
     const matched = standings.filter((r) => {
       if (r.leagueName) {
-        return r.leagueName.trim().toLowerCase() === normActive;
+        const rowCanonical = normalizeCanonicalLeagueName(r.leagueName).trim().toLowerCase();
+        return r.leagueName.trim().toLowerCase() === normActive || rowCanonical === normActive;
       }
       return normActive === 'champions league' || normActive === 'liga premier fútbol 7';
     });
@@ -847,21 +850,28 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
           isOpen={isAiScanModalOpen}
           onClose={() => setIsAiScanModalOpen(false)}
           team={team}
+          activeLeagueName={activeLeague}
           onApplyStandings={(newRows, updatedLeague) => {
-            const targetLeague = updatedLeague || activeLeague;
+            const targetLeague = normalizeCanonicalLeagueName(updatedLeague || activeLeague) || activeLeague;
             const tagged = newRows.map((r) => ({ ...r, leagueName: targetLeague }));
             setStandings((prev) => {
               const normTarget = targetLeague.trim().toLowerCase();
-              const others = prev.filter(
-                (r) => r.leagueName && r.leagueName.trim().toLowerCase() !== normTarget
-              );
+              const others = prev.filter((r) => {
+                if (!r.leagueName) return false;
+                const rNorm = normalizeCanonicalLeagueName(r.leagueName).trim().toLowerCase();
+                return r.leagueName.trim().toLowerCase() !== normTarget && rNorm !== normTarget;
+              });
               return [...others, ...tagged];
             });
-            if (updatedLeague && setTeam) {
-              setTeam((prev) => ({ ...prev, leagueName: updatedLeague }));
+            // Heal team.leagueName only if it was previously polluted with an OCR variant, never replace with a different league
+            if (setTeam && team.leagueName) {
+              const cleanedClubLeague = normalizeCanonicalLeagueName(team.leagueName);
+              if (cleanedClubLeague && cleanedClubLeague !== team.leagueName) {
+                setTeam((prev) => ({ ...prev, leagueName: cleanedClubLeague }));
+              }
             }
-            if (isLeagueAdmin && updatedLeague) {
-              setAdminSelectedLeague(updatedLeague);
+            if (isLeagueAdmin && targetLeague) {
+              setAdminSelectedLeague(targetLeague);
             }
             setToastMessage(`¡Tabla de ${targetLeague} (${tagged.length} equipos) actualizada con IA exitosamente!`);
             setTimeout(() => setToastMessage(null), 4000);

@@ -1,4 +1,4 @@
-import { Player, TeamInfo, Match, StandingsRow, Post, AppUser, Language } from '../types';
+import { Player, TeamInfo, Match, StandingsRow, Post, AppUser, Language, normalizeCanonicalLeagueName } from '../types';
 
 export const STORAGE_KEYS = {
   TEAM: 'teamgol_team',
@@ -146,8 +146,20 @@ export const getStandingsForLeague = (leagueName: string, _team?: any): Standing
   if (!leagueName) return [];
   try {
     const map = safeGetItem<Record<string, StandingsRow[]>>(STORAGE_KEYS.STANDINGS_BY_LEAGUE, {});
-    if (map && typeof map === 'object' && Array.isArray(map[leagueName])) {
-      return map[leagueName];
+    const canonical = normalizeCanonicalLeagueName(leagueName) || leagueName;
+    if (map && typeof map === 'object') {
+      if (Array.isArray(map[canonical]) && map[canonical].length > 0) {
+        return map[canonical];
+      }
+      if (Array.isArray(map[leagueName]) && map[leagueName].length > 0) {
+        return map[leagueName];
+      }
+      const normCanonical = canonical.trim().toLowerCase();
+      for (const [k, rows] of Object.entries(map)) {
+        if (Array.isArray(rows) && rows.length > 0 && normalizeCanonicalLeagueName(k).toLowerCase() === normCanonical) {
+          return rows;
+        }
+      }
     }
     const fallback = safeGetItem<StandingsRow[]>(STORAGE_KEYS.STANDINGS, []);
     return Array.isArray(fallback) ? fallback : [];
@@ -159,8 +171,9 @@ export const getStandingsForLeague = (leagueName: string, _team?: any): Standing
 export const saveStandingsForLeague = (leagueName: string, standings: StandingsRow[]) => {
   if (!leagueName) return;
   try {
+    const canonical = normalizeCanonicalLeagueName(leagueName) || leagueName;
     const rawMap = safeGetItem<Record<string, StandingsRow[]>>(STORAGE_KEYS.STANDINGS_BY_LEAGUE, {});
-    rawMap[leagueName] = standings;
+    rawMap[canonical] = standings;
     safeSetItem(STORAGE_KEYS.STANDINGS_BY_LEAGUE, JSON.stringify(rawMap));
     safeSetItem(STORAGE_KEYS.STANDINGS, JSON.stringify(standings));
   } catch (err) {
@@ -223,10 +236,19 @@ export const saveStateItem = <T>(key: string, value: T) => {
 
 export const loadFromStorage = () => {
   try {
-    const team = safeGetItem<TeamInfo | null>(STORAGE_KEYS.TEAM, null);
+    const rawTeam = safeGetItem<TeamInfo | null>(STORAGE_KEYS.TEAM, null);
+    const team = rawTeam
+      ? { ...rawTeam, leagueName: normalizeCanonicalLeagueName(rawTeam.leagueName) || 'Champions League' }
+      : null;
     const currentUser = safeGetItem<AppUser | null>(STORAGE_KEYS.CURRENT_USER, null);
     const users = safeGetItem<AppUser[]>(STORAGE_KEYS.USERS, []);
-    const allTeams = safeGetItem<TeamInfo[]>(STORAGE_KEYS.ALL_TEAMS, []);
+    const rawAllTeams = safeGetItem<TeamInfo[]>(STORAGE_KEYS.ALL_TEAMS, []);
+    const allTeams = Array.isArray(rawAllTeams)
+      ? rawAllTeams.map((t) => ({
+          ...t,
+          leagueName: normalizeCanonicalLeagueName(t.leagueName) || 'Champions League',
+        }))
+      : [];
     const posts = safeGetItem<Post[]>(STORAGE_KEYS.POSTS, []);
     const language = (localStorage.getItem(STORAGE_KEYS.LANGUAGE) as Language) || 'es';
 
