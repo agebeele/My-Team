@@ -15,8 +15,9 @@ import {
   ArrowRight,
   ExternalLink,
 } from 'lucide-react';
-import { AppUser, TeamInfo, TeamJoinRequest, Language, PlayerPosition } from '../types';
+import { AppUser, TeamInfo, TeamJoinRequest, Language, PlayerPosition, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { getT } from '../utils/translations';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 import { pushBackendSyncImmediate } from '../utils/backendSync';
 import {
   supabaseUpsertJoinRequest,
@@ -266,7 +267,7 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <img
-              src={currentUser.avatarUrl}
+              src={currentUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
               alt={currentUser.name}
               className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover ring-2 ring-[#1877F2]/40 bg-white shadow-sm shrink-0"
               onError={(e) => {
@@ -489,7 +490,7 @@ export const LeagueExplorerAndJoin: React.FC<LeagueExplorerAndJoinProps> = ({
                 >
                   <div className="flex items-start gap-3.5">
                     <img
-                      src={t.logoUrl}
+                      src={t.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                       alt={t.name}
                       className="w-14 h-14 rounded-2xl object-cover border border-[#CED0D4] dark:border-white/10 bg-white p-1 shadow-xs shrink-0"
                       onError={(e) => {

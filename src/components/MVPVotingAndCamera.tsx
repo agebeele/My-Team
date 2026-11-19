@@ -17,11 +17,12 @@ import {
   Instagram,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Match, Player, AppUser, Language, MVPRecord, TeamInfo } from '../types';
+import { Match, Player, AppUser, Language, MVPRecord, TeamInfo, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
 import { InstagramFlyerModal } from './InstagramFlyerModal';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface MVPVotingAndCameraProps {
   team: TeamInfo;
@@ -651,7 +652,7 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
                         #{player.number}
                       </span>
                       <img
-                        src={player.avatarUrl}
+                        src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={player.name}
                         referrerPolicy="no-referrer"
                         className="w-10 h-10 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"
@@ -741,7 +742,7 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
                 {/* Team 1: Our Team */}
                 <div className="flex items-center gap-2.5 flex-1 min-w-0">
                   <img
-                    src={team.logoUrl}
+                    src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                     alt={team.name}
                     referrerPolicy="no-referrer"
                     className="w-10 h-10 rounded-lg object-cover border border-emerald-500/50 shadow-sm shrink-0"
@@ -783,8 +784,8 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
                     </span>
                   </div>
                   <img
-                    src={activeMatch?.rivalLogo}
-                    alt={activeMatch?.rival}
+                    src={activeMatch?.rivalLogo || DEFAULT_GREY_SHIELD_SVG}
+                    alt={activeMatch?.rival || 'Rival'}
                     referrerPolicy="no-referrer"
                     className="w-10 h-10 rounded-lg object-cover border border-white/20 shadow-sm shrink-0"
                   />
@@ -1057,7 +1058,7 @@ export const MVPVotingAndCamera: React.FC<MVPVotingAndCameraProps> = ({
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <img
-                        src={player.avatarUrl}
+                        src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={player.name}
                         referrerPolicy="no-referrer"
                         className="w-10 h-10 rounded-full object-cover ring-1 ring-[#CED0D4] shrink-0"

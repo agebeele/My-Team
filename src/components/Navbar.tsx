@@ -21,10 +21,11 @@ import {
   XCircle,
   Megaphone,
 } from 'lucide-react';
-import { AppUser, Language, TeamInfo, UserRole, TeamInvitation, TeamJoinRequest } from '../types';
+import { AppUser, Language, TeamInfo, UserRole, TeamInvitation, TeamJoinRequest, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { getT } from '../utils/translations';
 import { APP_NAME, APP_LOGO_URL } from '../assets/branding';
 import { INITIAL_TEAMS } from '../data/initialData';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface NavbarProps {
   onOpenSupabaseModal?: () => void;
@@ -321,7 +322,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <div className="relative shrink-0">
                     <img
-                      src={team.logoUrl}
+                      src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                       alt={team.name}
                       referrerPolicy="no-referrer"
                       onError={(e) => {
@@ -412,7 +413,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <img
-                                  src={t.logoUrl}
+                                  src={t.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                                   alt={t.name}
                                   referrerPolicy="no-referrer"
                                   className="w-9 h-9 rounded-lg object-cover border border-[#CED0D4] bg-white shrink-0"
@@ -965,7 +966,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex items-center gap-2 p-1 rounded-full hover:bg-[#E4E6EB] dark:hover:bg-[#3A3B3C] transition-all cursor-pointer"
               >
                 <img
-                  src={currentUser.avatarUrl}
+                  src={currentUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                   alt={currentUser.name}
                   referrerPolicy="no-referrer"
                   className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover ring-2 ring-[#1877F2]"
@@ -989,7 +990,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <div className="p-3 bg-[#F0F2F5] dark:bg-[#18191A] rounded-xl border border-gray-100 dark:border-white/5 space-y-2">
                     <div className="flex items-center gap-2.5">
                       <img
-                        src={currentUser.avatarUrl}
+                        src={currentUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={currentUser.name}
                         referrerPolicy="no-referrer"
                         className="w-10 h-10 rounded-full object-cover ring-2 ring-[#1877F2] shadow-xs"
@@ -1175,7 +1176,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <img
-                        src={t.logoUrl}
+                        src={t.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                         alt={t.name}
                         referrerPolicy="no-referrer"
                         className="w-12 h-12 rounded-xl object-cover border border-[#CED0D4] dark:border-white/10 shadow-xs shrink-0 bg-white"

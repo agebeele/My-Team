@@ -53,6 +53,7 @@ import {
 import { isSupabaseConfigured } from '../utils/supabaseClient';
 import { supabaseUpsertUser, supabaseUpsertPlayer, supabaseUpsertTeam, supabaseUpsertJoinRequest } from '../utils/supabaseService';
 import { pushBackendSync } from '../utils/backendSync';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface LoginScreenProps {
   team: TeamInfo;
@@ -1623,7 +1624,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     >
                       <div className="flex items-start gap-3">
                         <img
-                          src={t.logoUrl}
+                          src={t.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                           alt={t.name}
                           referrerPolicy="no-referrer"
                           onError={(e) => {

@@ -771,7 +771,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </span>
               <div className="flex items-center gap-3">
                 <img
-                  src={newPlayerForm.avatarUrl}
+                  src={newPlayerForm.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                   alt="Avatar preview"
                   className="w-12 h-12 rounded-full object-cover ring-2 ring-[#1877F2] shadow-xs shrink-0"
                 />

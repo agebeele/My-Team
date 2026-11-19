@@ -21,7 +21,7 @@ import {
   X,
   Megaphone,
 } from 'lucide-react';
-import { Post, AppUser, Language, TeamInfo } from '../types';
+import { Post, AppUser, Language, TeamInfo, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { getT } from '../utils/translations';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
 import { supabaseUpsertPost, supabaseDeletePost } from '../utils/supabaseService';
@@ -475,7 +475,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
                     <img
-                      src={p.authorAvatar}
+                      src={p.authorAvatar || DEFAULT_FACEBOOK_AVATAR}
                       alt={p.authorName}
                       referrerPolicy="no-referrer"
                       className="w-8 h-8 rounded-full object-cover ring-1 ring-[#CED0D4]"
@@ -594,7 +594,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <img
-                      src={post.authorAvatar}
+                      src={post.authorAvatar || DEFAULT_FACEBOOK_AVATAR}
                       alt={post.authorName}
                       referrerPolicy="no-referrer"
                       className="w-10 h-10 rounded-full object-cover ring-1 ring-[#CED0D4]"
@@ -758,7 +758,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                     {post.comments.map((comment) => (
                       <div key={comment.id} className="flex gap-2.5 items-start text-xs">
                         <img
-                          src={comment.authorAvatar}
+                          src={comment.authorAvatar || DEFAULT_FACEBOOK_AVATAR}
                           alt={comment.authorName}
                           referrerPolicy="no-referrer"
                           className="w-7 h-7 rounded-full object-cover ring-1 ring-[#CED0D4]"
@@ -783,7 +783,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                     {/* Comment Input */}
                     <div className="flex items-center gap-2 pt-1">
                       <img
-                        src={currentUser.avatarUrl}
+                        src={currentUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={currentUser.name}
                         referrerPolicy="no-referrer"
                         className="w-7 h-7 rounded-full object-cover ring-1 ring-[#CED0D4]"
@@ -1077,7 +1077,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
                               <img
-                                src={post.authorAvatar}
+                                src={post.authorAvatar || DEFAULT_FACEBOOK_AVATAR}
                                 alt={post.authorName}
                                 referrerPolicy="no-referrer"
                                 className="w-9 h-9 rounded-full object-cover ring-1 ring-[#CED0D4]"

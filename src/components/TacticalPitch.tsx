@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   Clock,
 } from 'lucide-react';
-import { Match, Player, AppUser, Language, LineupPosition, MatchModality, TeamInfo } from '../types';
+import { Match, Player, AppUser, Language, LineupPosition, MatchModality, TeamInfo, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { getT } from '../utils/translations';
 import { DEFAULT_LINEUP } from '../data/initialData';
 import { LineupDownloadModal } from './LineupDownloadModal';
@@ -1150,7 +1150,7 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                         {player.number ? `#${player.number}` : '-'}
                       </span>
                       <img
-                        src={player.avatarUrl}
+                        src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={player.name}
                         referrerPolicy="no-referrer"
                         className="w-8 h-8 rounded-full object-cover shrink-0"

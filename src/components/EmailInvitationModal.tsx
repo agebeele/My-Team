@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, X, Check, Copy, ExternalLink, Send, Clock } from 'lucide-react';
 import { TeamInfo, TeamInvitation } from '../types';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface EmailInvitationModalProps {
   isOpen: boolean;
@@ -94,7 +95,7 @@ export const EmailInvitationModal: React.FC<EmailInvitationModalProps> = ({
           {/* Club Letterhead Banner */}
           <div className="rounded-xl border border-[#CED0D4] p-3.5 bg-gradient-to-r from-blue-50/50 via-white to-indigo-50/50 flex items-center gap-3">
             <img
-              src={team.logoUrl}
+              src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
               alt={team.name}
               className="w-11 h-11 rounded-xl object-cover border border-[#1877F2]/30 shadow-xs shrink-0"
               onError={(e) => {

@@ -35,6 +35,7 @@ import { generateMatchPosterCanvas } from '../utils/matchPosterGenerator';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
 import { MatchLineupViewerModal } from './MatchLineupViewerModal';
 import { InstagramFlyerModal } from './InstagramFlyerModal';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface MatchCalendarProps {
   matches: Match[];
@@ -594,7 +595,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 <div className="flex items-center justify-between gap-2.5 p-2 bg-white dark:bg-[#242526] rounded-xl border border-[#CED0D4]/60 dark:border-white/5 shadow-2xs">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <img
-                      src={match.isHome ? team.logoUrl : match.rivalLogo}
+                      src={(match.isHome ? team.logoUrl : match.rivalLogo) || DEFAULT_GREY_SHIELD_SVG}
                       alt={match.isHome ? team.name : match.rival}
                       referrerPolicy="no-referrer"
                       onError={(e) => {
@@ -624,7 +625,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 <div className="flex items-center justify-between gap-2.5 p-2 bg-white dark:bg-[#242526] rounded-xl border border-[#CED0D4]/60 dark:border-white/5 shadow-2xs">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <img
-                      src={!match.isHome ? team.logoUrl : match.rivalLogo}
+                      src={(!match.isHome ? team.logoUrl : match.rivalLogo) || DEFAULT_GREY_SHIELD_SVG}
                       alt={!match.isHome ? team.name : match.rival}
                       referrerPolicy="no-referrer"
                       onError={(e) => {
@@ -656,7 +657,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 {/* Our Team - Full Name */}
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <img
-                    src={team.logoUrl}
+                    src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                     alt={team.name}
                     referrerPolicy="no-referrer"
                     onError={(e) => {
@@ -703,7 +704,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                     </span>
                   </div>
                   <img
-                    src={match.rivalLogo}
+                    src={match.rivalLogo || DEFAULT_GREY_SHIELD_SVG}
                     alt={match.rival}
                     referrerPolicy="no-referrer"
                     onError={(e) => {

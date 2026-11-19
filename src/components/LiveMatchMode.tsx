@@ -25,11 +25,12 @@ import {
   Check,
   Zap,
 } from 'lucide-react';
-import { Match, MatchEvent, MatchEventType, MatchModality, TeamInfo, Player, AppUser, Language } from '../types';
+import { Match, MatchEvent, MatchEventType, MatchModality, TeamInfo, Player, AppUser, Language, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { getModalityInfo, ALL_MODALITIES } from '../utils/modalityHelper';
 import { PhotoPreviewModal } from './PhotoPreviewModal';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface LiveMatchModeProps {
   team: TeamInfo;
@@ -738,7 +739,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                 </span>
               </div>
               <img
-                src={team.logoUrl}
+                src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                 alt={team.name}
                 referrerPolicy="no-referrer"
                 className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-emerald-500/50 shadow-md shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"
@@ -809,7 +810,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
             {/* Team 2: Rival Team */}
             <div className="flex items-center justify-start gap-3 sm:gap-4 order-2 md:order-3 text-left">
               <img
-                src={currentMatch.rivalLogo}
+                src={currentMatch.rivalLogo || DEFAULT_GREY_SHIELD_SVG}
                 alt={currentMatch.rival}
                 referrerPolicy="no-referrer"
                 className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-[#CED0D4] dark:border-white/20 shadow-md shrink-0"
@@ -1158,7 +1159,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <img
-                      src={p.avatarUrl}
+                      src={p.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                       alt={p.name}
                       referrerPolicy="no-referrer"
                       className="w-6 h-6 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"
@@ -1190,7 +1191,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <img
-                        src={p.avatarUrl}
+                        src={p.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={p.name}
                         referrerPolicy="no-referrer"
                         className="w-6 h-6 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"
@@ -1244,7 +1245,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                   }`}
                 >
                   <img
-                    src={team.logoUrl}
+                    src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                     alt={team.shortName}
                     className="w-5 h-5 rounded-full object-cover"
                   />
@@ -1261,7 +1262,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                   }`}
                 >
                   <img
-                    src={currentMatch.rivalLogo}
+                    src={currentMatch.rivalLogo || DEFAULT_GREY_SHIELD_SVG}
                     alt={currentMatch.rival}
                     className="w-5 h-5 rounded-full object-cover"
                   />
@@ -1672,7 +1673,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
               {/* Watermark Crest */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 opacity-5 pointer-events-none">
                 <img
-                  src={team.logoUrl}
+                  src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                   alt={team.name}
                   className="w-full h-full object-contain filter grayscale"
                 />
@@ -1682,7 +1683,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
               <div className="relative z-10 flex items-center justify-between border-b border-white/10 pb-4 text-xs font-bold text-gray-400">
                 <div className="flex items-center gap-2 text-left">
                   <img
-                    src={team.logoUrl}
+                    src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                     alt={team.name}
                     className="w-8 h-8 rounded-lg object-cover border border-emerald-400/40"
                   />
@@ -1715,7 +1716,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                 {/* Team 1 */}
                 <div className="flex flex-col items-center">
                   <img
-                    src={team.logoUrl}
+                    src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                     alt={team.name}
                     referrerPolicy="no-referrer"
                     className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400 shadow-xl"
@@ -1743,7 +1744,7 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
                 {/* Rival Team */}
                 <div className="flex flex-col items-center">
                   <img
-                    src={currentMatch.rivalLogo}
+                    src={currentMatch.rivalLogo || DEFAULT_GREY_SHIELD_SVG}
                     alt={currentMatch.rival}
                     referrerPolicy="no-referrer"
                     className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/20 shadow-xl"

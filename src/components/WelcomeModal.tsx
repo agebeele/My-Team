@@ -13,6 +13,7 @@ import {
   Star,
 } from 'lucide-react';
 import { TeamInfo, TeamInvitation } from '../types';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -62,7 +63,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
           {/* Shield & Badge */}
           <div className="relative inline-block mb-3">
             <img
-              src={team.logoUrl}
+              src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
               alt={team.name}
               referrerPolicy="no-referrer"
               onError={(e) => {

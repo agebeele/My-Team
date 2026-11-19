@@ -1253,7 +1253,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
             {/* Background Stadium Image */}
             <div className="absolute inset-0 z-0">
               <img
-                src={selectedBg}
+                src={selectedBg || STADIUM_BACKGROUND_PRESETS[0].url}
                 alt="Estadio"
                 crossOrigin="anonymous"
                 onError={(e) => {
@@ -1680,7 +1680,7 @@ export const ConvocatoriaGraphic: React.FC<ConvocatoriaGraphicProps> = ({
                     </div>
 
                     <img
-                      src={player.avatarUrl}
+                      src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                       alt={player.name}
                       referrerPolicy="no-referrer"
                       className="w-8 h-8 rounded-full object-cover shrink-0 ring-1 ring-[#CED0D4] dark:ring-white/10"

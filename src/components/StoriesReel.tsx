@@ -12,7 +12,7 @@ import {
   Check,
   X,
 } from 'lucide-react';
-import { AppUser, ClubStory } from '../types';
+import { AppUser, ClubStory, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { StoryViewerModal } from './StoryViewerModal';
 
 interface StoriesReelProps {
@@ -148,7 +148,7 @@ export const StoriesReel: React.FC<StoriesReelProps> = ({
                 }`}
               >
                 <img
-                  src={currentUser.avatarUrl}
+                  src={currentUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                   alt={currentUser.name}
                   referrerPolicy="no-referrer"
                   className="w-full h-full rounded-full object-cover border-2 border-white dark:border-[#1E1F24] bg-white"
@@ -196,7 +196,7 @@ export const StoriesReel: React.FC<StoriesReelProps> = ({
                     className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full p-0.5 bg-gradient-to-tr ${ringGradient} cursor-pointer transition-transform hover:scale-105 shadow-xs`}
                   >
                     <img
-                      src={story.authorAvatar}
+                      src={story.authorAvatar || DEFAULT_FACEBOOK_AVATAR}
                       alt={story.authorName}
                       referrerPolicy="no-referrer"
                       className="w-full h-full rounded-full object-cover border-2 border-white dark:border-[#1E1F24] bg-black"

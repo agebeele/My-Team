@@ -14,7 +14,7 @@ import {
   Flame,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { AppNotification, AppUser, Player, TeamInfo } from '../types';
+import { AppNotification, AppUser, Player, TeamInfo, DEFAULT_FACEBOOK_AVATAR } from '../types';
 
 interface NotificationsModalProps {
   isOpen: boolean;
@@ -267,7 +267,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                     {/* Club or Sender Avatar */}
                     <div className="relative shrink-0">
                       <img
-                        src={notif.senderAvatar || notif.teamLogo || team.logoUrl}
+                        src={notif.senderAvatar || notif.teamLogo || team.logoUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={notif.senderName}
                         referrerPolicy="no-referrer"
                         className="w-11 h-11 rounded-full object-cover border-2 border-[#1877F2] bg-white shadow-xs"

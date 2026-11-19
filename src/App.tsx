@@ -76,6 +76,7 @@ import {
   subscribeToSupabaseTable,
 } from './services/supabaseService';
 import { fetchBackendSync, pushBackendSync, pushBackendSyncImmediate } from './utils/backendSync';
+import { DEFAULT_GREY_SHIELD_SVG } from './utils/ocrTableParser';
 
 export default function App() {
   // Persistence state
@@ -1630,7 +1631,7 @@ export default function App() {
             <div className="mb-4 px-4 py-2.5 rounded-2xl bg-white border border-[#CED0D4] shadow-xs flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2.5 min-w-0">
                 <img
-                  src={team.logoUrl}
+                  src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                   alt={team.name}
                   referrerPolicy="no-referrer"
                   className="w-7 h-7 rounded-lg object-cover border border-[#CED0D4] bg-white shrink-0"

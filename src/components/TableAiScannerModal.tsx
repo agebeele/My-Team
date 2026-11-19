@@ -522,11 +522,17 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                                 : 'border-[#CED0D4] dark:border-white/10 hover:border-gray-400'
                             }`}
                           >
-                            <img
-                              src={photo.base64}
-                              alt={photo.name}
-                              className="w-full h-20 object-cover rounded-lg"
-                            />
+                            {photo.base64 ? (
+                              <img
+                                src={photo.base64}
+                                alt={photo.name}
+                                className="w-full h-20 object-cover rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-full h-20 rounded-lg bg-slate-800 flex items-center justify-center text-gray-500 text-[10px]">
+                                Sin vista
+                              </div>
+                            )}
                             <div className="absolute top-1.5 left-1.5 bg-black/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-xs">
                               Foto #{idx + 1}
                             </div>
@@ -565,7 +571,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                     </div>
 
                     {/* Active Photo Full Preview */}
-                    {currentPreviewPhoto && (
+                    {currentPreviewPhoto && currentPreviewPhoto.base64 && (
                       <div className="relative rounded-2xl overflow-hidden border border-[#CED0D4] dark:border-white/10 bg-black/95 max-h-72 flex items-center justify-center">
                         <img
                           src={currentPreviewPhoto.base64}
@@ -762,7 +768,7 @@ export const TableAiScannerModal: React.FC<TableAiScannerModalProps> = ({
                         <td className="py-2 px-3">
                           <div className="flex items-center gap-2">
                             <img
-                              src={row.logo}
+                              src={row.logo || DEFAULT_GREY_SHIELD_SVG}
                               alt={row.name}
                               className="w-6 h-6 rounded-full object-cover shrink-0 border border-gray-200 bg-white"
                               onError={(e) => {

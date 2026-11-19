@@ -27,6 +27,7 @@ import { Player, TeamInfo, AppUser, Language, DEFAULT_FACEBOOK_AVATAR, getPlayer
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { ChangePasswordSection } from './ChangePasswordSection';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface PlayerProfileViewProps {
   player: Player;
@@ -662,12 +663,18 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
                 className="bg-[#F0F2F5] rounded-xl border border-[#CED0D4]/60 overflow-hidden group hover:border-[#1877F2] transition-all shadow-xs"
               >
                 <div className="relative aspect-[4/3] overflow-hidden bg-black">
-                  <img
-                    src={rec.photoUrl}
-                    alt={`MVP vs ${rec.rival}`}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
+                  {rec.photoUrl ? (
+                    <img
+                      src={rec.photoUrl}
+                      alt={`MVP vs ${rec.rival}`}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs font-semibold">
+                      Sin foto
+                    </div>
+                  )}
                   <div className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-[#1877F2] text-white font-bold text-[10px] uppercase flex items-center gap-1 shadow-md">
                     <Star className="w-3 h-3 fill-white" />
                     OFICIAL MVP
@@ -922,7 +929,7 @@ export const PlayerProfileView: React.FC<PlayerProfileViewProps> = ({
               <div className="relative z-10 flex items-center justify-between border-b border-white/20 pb-3 gap-2">
                 <div className="flex items-center gap-2.5 text-left">
                   <img
-                    src={team.logoUrl}
+                    src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                     alt={team.name}
                     referrerPolicy="no-referrer"
                     className="w-11 h-11 rounded-xl object-cover border border-white/30 shadow-md bg-white"

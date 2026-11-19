@@ -246,11 +246,13 @@ export const LineupDownloadModal: React.FC<LineupDownloadModalProps> = ({
                 className="w-full max-w-[460px] aspect-[4/5] rounded-2xl relative overflow-hidden flex flex-col items-center justify-center shadow-2xl border-2 bg-[#05070B] animate-fadeIn"
                 style={{ borderColor: primaryColor }}
               >
+              {(generatedResult.blobUrl || generatedResult.dataUrl) && (
                 <img
                   src={generatedResult.blobUrl || generatedResult.dataUrl}
                   alt="Alineación Oficial Generada"
                   className="w-full h-full object-contain"
                 />
+              )}
                 <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl border border-emerald-500/40 text-[11px] font-black text-emerald-400 flex items-center gap-1.5 shadow-lg">
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Foto Lista (1080 × 1350 px)</span>
@@ -270,7 +272,7 @@ export const LineupDownloadModal: React.FC<LineupDownloadModalProps> = ({
                 {/* Layer 1: Stadium / Pitch / Players Background Image */}
                 <div className="absolute inset-0 z-0">
                   <img
-                    src={selectedBg}
+                    src={selectedBg || STADIUM_BACKGROUND_PRESETS[0].url}
                     alt="Estadio Fondo"
                     crossOrigin="anonymous"
                     className="w-full h-full object-cover brightness-[0.45] contrast-125 scale-105"

@@ -27,7 +27,9 @@ import {
   Match,
   StoryType,
   StoryTheme,
+  DEFAULT_FACEBOOK_AVATAR,
 } from '../types';
+import { DEFAULT_GREY_SHIELD_SVG } from '../utils/ocrTableParser';
 
 interface StoryShareModalProps {
   isOpen: boolean;
@@ -261,7 +263,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
               <div className="flex items-center gap-2.5">
                 <div className="relative">
                   <img
-                    src={currentUser.avatarUrl}
+                    src={currentUser.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                     alt={currentUser.name}
                     crossOrigin="anonymous"
                     className="w-10 h-10 rounded-full object-cover ring-2 ring-amber-400 shadow-md bg-white"
@@ -288,7 +290,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
               {/* Club Shield */}
               <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10">
                 <img
-                  src={team.logoUrl}
+                  src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                   alt={team.name}
                   crossOrigin="anonymous"
                   className="w-5 h-5 rounded-full object-cover bg-white"
@@ -349,7 +351,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
                               {row.rank}º
                             </span>
                             <img
-                              src={row.logo}
+                              src={row.logo || DEFAULT_GREY_SHIELD_SVG}
                               alt={row.name}
                               crossOrigin="anonymous"
                               className="w-4 h-4 rounded-full object-contain bg-white/10 shrink-0"
@@ -428,7 +430,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
                             #{idx + 1}
                           </span>
                           <img
-                            src={scorer.avatarUrl}
+                            src={scorer.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                             alt={scorer.name}
                             crossOrigin="anonymous"
                             className="w-7 h-7 rounded-full object-cover ring-1 ring-white/20 bg-white"
@@ -468,7 +470,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
 
                   <div className="relative mx-auto w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden ring-4 ring-amber-400 shadow-2xl bg-black">
                     <img
-                      src={activePlayer.avatarUrl}
+                      src={activePlayer.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                       alt={activePlayer.name}
                       crossOrigin="anonymous"
                       className="w-full h-full object-cover"
@@ -539,7 +541,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
 
                     <div className="relative mx-auto w-24 h-24 rounded-full overflow-hidden ring-2 ring-white/30 bg-black">
                       <img
-                        src={activePlayer.avatarUrl}
+                        src={activePlayer.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                         alt={activePlayer.name}
                         crossOrigin="anonymous"
                         className="w-full h-full object-cover"
@@ -592,7 +594,7 @@ export const StoryShareModal: React.FC<StoryShareModalProps> = ({
                       {/* Us */}
                       <div className="flex flex-col items-center w-24">
                         <img
-                          src={team.logoUrl}
+                          src={team.logoUrl || DEFAULT_GREY_SHIELD_SVG}
                           alt={team.name}
                           crossOrigin="anonymous"
                           className="w-12 h-12 rounded-full object-cover bg-white ring-2 ring-amber-400 shadow-md"

@@ -11,7 +11,7 @@ import {
   Trash2,
   Sparkles,
 } from 'lucide-react';
-import { AppUser, ClubStory } from '../types';
+import { AppUser, ClubStory, DEFAULT_FACEBOOK_AVATAR } from '../types';
 
 interface StoryViewerModalProps {
   isOpen: boolean;
@@ -155,7 +155,7 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
         <div className="absolute top-6 left-3 right-3 z-30 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2.5">
             <img
-              src={currentStory.authorAvatar}
+              src={currentStory.authorAvatar || DEFAULT_FACEBOOK_AVATAR}
               alt={currentStory.authorName}
               referrerPolicy="no-referrer"
               className="w-10 h-10 rounded-full object-cover ring-2 ring-white/80 shadow-md bg-black"
@@ -215,11 +215,15 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
 
         {/* Story Media (Image) */}
         <div className="relative flex-1 flex items-center justify-center bg-black overflow-hidden">
-          <img
-            src={currentStory.imageUrl}
-            alt={currentStory.title}
-            className="w-full h-full object-contain"
-          />
+          {currentStory.imageUrl ? (
+            <img
+              src={currentStory.imageUrl}
+              alt={currentStory.title}
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <span className="text-xs text-gray-400 font-semibold">Historia sin imagen</span>
+          )}
 
           {/* Left / Right touch zones for previous/next */}
           <button

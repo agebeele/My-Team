@@ -19,7 +19,7 @@ import {
   Share2,
   Trash2,
 } from 'lucide-react';
-import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory, STANDARD_LEAGUES } from '../types';
+import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory, STANDARD_LEAGUES, DEFAULT_FACEBOOK_AVATAR } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage, captureElementAsDataUrl } from '../utils/imageDownloader';
 import { TableAiScannerModal } from './TableAiScannerModal';
@@ -385,7 +385,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                 >
                   <div className="relative">
                     <img
-                      src={scorer.avatarUrl}
+                      src={scorer.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                       alt={scorer.name}
                       referrerPolicy="no-referrer"
                       className="w-14 h-14 rounded-2xl object-cover ring-2 ring-white dark:ring-white/10 shadow-xs"
@@ -470,7 +470,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
                           <img
-                            src={player.avatarUrl}
+                            src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                             alt={player.name}
                             referrerPolicy="no-referrer"
                             className="w-8 h-8 rounded-full object-cover shrink-0"
@@ -645,7 +645,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                       <td className="py-2 px-3">
                         <div className="flex items-center gap-2">
                           <img
-                            src={row.logo}
+                            src={row.logo || DEFAULT_GREY_SHIELD_SVG}
                             alt={row.name}
                             className="w-6 h-6 rounded-full object-cover shrink-0 border border-gray-200 dark:border-white/10 bg-white shadow-2xs"
                             onError={(e) => {

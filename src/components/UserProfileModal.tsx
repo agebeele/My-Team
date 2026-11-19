@@ -23,6 +23,7 @@ import {
   TeamInfo,
   PlayerPosition,
   ALL_POSITIONS,
+  DEFAULT_FACEBOOK_AVATAR,
 } from '../types';
 import { ChangePasswordSection } from './ChangePasswordSection';
 
@@ -163,7 +164,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0F1012] to-[#1A1C20] text-white flex items-center gap-4 shadow-lg border border-white/10 relative overflow-hidden">
             <div className="relative shrink-0">
               <img
-                src={formData.avatarUrl}
+                src={formData.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                 alt={formData.name}
                 className="w-16 h-16 rounded-2xl object-cover ring-2 ring-amber-400 shadow-md bg-white"
               />
@@ -353,7 +354,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     }`}
                   >
                     <img
-                      src={u.avatarUrl}
+                      src={u.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
                       alt={u.name}
                       className="w-7 h-7 rounded-full object-cover shrink-0 ring-1 ring-white/50"
                     />
