@@ -771,6 +771,165 @@ export const supabaseUpsertTeamInvitation = async (inv: TeamInvitation): Promise
 };
 
 // ==========================================
+// 7C. STANDINGS SERVICE (TABLA GENERAL DE LIGA)
+// ==========================================
+export const mapStandingToDb = (row: StandingsRow, fallbackLeague = 'Champions League') => ({
+  id: row.id,
+  league_name: normalizeCanonicalLeagueName(row.leagueName || fallbackLeague) || 'Champions League',
+  rank: Number(row.rank) || 1,
+  name: row.name,
+  logo: row.logo || null,
+  pj: Math.max(0, Number(row.pj) || 0),
+  g: Math.max(0, Number(row.g) || 0),
+  e: Math.max(0, Number(row.e) || 0),
+  p: Math.max(0, Number(row.p) || 0),
+  gf: Math.max(0, Number(row.gf) || 0),
+  gc: Math.max(0, Number(row.gc) || 0),
+  dg: Number.isFinite(Number(row.dg)) ? Number(row.dg) : (Number(row.gf) || 0) - (Number(row.gc) || 0),
+  pts: Number.isFinite(Number(row.pts)) ? Number(row.pts) : (Number(row.g) || 0) * 3 + (Number(row.e) || 0),
+  is_our_team: Boolean(row.isOurTeam),
+});
+
+export const mapStandingFromDb = (row: any): StandingsRow => ({
+  id: row.id,
+  leagueName: normalizeCanonicalLeagueName(row.league_name) || 'Champions League',
+  rank: Number(row.rank) || 1,
+  name: row.name || '',
+  logo: row.logo || '',
+  pj: Number(row.pj) || 0,
+  g: Number(row.g) || 0,
+  e: Number(row.e) || 0,
+  p: Number(row.p) || 0,
+  gf: Number(row.gf) || 0,
+  gc: Number(row.gc) || 0,
+  dg: Number(row.dg) || 0,
+  pts: Number(row.pts) || 0,
+  isOurTeam: Boolean(row.is_our_team),
+});
+
+export const sortStandingsByStats = (rows: StandingsRow[]): StandingsRow[] => {
+  return [...rows]
+    .sort(
+      (a, b) =>
+        (Number(b.pts) || 0) - (Number(a.pts) || 0) ||
+        (Number(b.dg) || 0) - (Number(a.dg) || 0) ||
+        (Number(b.gf) || 0) - (Number(a.gf) || 0) ||
+        (Number(a.rank) || 999) - (Number(b.rank) || 999)
+    )
+    .map((r, idx) => ({
+      ...r,
+      rank: idx + 1,
+    }));
+};
+
+export const supabaseFetchStandings = async (leagueName?: string): Promise<StandingsRow[] | null> => {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('standings')
+      .select('*')
+      .order('pts', { ascending: false })
+      .order('dg', { ascending: false })
+      .order('gf', { ascending: false })
+      .order('rank', { ascending: true });
+
+    if (error) {
+      console.warn('[Supabase] fetchStandings error:', error.message);
+      return null;
+    }
+    if (!data) return [];
+
+    const mapped = data.map(mapStandingFromDb);
+    if (leagueName) {
+      const target = normalizeCanonicalLeagueName(leagueName).trim().toLowerCase();
+      return sortStandingsByStats(
+        mapped.filter((r) => normalizeCanonicalLeagueName(r.leagueName).trim().toLowerCase() === target)
+      );
+    }
+
+    // Group and sort each league cleanly by stats
+    const byLeague = new Map<string, StandingsRow[]>();
+    for (const row of mapped) {
+      const lg = normalizeCanonicalLeagueName(row.leagueName) || 'Champions League';
+      const list = byLeague.get(lg) || [];
+      list.push({ ...row, leagueName: lg });
+      byLeague.set(lg, list);
+    }
+    const result: StandingsRow[] = [];
+    for (const rows of byLeague.values()) {
+      result.push(...sortStandingsByStats(rows));
+    }
+    return result;
+  } catch (err: any) {
+    console.warn('[Supabase] fetchStandings exception:', err?.message || err);
+    return null;
+  }
+};
+
+export const supabaseSaveLeagueStandings = async (
+  leagueName: string,
+  rows: StandingsRow[]
+): Promise<boolean> => {
+  const client = getSupabaseClient();
+  if (!client) return false;
+
+  const canonicalLeague = normalizeCanonicalLeagueName(leagueName) || 'Champions League';
+  const normCanonical = canonicalLeague.trim().toLowerCase();
+
+  try {
+    const sorted = sortStandingsByStats(
+      rows.map((r, idx) => ({
+        ...r,
+        id: r.id || `standing_${normCanonical.replace(/[^a-z0-9]/g, '_')}_${Date.now()}_${idx}`,
+        leagueName: canonicalLeague,
+      }))
+    );
+
+    const nextIds = new Set(sorted.map((r) => r.id));
+
+    // Find old rows for this league (including any legacy/OCR-variant league names) to remove stale entries
+    const { data: existingRows, error: selectErr } = await client
+      .from('standings')
+      .select('id, league_name');
+
+    if (!selectErr && Array.isArray(existingRows)) {
+      const idsToDelete = existingRows
+        .filter(
+          (er: any) =>
+            normalizeCanonicalLeagueName(er.league_name).trim().toLowerCase() === normCanonical &&
+            !nextIds.has(er.id)
+        )
+        .map((er: any) => er.id);
+
+      if (idsToDelete.length > 0) {
+        const { error: delErr } = await client.from('standings').delete().in('id', idsToDelete);
+        if (delErr) {
+          console.warn('[Supabase] Error limpiando filas previas de standings:', delErr.message);
+        }
+      }
+    }
+
+    if (sorted.length > 0) {
+      const payloads = sorted.map((r) => mapStandingToDb(r, canonicalLeague));
+      const { error: upsertErr } = await client
+        .from('standings')
+        .upsert(payloads, { onConflict: 'id' });
+      if (upsertErr) {
+        console.error('[Supabase] Error al guardar tabla standings:', upsertErr.message);
+        return false;
+      }
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error('[Supabase] Excepción al guardar tabla standings:', err?.message || err);
+    return false;
+  }
+};
+
+// ==========================================
 // 8. REALTIME SUBSCRIPTIONS
 // ==========================================
 export const subscribeToSupabaseTable = (

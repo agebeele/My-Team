@@ -2566,7 +2566,15 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
           activeLeagueName={canonicalTeamLeague}
           onApplyStandings={(newRows, updatedLeague) => {
             const targetLeague = normalizeCanonicalLeagueName(updatedLeague || canonicalTeamLeague) || canonicalTeamLeague;
-            const tagged = newRows.map((r) => ({ ...r, leagueName: targetLeague }));
+            const tagged = [...newRows]
+              .sort(
+                (a, b) =>
+                  (Number(b.pts) || 0) - (Number(a.pts) || 0) ||
+                  (Number(b.dg) || 0) - (Number(a.dg) || 0) ||
+                  (Number(b.gf) || 0) - (Number(a.gf) || 0) ||
+                  (Number(a.rank) || 999) - (Number(b.rank) || 999)
+              )
+              .map((r, idx) => ({ ...r, rank: idx + 1, leagueName: targetLeague }));
             setStandings((prev) => {
               const normTarget = targetLeague.trim().toLowerCase();
               const others = prev.filter((r) => {

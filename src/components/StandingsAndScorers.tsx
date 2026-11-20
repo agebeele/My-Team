@@ -80,10 +80,19 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
     });
 
     if (matched.length > 0) {
-      return matched.map((r) => ({
-        ...r,
-        isOurTeam: team?.name ? r.name.trim().toLowerCase() === team.name.trim().toLowerCase() : r.isOurTeam,
-      }));
+      return [...matched]
+        .sort(
+          (a, b) =>
+            (Number(b.pts) || 0) - (Number(a.pts) || 0) ||
+            (Number(b.dg) || 0) - (Number(a.dg) || 0) ||
+            (Number(b.gf) || 0) - (Number(a.gf) || 0) ||
+            (Number(a.rank) || 999) - (Number(b.rank) || 999)
+        )
+        .map((r, idx) => ({
+          ...r,
+          rank: idx + 1,
+          isOurTeam: team?.name ? r.name.trim().toLowerCase() === team.name.trim().toLowerCase() : r.isOurTeam,
+        }));
     }
 
     return getStandingsForLeague(activeLeague, team);
@@ -100,15 +109,25 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
 
   const handleSaveDirectEdit = () => {
     if (setStandings) {
-      const taggedRows = editRows.map((r) => ({ ...r, leagueName: activeLeague }));
+      const sortedTagged = [...editRows]
+        .sort(
+          (a, b) =>
+            (Number(b.pts) || 0) - (Number(a.pts) || 0) ||
+            (Number(b.dg) || 0) - (Number(a.dg) || 0) ||
+            (Number(b.gf) || 0) - (Number(a.gf) || 0) ||
+            (Number(a.rank) || 999) - (Number(b.rank) || 999)
+        )
+        .map((r, idx) => ({ ...r, rank: idx + 1, leagueName: activeLeague }));
       setStandings((prev) => {
         const normActive = activeLeague.trim().toLowerCase();
-        const others = prev.filter(
-          (r) => r.leagueName && r.leagueName.trim().toLowerCase() !== normActive
-        );
-        return [...others, ...taggedRows];
+        const others = prev.filter((r) => {
+          if (!r.leagueName) return false;
+          const rNorm = normalizeCanonicalLeagueName(r.leagueName).trim().toLowerCase();
+          return r.leagueName.trim().toLowerCase() !== normActive && rNorm !== normActive;
+        });
+        return [...others, ...sortedTagged];
       });
-      setToastMessage(`¡Datos de la tabla (${activeLeague}) guardados exitosamente!`);
+      setToastMessage(`¡Datos de la tabla (${activeLeague}) guardados y ordenados por estadísticas!`);
       setTimeout(() => setToastMessage(null), 3500);
     }
     setIsDirectEditing(false);
@@ -518,7 +537,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
           <div className="p-4 border-b border-[#CED0D4] dark:border-white/10 flex items-center justify-between gap-3 flex-wrap">
             <div>
               <h3 className="text-sm font-black text-[#050505] dark:text-white">
-                Clasificación General - {team.leagueName}
+                Clasificación General - {activeLeague}
               </h3>
               <p className="text-xs text-[#65676B] dark:text-gray-400 font-medium">
                 Puestos 1-4 clasifican a la Liguilla por el campeonato
@@ -853,7 +872,15 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
           activeLeagueName={activeLeague}
           onApplyStandings={(newRows, updatedLeague) => {
             const targetLeague = normalizeCanonicalLeagueName(updatedLeague || activeLeague) || activeLeague;
-            const tagged = newRows.map((r) => ({ ...r, leagueName: targetLeague }));
+            const tagged = [...newRows]
+              .sort(
+                (a, b) =>
+                  (Number(b.pts) || 0) - (Number(a.pts) || 0) ||
+                  (Number(b.dg) || 0) - (Number(a.dg) || 0) ||
+                  (Number(b.gf) || 0) - (Number(a.gf) || 0) ||
+                  (Number(a.rank) || 999) - (Number(b.rank) || 999)
+              )
+              .map((r, idx) => ({ ...r, rank: idx + 1, leagueName: targetLeague }));
             setStandings((prev) => {
               const normTarget = targetLeague.trim().toLowerCase();
               const others = prev.filter((r) => {

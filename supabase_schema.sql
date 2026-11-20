@@ -175,6 +175,11 @@ CREATE TABLE IF NOT EXISTS standings (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+ALTER TABLE standings ADD COLUMN IF NOT EXISTS logo TEXT;
+ALTER TABLE standings ADD COLUMN IF NOT EXISTS is_our_team BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_standings_league_stats
+  ON standings (league_name, pts DESC, dg DESC, gf DESC, rank ASC);
+
 -- 7. TABLA DE SOLICITUDES DE INGRESO A EQUIPOS (JOIN_REQUESTS)
 CREATE TABLE IF NOT EXISTS join_requests (
   id TEXT PRIMARY KEY,
@@ -263,6 +268,12 @@ DO $$
 BEGIN
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE posts, players, matches, app_users, teams, standings, join_requests, team_invitations;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN others THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE standings;
   EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;
