@@ -49,6 +49,7 @@ import {
   TeamJoinRequest,
   STANDARD_LEAGUES,
   normalizeCanonicalLeagueName,
+  canManageLeagueStandings,
 } from '../types';
 import { getT } from '../utils/translations';
 import { CameraCaptureModal } from './CameraCaptureModal';
@@ -103,6 +104,7 @@ export const OwnerAdminPanel: React.FC<OwnerAdminPanelProps> = ({
   const [isAiTableModalOpen, setIsAiTableModalOpen] = useState(false);
 
   const canonicalTeamLeague = normalizeCanonicalLeagueName(team.leagueName) || 'Champions League';
+  const canEditLeagueTable = canManageLeagueStandings(currentUser);
 
   // Team identity form
   const [teamForm, setTeamForm] = useState({
@@ -2019,8 +2021,8 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
             </form>
           </div>
 
-          {/* AI League Standings Scanner Card */}
-          {setStandings && (
+          {/* AI League Standings Scanner Card (Only admin@dreamteam.com) */}
+          {canEditLeagueTable && setStandings && (
             <div className="bg-gradient-to-br from-indigo-900 via-blue-900 to-purple-900 text-white p-5 rounded-2xl shadow-md border border-indigo-500/30 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -2557,8 +2559,8 @@ const [sentInvitations, setSentInvitations] = useState<TeamInvitation[]>(() => {
         dorsal={cameraModalTarget === 'admin' ? 'DT' : cameraModalTarget === 'new' ? newPlayerNumber : editForm.number}
       />
 
-      {/* AI Table Scanner Modal */}
-      {setStandings && (
+      {/* AI Table Scanner Modal (Only admin@dreamteam.com) */}
+      {canEditLeagueTable && setStandings && (
         <TableAiScannerModal
           isOpen={isAiTableModalOpen}
           onClose={() => setIsAiTableModalOpen(false)}

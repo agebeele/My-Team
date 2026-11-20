@@ -273,6 +273,7 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
     if (!formData.rival.trim()) return;
 
     const matchDateTime = new Date(`${formData.date}T${formData.time}:00`).getTime();
+    const isDueNow = Number.isFinite(matchDateTime) && matchDateTime > 0 && Date.now() >= matchDateTime;
 
     if (editingMatch) {
       setMatches((prev) =>
@@ -287,6 +288,9 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
                 stadium: formData.stadium,
                 isHome: formData.isHome,
                 modality: formData.modality,
+                status: m.status === 'scheduled' && isDueNow ? 'live' : m.status,
+                scoreUs: m.status === 'scheduled' && isDueNow ? (m.scoreUs ?? 0) : m.scoreUs,
+                scoreThem: m.status === 'scheduled' && isDueNow ? (m.scoreThem ?? 0) : m.scoreThem,
                 matchStartTimestamp: matchDateTime || m.matchStartTimestamp,
               }
             : m
@@ -304,9 +308,9 @@ export const MatchCalendar: React.FC<MatchCalendarProps> = ({
         stadium: formData.stadium,
         isHome: formData.isHome,
         modality: formData.modality,
-        status: 'scheduled',
-        scoreUs: null,
-        scoreThem: null,
+        status: isDueNow ? 'live' : 'scheduled',
+        scoreUs: isDueNow ? 0 : null,
+        scoreThem: isDueNow ? 0 : null,
         scorersUs: [],
         calledUpPlayerIds: players.map((p) => p.id),
         lineup: [],

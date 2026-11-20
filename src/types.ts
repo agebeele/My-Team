@@ -456,3 +456,54 @@ export function normalizeCanonicalLeagueName(raw?: string): string {
 
   return trimmed;
 }
+
+export const MASTER_TABLE_ADMIN_EMAIL = 'admin@dreamteam.com';
+
+export const canManageLeagueStandings = (
+  user?: Pick<AppUser, 'email' | 'username'> | null
+): boolean => {
+  if (!user) return false;
+  const email = (user.email || '').trim().toLowerCase();
+  const username = (user.username || '').trim().toLowerCase();
+  return email === MASTER_TABLE_ADMIN_EMAIL || username === MASTER_TABLE_ADMIN_EMAIL;
+};
+
+export const getScheduledMatchStartMs = (
+  match: Pick<Match, 'date' | 'time' | 'matchStartTimestamp'>
+): number | null => {
+  if (match.date) {
+    const rawTime = (match.time || '00:00').trim();
+    const normalizedTime = /^\d{2}:\d{2}$/.test(rawTime) ? `${rawTime}:00` : rawTime;
+    const parsed = new Date(`${match.date}T${normalizedTime}`).getTime();
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  if (Number.isFinite(match.matchStartTimestamp) && match.matchStartTimestamp > 0) {
+    return match.matchStartTimestamp;
+  }
+  return null;
+};
+
+export const autoStartDueMatches = (
+  matches: Match[],
+  nowMs: number = Date.now()
+): { updated: Match[]; changed: boolean } => {
+  let changed = false;
+  const updated = matches.map((m) => {
+    if (m.status !== 'scheduled') return m;
+    const startMs = getScheduledMatchStartMs(m);
+    if (startMs !== null && nowMs >= startMs) {
+      changed = true;
+      return {
+        ...m,
+        status: 'live' as const,
+        matchStartTimestamp: startMs,
+        scoreUs: m.scoreUs ?? 0,
+        scoreThem: m.scoreThem ?? 0,
+      };
+    }
+    return m;
+  });
+  return { updated, changed };
+};
+
+

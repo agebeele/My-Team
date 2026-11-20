@@ -12,6 +12,8 @@ import {
   TeamInvitation,
   normalizeCanonicalLeagueName,
   sortPostsNewestFirst,
+  canManageLeagueStandings,
+  autoStartDueMatches,
 } from './types';
 import {
   INITIAL_TEAM,
@@ -57,6 +59,7 @@ import confetti from 'canvas-confetti';
 import { isSupabaseConfigured, initSupabaseFromServer, supabase } from './utils/supabaseClient';
 import {
   supabaseFetchPlayers,
+  supabaseFetchAllPlayers,
   supabaseFetchPlayersByUser,
   supabaseFetchMatches,
   supabaseFetchPosts,
@@ -92,7 +95,10 @@ export default function App() {
     return t ? { ...t, leagueName: normalizeCanonicalLeagueName(t.leagueName) || t.leagueName || 'Champions League' } : t;
   });
   const [players, setPlayers] = useState<Player[]>(initial.players || INITIAL_PLAYERS);
-  const [matches, setMatches] = useState<Match[]>(initial.matches || INITIAL_MATCHES);
+  const [allLeaguePlayers, setAllLeaguePlayers] = useState<Player[]>([]);
+  const [matches, setMatches] = useState<Match[]>(() =>
+    autoStartDueMatches(initial.matches || INITIAL_MATCHES).updated
+  );
   const [posts, setPosts] = useState<Post[]>(() =>
     sortPostsNewestFirst(initial.posts || INITIAL_POSTS)
   );
@@ -175,6 +181,8 @@ export default function App() {
   allTeamsRef.current = allTeams;
   const playersRef = useRef<Player[]>(players);
   playersRef.current = players;
+  const matchesRef = useRef<Match[]>(matches);
+  matchesRef.current = matches;
   const standingsRef = useRef<StandingsRow[]>(standings);
   standingsRef.current = standings;
 
@@ -416,8 +424,11 @@ export default function App() {
 
       // 2. Refresh from Supabase if configured
       if (isSupabaseConfigured()) {
-        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations, myPlayerCards, cloudStandings] = await Promise.all([
+        const [cloudPlayers, cloudAllPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations, myPlayerCards, cloudStandings] = await Promise.all([
           supabaseFetchPlayers(team.id),
+          currentUser?.role === 'league_admin'
+            ? supabaseFetchAllPlayers()
+            : Promise.resolve(null as Player[] | null),
           supabaseFetchMatches(team.id),
           supabaseFetchPosts(team.id),
           supabaseFetchUsers(),
@@ -456,6 +467,7 @@ export default function App() {
           if (cur) setTeam(cur);
         }
         if (cloudPlayers && cloudPlayers.length > 0) setPlayers(cloudPlayers);
+        if (cloudAllPlayers) setAllLeaguePlayers(cloudAllPlayers);
         if (cloudMatches && cloudMatches.length > 0) setMatches(cloudMatches);
         if (cloudPosts && cloudPosts.length > 0) setPosts(cloudPosts);
         if (cloudUsers && cloudUsers.length > 0) {
@@ -549,8 +561,11 @@ export default function App() {
 
     const syncFromSupabase = async () => {
       try {
-        const [cloudPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations, myPlayerCards, cloudStandings] = await Promise.all([
+        const [cloudPlayers, cloudAllPlayers, cloudMatches, cloudPosts, cloudUsers, cloudTeams, cloudRequests, cloudInvitations, myPlayerCards, cloudStandings] = await Promise.all([
           supabaseFetchPlayers(team.id),
+          currentUser?.role === 'league_admin'
+            ? supabaseFetchAllPlayers()
+            : Promise.resolve(null as Player[] | null),
           supabaseFetchMatches(team.id),
           supabaseFetchPosts(team.id),
           supabaseFetchUsers(),
@@ -579,7 +594,7 @@ export default function App() {
           cloudStandings !== null &&
           cloudStandings.length === 0 &&
           standingsRef.current.length > 0 &&
-          ['owner', 'coach', 'league_admin'].includes(currentUserRef.current?.role || '')
+          canManageLeagueStandings(currentUserRef.current)
         ) {
           // One-time migration: push locally saved standings (e.g. from PC) up to Supabase so mobile/other devices receive them
           const byLg = new Map<string, StandingsRow[]>();
@@ -620,6 +635,9 @@ export default function App() {
         }
         if (cloudPlayers && cloudPlayers.length > 0) {
           setPlayers(cloudPlayers);
+        }
+        if (cloudAllPlayers) {
+          setAllLeaguePlayers(cloudAllPlayers);
         }
         if (cloudMatches && cloudMatches.length > 0) {
           setMatches(cloudMatches);
@@ -705,6 +723,11 @@ export default function App() {
       supabaseFetchPlayers(team.id).then((fresh) => {
         if (isMounted && fresh && fresh.length > 0) setPlayers(fresh);
       });
+      if (currentUserRef.current?.role === 'league_admin') {
+        supabaseFetchAllPlayers().then((allFresh) => {
+          if (isMounted && allFresh) setAllLeaguePlayers(allFresh);
+        });
+      }
     });
 
     const unsubMatches = subscribeToSupabaseTable('matches', () => {
@@ -894,6 +917,9 @@ export default function App() {
 
   const handleSetStandings: React.Dispatch<React.SetStateAction<StandingsRow[]>> = (action) => {
     setStandings((prev) => {
+      if (!canManageLeagueStandings(currentUserRef.current)) {
+        return prev;
+      }
       const next = typeof action === 'function' ? action(prev) : action;
 
       // Group rows by canonical league name
@@ -1001,6 +1027,7 @@ export default function App() {
       }
 
       if (data.players && data.players.length > 0) {
+        setAllLeaguePlayers(data.players);
         // Filter players specifically for the currently active team
         const currentSquad = data.players.filter((p: any) => !p.teamId || p.teamId === team.id);
         if (currentSquad.length > 0) {
@@ -1050,6 +1077,30 @@ export default function App() {
       clearInterval(timer);
     };
   }, [team.id, currentUser?.id]);
+
+  // Automatically start scheduled matches when their scheduled date & time arrives
+  useEffect(() => {
+    const checkDueMatches = () => {
+      const currentList = matchesRef.current;
+      if (!currentList || currentList.length === 0) return;
+      const { updated, changed } = autoStartDueMatches(currentList);
+      if (!changed) return;
+
+      const role = currentUserRef.current?.role;
+      if (role === 'owner' || role === 'admin' || role === 'coach') {
+        handleSetMatches(updated);
+      } else {
+        setMatches(updated);
+        if (team?.id) {
+          saveMatchesForTeam(team.id, updated);
+        }
+      }
+    };
+
+    checkDueMatches();
+    const intervalId = setInterval(checkDueMatches, 5000);
+    return () => clearInterval(intervalId);
+  }, [matches, team?.id]);
 
   // Clean light theme
   useEffect(() => {
@@ -1947,9 +1998,11 @@ export default function App() {
             {(activeTab === 'standings' || activeTab === 'tables') && (
               <StandingsAndScorers
                 standings={standings}
-                setStandings={handleSetStandings}
+                setStandings={canManageLeagueStandings(currentUser) ? handleSetStandings : undefined}
                 players={players}
+                allLeaguePlayers={allLeaguePlayers}
                 team={team}
+                allTeams={allTeams}
                 setTeam={handleSetTeam}
                 currentUser={currentUser}
                 language={language}
@@ -2044,7 +2097,7 @@ export default function App() {
                 setPlayers={handleSetPlayers}
                 matches={matches}
                 standings={standings}
-                setStandings={handleSetStandings}
+                setStandings={canManageLeagueStandings(currentUser) ? handleSetStandings : undefined}
                 currentUser={currentUser}
                 setCurrentUser={(u) => {
                   setCurrentUser(u);

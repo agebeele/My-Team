@@ -25,7 +25,7 @@ import {
   Check,
   Zap,
 } from 'lucide-react';
-import { Match, MatchEvent, MatchEventType, MatchModality, TeamInfo, Player, AppUser, Language, DEFAULT_FACEBOOK_AVATAR } from '../types';
+import { Match, MatchEvent, MatchEventType, MatchModality, TeamInfo, Player, AppUser, Language, DEFAULT_FACEBOOK_AVATAR, getScheduledMatchStartMs } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage } from '../utils/imageDownloader';
 import { getModalityInfo, ALL_MODALITIES } from '../utils/modalityHelper';
@@ -99,26 +99,48 @@ export const LiveMatchMode: React.FC<LiveMatchModeProps> = ({
     return currentMins >= halfMinutes ? '2T' : '1T';
   });
 
-  // Synchronize clock & period whenever currentMatch id or modality changes
+  // Synchronize clock & period whenever currentMatch id, modality, status, or start time changes
+  // Also auto-start a scheduled match immediately if its scheduled kickoff time has arrived
   useEffect(() => {
-    if (currentMatch) {
-      if (currentMatch.status === 'finished') {
-        setPeriod('FT');
-        setTimerSeconds(totalSeconds);
-        setIsTimerRunning(false);
-      } else if (currentMatch.status === 'live') {
-        const initSec = calculateInitialSeconds();
+    if (!currentMatch) return;
+
+    if (currentMatch.status === 'finished') {
+      setPeriod('FT');
+      setTimerSeconds(totalSeconds);
+      setIsTimerRunning(false);
+    } else if (currentMatch.status === 'live') {
+      const initSec = calculateInitialSeconds();
+      setTimerSeconds(initSec);
+      setIsTimerRunning(true);
+      const mins = Math.floor(initSec / 60);
+      setPeriod(mins >= halfMinutes ? '2T' : '1T');
+    } else {
+      const startMs = getScheduledMatchStartMs(currentMatch);
+      if (startMs !== null && Date.now() >= startMs) {
+        const initSec = Math.max(0, Math.min(Math.floor((Date.now() - startMs) / 1000), totalSeconds + 10 * 60));
         setTimerSeconds(initSec);
         setIsTimerRunning(true);
-        const mins = Math.floor(initSec / 60);
-        setPeriod(mins >= halfMinutes ? '2T' : '1T');
+        setPeriod(Math.floor(initSec / 60) >= halfMinutes ? '2T' : '1T');
+        setMatches((prev) =>
+          prev.map((m) =>
+            m.id === currentMatch.id && m.status === 'scheduled'
+              ? {
+                  ...m,
+                  status: 'live',
+                  matchStartTimestamp: startMs,
+                  scoreUs: m.scoreUs ?? 0,
+                  scoreThem: m.scoreThem ?? 0,
+                }
+              : m
+          )
+        );
       } else {
         setTimerSeconds(0);
         setPeriod('1T');
         setIsTimerRunning(false);
       }
     }
-  }, [currentMatch?.id, currentMatch?.modality, currentMatch?.status]);
+  }, [currentMatch?.id, currentMatch?.modality, currentMatch?.status, currentMatch?.matchStartTimestamp]);
 
   // Keep timer ticking every second
   useEffect(() => {

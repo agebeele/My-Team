@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS players (
 -- Migraciones idempotentes para multi-equipo en players y app_users
 ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES app_users(id) ON DELETE SET NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_players_team_user ON players (team_id, user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_players_pichichi ON players (goals DESC, assists DESC, team_id);
 
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_ids JSONB DEFAULT '[]'::JSONB;
 ALTER TABLE app_users ADD COLUMN IF NOT EXISTS team_join_status TEXT DEFAULT 'none';
@@ -125,6 +126,7 @@ ALTER TABLE matches ADD COLUMN IF NOT EXISTS mvp_photo_url TEXT;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS created_at_timestamp BIGINT;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS match_start_timestamp BIGINT;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS finished_at_timestamp BIGINT;
+CREATE INDEX IF NOT EXISTS idx_matches_status_start ON matches (status, match_start_timestamp);
 
 -- 5. TABLA DE PUBLICACIONES / MURO (POSTS)
 CREATE TABLE IF NOT EXISTS posts (
@@ -292,6 +294,18 @@ BEGIN
   END;
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE posts;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN others THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE players;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN others THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE matches;
   EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;

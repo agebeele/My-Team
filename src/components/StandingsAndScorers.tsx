@@ -19,7 +19,7 @@ import {
   Share2,
   Trash2,
 } from 'lucide-react';
-import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory, STANDARD_LEAGUES, DEFAULT_FACEBOOK_AVATAR, normalizeCanonicalLeagueName } from '../types';
+import { StandingsRow, Player, TeamInfo, AppUser, Language, ClubStory, STANDARD_LEAGUES, DEFAULT_FACEBOOK_AVATAR, normalizeCanonicalLeagueName, canManageLeagueStandings } from '../types';
 import { getT } from '../utils/translations';
 import { downloadElementAsImage, captureElementAsDataUrl } from '../utils/imageDownloader';
 import { TableAiScannerModal } from './TableAiScannerModal';
@@ -31,7 +31,9 @@ interface StandingsAndScorersProps {
   standings: StandingsRow[];
   setStandings?: React.Dispatch<React.SetStateAction<StandingsRow[]>>;
   players: Player[];
+  allLeaguePlayers?: Player[];
   team: TeamInfo;
+  allTeams?: TeamInfo[];
   setTeam?: React.Dispatch<React.SetStateAction<TeamInfo>>;
   currentUser: AppUser;
   language: Language;
@@ -44,7 +46,9 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   standings,
   setStandings,
   players,
+  allLeaguePlayers = [],
   team,
+  allTeams = [],
   setTeam,
   currentUser,
   language,
@@ -60,6 +64,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   const [editRows, setEditRows] = useState<StandingsRow[]>([]);
 
   const isLeagueAdmin = currentUser.role === 'league_admin';
+  const canEditLeagueTable = canManageLeagueStandings(currentUser);
   const defaultLeague = normalizeCanonicalLeagueName(team.leagueName) || 'Champions League';
   const [adminSelectedLeague, setAdminSelectedLeague] = useState<string>(defaultLeague);
 
@@ -99,6 +104,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   }, [standings, activeLeague, team]);
 
   const handleStartDirectEdit = () => {
+    if (!canEditLeagueTable) return;
     setEditRows(JSON.parse(JSON.stringify(currentLeagueStandings)));
     setIsDirectEditing(true);
   };
@@ -108,6 +114,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
   };
 
   const handleSaveDirectEdit = () => {
+    if (!canEditLeagueTable) return;
     if (setStandings) {
       const sortedTagged = [...editRows]
         .sort(
@@ -292,10 +299,46 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
     }
   };
 
+  const teamById = useMemo(() => {
+    const map = new Map<string, TeamInfo>();
+    if (team?.id) map.set(team.id, team);
+    allTeams.forEach((tItem) => {
+      if (tItem?.id) map.set(tItem.id, tItem);
+    });
+    return map;
+  }, [allTeams, team]);
+
+  // For League Admin: show Pichichi scorers across ALL clubs belonging to the selected league
+  const scorersPool = useMemo(() => {
+    if (!isLeagueAdmin) return players;
+
+    const sourcePlayers = allLeaguePlayers.length > 0 ? allLeaguePlayers : players;
+    const normActive = activeLeague.trim().toLowerCase();
+    const leagueTeamIds = new Set(
+      allTeams
+        .filter((tItem) => {
+          const tLg = normalizeCanonicalLeagueName(tItem.leagueName || '').trim().toLowerCase();
+          return tLg === normActive;
+        })
+        .map((tItem) => tItem.id)
+    );
+
+    if (leagueTeamIds.size === 0) {
+      return [];
+    }
+
+    return sourcePlayers.filter((p) => p.teamId && leagueTeamIds.has(p.teamId));
+  }, [isLeagueAdmin, players, allLeaguePlayers, allTeams, activeLeague]);
+
   // Sort players by goals descending, then assists
-  const sortedScorers = [...players]
-    .sort((a, b) => b.goals - a.goals || b.assists - a.assists)
-    .filter((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const sortedScorers = [...scorersPool]
+    .sort((a, b) => b.goals - a.goals || b.assists - a.assists || (a.matches || 0) - (b.matches || 0))
+    .filter((p) => {
+      const q = searchTerm.toLowerCase().trim();
+      if (!q) return true;
+      const clubName = p.teamId ? (teamById.get(p.teamId)?.name || '').toLowerCase() : '';
+      return p.name.toLowerCase().includes(q) || clubName.includes(q);
+    });
 
   return (
     <div className="space-y-6">
@@ -399,11 +442,17 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
 
               const medalEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
 
+              const playerClub = scorer.teamId ? teamById.get(scorer.teamId) : undefined;
+
               return (
                 <div
                   key={scorer.id}
-                  onClick={() => onViewPlayerProfile(scorer.id)}
-                  className={`relative p-5 rounded-2xl border transition-all cursor-pointer hover:scale-[1.01] flex items-center gap-4 shadow-xs ${rankColor}`}
+                  onClick={() => {
+                    if (!isLeagueAdmin) onViewPlayerProfile(scorer.id);
+                  }}
+                  className={`relative p-5 rounded-2xl border transition-all flex items-center gap-4 shadow-xs ${
+                    !isLeagueAdmin ? 'cursor-pointer hover:scale-[1.01]' : ''
+                  } ${rankColor}`}
                 >
                   <div className="relative">
                     <img
@@ -422,8 +471,9 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                     <h4 className="text-sm font-bold text-[#050505] dark:text-white truncate">
                       {scorer.name}
                     </h4>
-                    <p className="text-xs text-[#65676B] dark:text-gray-400 font-medium">
+                    <p className="text-xs text-[#65676B] dark:text-gray-400 font-medium truncate">
                       {scorer.position} • #{scorer.number}
+                      {isLeagueAdmin && playerClub ? ` • ${playerClub.shortName || playerClub.name}` : ''}
                     </p>
                   </div>
 
@@ -472,58 +522,88 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#CED0D4]/60 dark:divide-white/5 text-[#050505] dark:text-gray-300">
-                  {sortedScorers.map((player, index) => (
-                    <tr
-                      key={player.id}
-                      onClick={() => onViewPlayerProfile(player.id)}
-                      className="hover:bg-[#F0F2F5]/80 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 text-center font-bold font-mono">
-                        {index === 0 ? (
-                          <span className="text-amber-500 dark:text-amber-400 font-black">1</span>
-                        ) : index === 1 ? (
-                          <span className="text-[#65676B] dark:text-gray-300 font-bold">2</span>
-                        ) : index === 2 ? (
-                          <span className="text-amber-700 dark:text-amber-600 font-bold">3</span>
-                        ) : (
-                          <span>{index + 1}</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <img
-                            src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
-                            alt={player.name}
-                            referrerPolicy="no-referrer"
-                            className="w-8 h-8 rounded-full object-cover shrink-0"
-                          />
-                          <div>
-                            <span className="font-bold text-[#050505] dark:text-white block">
-                              {player.name}
-                            </span>
-                            <span className="text-[10px] text-[#65676B] dark:text-gray-400">
-                              {player.number ? `#${player.number} ` : ''}{player.nickname ? `"${player.nickname}"` : ''}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-center font-semibold text-[#65676B] dark:text-gray-400">
-                        {player.position}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono font-black text-[#1877F2] dark:text-amber-400 text-sm">
-                        {player.goals}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono text-[#050505] dark:text-gray-300 font-semibold">
-                        {player.assists}
-                      </td>
-                      <td className="py-3 px-4 text-center font-mono text-[#65676B] dark:text-gray-400 font-semibold">
-                        {player.matches}
-                      </td>
-                      <td className="py-3 px-4 text-center font-bold text-amber-500 dark:text-amber-400">
-                        {player.mvpHistory?.length || 0} ★
+                  {sortedScorers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-10 px-4 text-center text-xs text-[#65676B] dark:text-gray-400">
+                        {isLeagueAdmin
+                          ? `Aún no hay jugadores registrados en clubes de ${activeLeague}.`
+                          : 'No se encontraron jugadores para mostrar.'}
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    sortedScorers.map((player, index) => {
+                      const playerClub = player.teamId ? teamById.get(player.teamId) : undefined;
+                      return (
+                        <tr
+                          key={player.id}
+                          onClick={() => {
+                            if (!isLeagueAdmin) onViewPlayerProfile(player.id);
+                          }}
+                          className={`hover:bg-[#F0F2F5]/80 dark:hover:bg-white/5 transition-colors ${
+                            !isLeagueAdmin ? 'cursor-pointer' : ''
+                          }`}
+                        >
+                          <td className="py-3 px-4 text-center font-bold font-mono">
+                            {index === 0 ? (
+                              <span className="text-amber-500 dark:text-amber-400 font-black">1</span>
+                            ) : index === 1 ? (
+                              <span className="text-[#65676B] dark:text-gray-300 font-bold">2</span>
+                            ) : index === 2 ? (
+                              <span className="text-amber-700 dark:text-amber-600 font-bold">3</span>
+                            ) : (
+                              <span>{index + 1}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <img
+                                src={player.avatarUrl || DEFAULT_FACEBOOK_AVATAR}
+                                alt={player.name}
+                                referrerPolicy="no-referrer"
+                                className="w-8 h-8 rounded-full object-cover shrink-0"
+                              />
+                              <div>
+                                <span className="font-bold text-[#050505] dark:text-white block">
+                                  {player.name}
+                                </span>
+                                <span className="text-[10px] text-[#65676B] dark:text-gray-400 inline-flex items-center gap-1 flex-wrap">
+                                  {player.number ? `#${player.number}` : ''}
+                                  {player.nickname ? ` "${player.nickname}"` : ''}
+                                  {isLeagueAdmin && playerClub && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#E7F3FF] dark:bg-white/10 text-[#1877F2] dark:text-blue-300 font-bold">
+                                      {playerClub.logoUrl && (
+                                        <img
+                                          src={playerClub.logoUrl}
+                                          alt={playerClub.name}
+                                          className="w-3 h-3 rounded-full object-cover"
+                                        />
+                                      )}
+                                      {playerClub.name}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center font-semibold text-[#65676B] dark:text-gray-400">
+                            {player.position}
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono font-black text-[#1877F2] dark:text-amber-400 text-sm">
+                            {player.goals}
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-[#050505] dark:text-gray-300 font-semibold">
+                            {player.assists}
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-[#65676B] dark:text-gray-400 font-semibold">
+                            {player.matches}
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-amber-500 dark:text-amber-400">
+                            {player.mvpHistory?.length || 0} ★
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -576,7 +656,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
                 </>
               ) : (
                 <>
-                  {(currentUser.role === 'owner' || currentUser.role === 'coach' || currentUser.role === 'league_admin') && setStandings && (
+                  {canEditLeagueTable && setStandings && (
                     <>
                       <button
                         type="button"
@@ -864,7 +944,7 @@ export const StandingsAndScorers: React.FC<StandingsAndScorersProps> = ({
       )}
 
       {/* AI League Table Scanner Modal */}
-      {setStandings && (
+      {canEditLeagueTable && setStandings && (
         <TableAiScannerModal
           isOpen={isAiScanModalOpen}
           onClose={() => setIsAiScanModalOpen(false)}

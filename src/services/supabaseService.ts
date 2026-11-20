@@ -400,6 +400,29 @@ export const supabaseFetchPlayers = async (teamId: string): Promise<Player[] | n
   }
 };
 
+export const supabaseFetchAllPlayers = async (): Promise<Player[] | null> => {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from('players')
+      .select('*')
+      .order('goals', { ascending: false })
+      .order('assists', { ascending: false });
+
+    if (error) {
+      console.warn('[Supabase] fetchAllPlayers error:', error.message);
+      return null;
+    }
+    if (!data) return [];
+    return data.map(mapPlayerFromDb);
+  } catch (err: any) {
+    console.warn('[Supabase] fetchAllPlayers exception:', err?.message || err);
+    return null;
+  }
+};
+
 export const supabaseFetchPlayersByUser = async (userId: string): Promise<Player[]> => {
   const client = getSupabaseClient();
   if (!client || !userId) return [];
