@@ -11,6 +11,7 @@ import {
   TeamJoinRequest,
   TeamInvitation,
   normalizeCanonicalLeagueName,
+  sortPostsNewestFirst,
 } from './types';
 import {
   INITIAL_TEAM,
@@ -92,7 +93,9 @@ export default function App() {
   });
   const [players, setPlayers] = useState<Player[]>(initial.players || INITIAL_PLAYERS);
   const [matches, setMatches] = useState<Match[]>(initial.matches || INITIAL_MATCHES);
-  const [posts, setPosts] = useState<Post[]>(initial.posts || INITIAL_POSTS);
+  const [posts, setPosts] = useState<Post[]>(() =>
+    sortPostsNewestFirst(initial.posts || INITIAL_POSTS)
+  );
   const [standings, setStandings] = useState<StandingsRow[]>(initial.standings || INITIAL_STANDINGS);
   const [users, setUsers] = useState<AppUser[]>(initial.users || INITIAL_USERS);
   const [allTeams, setAllTeams] = useState<TeamInfo[]>(() =>
@@ -815,7 +818,8 @@ export default function App() {
   // Wrapper mutators that sync changes to SQLite backend and Supabase in real-time
   const handleSetPosts: React.Dispatch<React.SetStateAction<Post[]>> = (action) => {
     setPosts((prev) => {
-      const next = typeof action === 'function' ? action(prev) : action;
+      const rawNext = typeof action === 'function' ? action(prev) : action;
+      const next = sortPostsNewestFirst(rawNext);
       try {
         localStorage.setItem('teamgol_posts_data', JSON.stringify(next));
       } catch {}

@@ -246,6 +246,7 @@ export interface Post {
   mediaType?: 'image' | 'video';
   status?: 'approved' | 'pending' | 'rejected';
   createdAt: string;
+  createdAtIso?: string;
   reactions: {
     likes: number;
     fire: number;
@@ -255,6 +256,33 @@ export interface Post {
   };
   comments: PostComment[];
 }
+
+export const getPostTimestampMs = (post: Pick<Post, 'id' | 'createdAt' | 'createdAtIso'>): number => {
+  const candidates = [post.createdAt, post.createdAtIso];
+  for (const val of candidates) {
+    if (!val) continue;
+    const str = String(val).trim();
+    if (/^\d{10,15}$/.test(str)) {
+      const num = Number(str);
+      if (Number.isFinite(num) && num > 0) return num;
+    }
+    const parsed = Date.parse(str);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  // Fallback to timestamp embedded in generated id (e.g. post_1763598450123)
+  const idMatch = String(post.id || '').match(/(\d{12,15})/);
+  if (idMatch) {
+    const num = Number(idMatch[1]);
+    if (Number.isFinite(num) && num > 0) return num;
+  }
+
+  return 0;
+};
+
+export const sortPostsNewestFirst = (posts: Post[]): Post[] => {
+  return [...posts].sort((a, b) => getPostTimestampMs(b) - getPostTimestampMs(a));
+};
 
 export interface AppUser {
   id: string;

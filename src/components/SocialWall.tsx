@@ -21,7 +21,7 @@ import {
   X,
   Megaphone,
 } from 'lucide-react';
-import { Post, AppUser, Language, TeamInfo, DEFAULT_FACEBOOK_AVATAR, normalizeCanonicalLeagueName } from '../types';
+import { Post, AppUser, Language, TeamInfo, DEFAULT_FACEBOOK_AVATAR, normalizeCanonicalLeagueName, sortPostsNewestFirst } from '../types';
 import { getT } from '../utils/translations';
 import { isSupabaseConfigured } from '../utils/supabaseClient';
 import { supabaseUpsertPost, supabaseDeletePost } from '../utils/supabaseService';
@@ -125,9 +125,10 @@ export const SocialWall: React.FC<SocialWallProps> = ({
     return false;
   });
 
-  const pendingPosts = relevantPosts.filter((p) => p.status === 'pending');
-  const approvedPosts = relevantPosts.filter((p) => p.status === 'approved' || !p.status);
-  const myPendingPosts = relevantPosts.filter(
+  const sortedRelevantPosts = sortPostsNewestFirst(relevantPosts);
+  const pendingPosts = sortedRelevantPosts.filter((p) => p.status === 'pending');
+  const approvedPosts = sortedRelevantPosts.filter((p) => p.status === 'approved' || !p.status);
+  const myPendingPosts = sortedRelevantPosts.filter(
     (p) => p.authorId === currentUser.id && p.status === 'pending'
   );
 
@@ -189,6 +190,7 @@ export const SocialWall: React.FC<SocialWallProps> = ({
 
     const selectedLeague = currentUser.role === 'league_admin' ? targetLeague : (team?.leagueName || 'Champions League');
 
+    const nowIso = getCurrentTimestampIso();
     const post: Post = {
       id: `post_${Date.now()}`,
       teamId: isLeagueOfficialPost ? undefined : (team?.id || 'team_01'),
@@ -204,7 +206,8 @@ export const SocialWall: React.FC<SocialWallProps> = ({
       imageUrl: attachedMediaUrl || undefined,
       mediaType: attachedMediaType || undefined,
       status: postStatus,
-      createdAt: getCurrentTimestampIso(),
+      createdAt: nowIso,
+      createdAtIso: nowIso,
       reactions: {
         likes: 0,
         fire: 0,

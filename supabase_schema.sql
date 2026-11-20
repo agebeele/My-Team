@@ -156,6 +156,18 @@ ALTER TABLE posts ADD COLUMN IF NOT EXISTS comments JSONB DEFAULT '[]'::JSONB;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS created_at_iso TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS inserted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
+-- Backfill de created_at_iso en publicaciones existentes y creación de índice más reciente -> más antigua
+UPDATE posts
+SET created_at_iso = CASE
+  WHEN created_at ~ '^\d{4}-\d{2}-\d{2}T' THEN created_at::TIMESTAMPTZ
+  WHEN id ~ '(\d{13})' THEN to_timestamp((substring(id from '(\d{13})'))::BIGINT / 1000.0)
+  ELSE COALESCE(inserted_at, NOW())
+END
+WHERE created_at_iso IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_posts_newest_first
+  ON posts (created_at_iso DESC NULLS LAST, inserted_at DESC NULLS LAST);
+
 -- 6. TABLA DE CLASIFICACIÓN / TABLAS DE LIGA (STANDINGS)
 CREATE TABLE IF NOT EXISTS standings (
   id TEXT PRIMARY KEY,
@@ -274,6 +286,12 @@ BEGIN
   END;
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE standings;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN others THEN NULL;
+  END;
+  BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE posts;
   EXCEPTION
     WHEN duplicate_object THEN NULL;
     WHEN others THEN NULL;

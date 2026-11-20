@@ -1,5 +1,17 @@
 import { getSupabaseClient, isSupabaseConfigured } from '../utils/supabaseClient';
-import { Player, Match, Post, TeamInfo, StandingsRow, AppUser, TeamJoinRequest, TeamInvitation, normalizeCanonicalLeagueName } from '../types';
+import {
+  Player,
+  Match,
+  Post,
+  TeamInfo,
+  StandingsRow,
+  AppUser,
+  TeamJoinRequest,
+  TeamInvitation,
+  normalizeCanonicalLeagueName,
+  getPostTimestampMs,
+  sortPostsNewestFirst,
+} from '../types';
 
 // ==========================================
 // 1. CAMELCASE <-> SNAKE_CASE MAPPERS
@@ -135,57 +147,70 @@ export const mapMatchFromDb = (row: any): Match => ({
   finishedAtTimestamp: row.finished_at_timestamp ? Number(row.finished_at_timestamp) : undefined,
 });
 
-export const mapPostToDb = (post: Post) => ({
-  id: post.id,
-  team_id: post.teamId || null,
-  league_name: post.leagueName || 'Champions League',
-  is_league_official: post.isLeagueOfficial ?? false,
-  author_id: post.authorId,
-  author_name: post.authorName,
-  author_avatar: post.authorAvatar || null,
-  author_role: post.authorRole || 'player',
-  category: post.category,
-  title: post.title,
-  content: post.content,
-  image_url: post.imageUrl || null,
-  media_type: post.mediaType || null,
-  status: post.status || 'approved',
-  created_at: post.createdAt || 'Justo ahora',
-  reactions: post.reactions || {
-    likes: 0,
-    fire: 0,
-    clap: 0,
-    goal: 0,
-    userReactions: {},
-  },
-  comments: post.comments || [],
-});
+export const mapPostToDb = (post: Post) => {
+  const ts = getPostTimestampMs(post);
+  const resolvedIso = post.createdAtIso || (ts > 0 ? new Date(ts).toISOString() : new Date().toISOString());
+  return {
+    id: post.id,
+    team_id: post.teamId || null,
+    league_name: post.leagueName || 'Champions League',
+    is_league_official: post.isLeagueOfficial ?? false,
+    author_id: post.authorId,
+    author_name: post.authorName,
+    author_avatar: post.authorAvatar || null,
+    author_role: post.authorRole || 'player',
+    category: post.category,
+    title: post.title,
+    content: post.content,
+    image_url: post.imageUrl || null,
+    media_type: post.mediaType || null,
+    status: post.status || 'approved',
+    created_at: post.createdAt || resolvedIso,
+    created_at_iso: resolvedIso,
+    reactions: post.reactions || {
+      likes: 0,
+      fire: 0,
+      clap: 0,
+      goal: 0,
+      userReactions: {},
+    },
+    comments: post.comments || [],
+  };
+};
 
-export const mapPostFromDb = (row: any): Post => ({
-  id: row.id,
-  teamId: row.team_id || undefined,
-  leagueName: row.league_name || 'Champions League',
-  isLeagueOfficial: Boolean(row.is_league_official),
-  authorId: row.author_id,
-  authorName: row.author_name,
-  authorAvatar: row.author_avatar || '',
-  authorRole: row.author_role || 'player',
-  category: row.category,
-  title: row.title,
-  content: row.content,
-  imageUrl: row.image_url || undefined,
-  mediaType: row.media_type || undefined,
-  status: (row.status || 'approved') as Post['status'],
-  createdAt: row.created_at || 'Justo ahora',
-  reactions: row.reactions || {
-    likes: 0,
-    fire: 0,
-    clap: 0,
-    goal: 0,
-    userReactions: {},
-  },
-  comments: Array.isArray(row.comments) ? row.comments : [],
-});
+export const mapPostFromDb = (row: any): Post => {
+  const isoFallback = row.created_at_iso || row.inserted_at || undefined;
+  const resolvedCreatedAt =
+    row.created_at && row.created_at !== 'Justo ahora'
+      ? row.created_at
+      : isoFallback || 'Justo ahora';
+  return {
+    id: row.id,
+    teamId: row.team_id || undefined,
+    leagueName: row.league_name || 'Champions League',
+    isLeagueOfficial: Boolean(row.is_league_official),
+    authorId: row.author_id,
+    authorName: row.author_name,
+    authorAvatar: row.author_avatar || '',
+    authorRole: row.author_role || 'player',
+    category: row.category,
+    title: row.title,
+    content: row.content,
+    imageUrl: row.image_url || undefined,
+    mediaType: row.media_type || undefined,
+    status: (row.status || 'approved') as Post['status'],
+    createdAt: resolvedCreatedAt,
+    createdAtIso: isoFallback,
+    reactions: row.reactions || {
+      likes: 0,
+      fire: 0,
+      clap: 0,
+      goal: 0,
+      userReactions: {},
+    },
+    comments: Array.isArray(row.comments) ? row.comments : [],
+  };
+};
 
 export const mapUserToDb = (user: AppUser) => {
   const mergedTeamIds = Array.from(
@@ -499,7 +524,11 @@ export const supabaseFetchPosts = async (teamId?: string): Promise<Post[] | null
   if (!client) return null;
 
   try {
-    let query = client.from('posts').select('*');
+    let query = client
+      .from('posts')
+      .select('*')
+      .order('created_at_iso', { ascending: false })
+      .order('inserted_at', { ascending: false });
     if (teamId) {
       query = query.or(`team_id.eq.${teamId},is_league_official.eq.true`);
     }
@@ -511,7 +540,7 @@ export const supabaseFetchPosts = async (teamId?: string): Promise<Post[] | null
     }
     if (!data) return [];
     const mapped = data.map(mapPostFromDb);
-    return mapped.reverse();
+    return sortPostsNewestFirst(mapped);
   } catch (err: any) {
     console.warn('[Supabase] fetchPosts exception:', err?.message || err);
     return null;
